@@ -413,7 +413,7 @@ const component = {
           } 
         }, 
         {
-          init: { childPropToInitInConstructor: $ => $.meta.idx }  // questa forse è vecchia..vedere altre cose
+          init: { childPropToInitInConstructor: $ => $.meta.idx }
         }, 
         // todo: qui potrebbe starci una connect del signal con autopropagate, ovvero poter indicare che propago un certo segnale nel mio parent!
       )
@@ -574,6 +574,7 @@ const debug = { log: (...args)=> DEBUG_ENABLED && console.log(...args) }
 const pass = undefined
 const none = ()=>undefined
 
+
 // utils
 const copyObjPropsInplace = (copy_from, copy_into, props) => {
   Object.keys(copy_from).forEach(p=>{
@@ -601,6 +602,105 @@ const toInlineStyle = /** @param {CSSStyleDeclaration | ()=>CSSStyleDeclaration}
 }
 
 const isFunction = (what)=>typeof what === "function"
+
+
+// Framework
+
+class Property{
+  constructor(valueFunc, onGet, onSet){
+    this.isFunc = isFunction(valueFunc)
+
+    this._valueFunc = valueFunc
+    this._onGet = onGet
+    this._onSet = onSet
+
+    this._latestResolvedValue = undefined
+
+    try{ this._latestResolvedValue = this.isFunc ? this._valueFunc() : this._valueFunc } catch {} // with this trick (and setting on markAsChanged and set value) we can compare new and old!
+  }
+
+  get value(){
+    this._onGet()
+    return this.isFunc ? this._valueFunc() : this._valueFunc
+  }
+  set value(v){
+    this.isFunc = isFunction(v)
+    this._valueFunc = v
+    let _v = this.isFunc ? this._valueFunc() : this._valueFunc
+    this._onSet(_v, v, this)
+    this._latestResolvedValue = _v // in this way during the onSet we have the latest val in "_latestResolvedValue" fr caching strategy
+  }
+
+  markAsChanged(){
+    debug.log("marked as changed!", this)
+    let _v = this.isFunc ? this._valueFunc() : this._valueFunc
+    this._onSet(_v, v, this)
+    this._latestResolvedValue = _v
+  }
+}
+
+// signalHandler = {
+//   singal1: {
+//     handlers = [ {who:..., handler:...} ],
+//     emit = (...args)=>this.handlers.forEach(h=>h.handler(...args))
+//   }
+// }
+class Signal {
+  constructor(name, definition){
+    this.name = name;
+    this.definition = definition;
+    this.handlers = []
+  }
+
+  emit(...args){
+    this.handlers.forEach(h=>h.handler(...args))
+  }
+
+  hasHandler(who){
+    return this.handlers.find(h=>h.who === who) !== undefined
+  }
+  addHandler(who, handler){
+    if(!this.hasHandler(who)){
+      this.handlers.push({who: who, handler: handler})
+    }
+  }
+  removeHandler(who){
+    this.handlers = this.handlers.filter(h=>h.who !== who)
+  }
+
+  // proxy dei signal esposto agli user, che possono fare solo $.this.signalName.emit(...)
+  static getSignalProxy = (realSignal)=> ( {emit: (...args)=>realSignal.emit(...args)} )
+
+}
+
+class SignalSubSystem {
+  singals = {} // Map?? e uso un component dell'albero direttamente..così però rischio di perdere il "riferimento" in caso di dynamics..o meglio, va gestito bene..
+
+  toRegister = {}
+
+  addSignal(signal){
+
+  }
+  removeSignal(signal){
+
+  }
+
+  replaceSignal(oldSignal, newSignal){ // quando so che c'è una replace/update di un nodo..devo replecare per far in modo che le subscribe funzionino ancora
+
+  }
+
+  registerToSignal(signal, who){
+
+  }
+
+  sendSignal(signal, ...args) {
+    //mentre segnalo bisogona controllare che esiste ancora il sengale..potrebbe portare all'eleiminazione'..
+
+  }
+
+  _dispatchSignal(){}
+
+}
 
 
 //const Use = (component, redefinition, initialization_args=$=>({p1:1, p2:"bla"}), passed_props= $=>({prop1: $.this.prop1...}) )=>{ 
@@ -746,80 +846,6 @@ const getComponentType = (template)=>{
   // return [elementType, componentDef ?? definition] // per i template veri restituisco la definizione (aka la definizione del componente), mentre per gli UseComponent il template/classe passata
 }
 
-class Property{
-  constructor(valueFunc, onGet, onSet){
-    this.isFunc = isFunction(valueFunc)
-
-    this._valueFunc = valueFunc
-    this._onGet = onGet
-    this._onSet = onSet
-
-    this._latestResolvedValue = undefined
-
-    try{ this._latestResolvedValue = this.isFunc ? this._valueFunc() : this._valueFunc } catch {} // with this trick (and setting on markAsChanged and set value) we can compare new and old!
-  }
-
-  get value(){
-    this._onGet()
-    return this.isFunc ? this._valueFunc() : this._valueFunc
-  }
-  set value(v){
-    this.isFunc = isFunction(v)
-    this._valueFunc = v
-    let _v = this.isFunc ? this._valueFunc() : this._valueFunc
-    this._onSet(_v, v, this)
-    this._latestResolvedValue = _v // in this way during the onSet we have the latest val in "_latestResolvedValue" fr caching strategy
-  }
-
-  markAsChanged(){
-    debug.log("marked as changed!", this)
-    let _v = this.isFunc ? this._valueFunc() : this._valueFunc
-    this._onSet(_v, v, this)
-    this._latestResolvedValue = _v
-  }
-}
-
-
-
-const RenderApp = (html_root, definition)=>{
-
-  let component_tree_root = new ComponentsTreeRoot(html_root, definition)
-  component_tree_root.renderize()
-
-  return component_tree_root
-
-}
-
-
-class SignalSubSystem {
-  singals = {} // Map?? e uso un component dell'albero direttamente..così però rischio di perdere il "riferimento" in caso di dynamics..o meglio, va gestito bene..
-
-  toRegister = {}
-
-  addSignal(signal){
-
-  }
-  removeSignal(signal){
-
-  }
-
-  replaceSignal(oldSignal, newSignal){ // quando so che c'è una replace/update di un nodo..devo replecare per far in modo che le subscribe funzionino ancora
-
-  }
-
-  registerToSignal(signal, who){
-
-  }
-
-  sendSignal(signal, ...args) {
-    //mentre segnalo bisogona controllare che esiste ancora il sengale..potrebbe portare all'eleiminazione'..
-
-  }
-
-  _dispatchSignal(){}
-
-}
-
 const analizeDepsStatically = (f)=>{
 
   // const f = $ => $.this.title + $.parent.width + $.le.navbar.height
@@ -843,7 +869,6 @@ class ComponentProxy_ {
     Object.assign(this, obj)
   }
 }
-
 
 // let deps_stack = [];
 const ComponentProxy = (context, lvl=0)=>{
@@ -875,6 +900,7 @@ const ComponentProxy = (context, lvl=0)=>{
 
         let prop_or_value_target = target[prop];
         if (prop_or_value_target instanceof Property){
+          // todo, intercept and setup dependency again
           prop_or_value_target.value = value
           return true
         }
@@ -892,6 +918,17 @@ class ComponentsContainer {
       }
     })
   }
+}
+
+
+
+const RenderApp = (html_root, definition)=>{
+
+  let component_tree_root = new ComponentsTreeRoot(html_root, definition)
+  component_tree_root.renderize()
+
+  return component_tree_root
+
 }
 
 
@@ -950,41 +987,6 @@ class ComponentsTreeRoot {
   }
 
 }
-
-// signalHandler = {
-//   singal1: {
-//     handlers = [ {who:..., handler:...} ],
-//     emit = (...args)=>this.handlers.forEach(h=>h.handler(...args))
-//   }
-// }
-class Signal {
-  constructor(name, definition){
-    this.name = name;
-    this.definition = definition;
-    this.handlers = []
-  }
-
-  emit(...args){
-    this.handlers.forEach(h=>h.handler(...args))
-  }
-
-  hasHandler(who){
-    return this.handlers.find(h=>h.who === who) !== undefined
-  }
-  addHandler(who, handler){
-    if(!this.hasHandler(who)){
-      this.handlers.push({who: who, handler: handler})
-    }
-  }
-  removeHandler(who){
-    this.handlers = this.handlers.filter(h=>h.who !== who)
-  }
-
-  // proxy dei signal esposto agli user, che possono fare solo $.this.signalName.emit(...)
-  static getSignalProxy = (realSignal)=> ( {emit: (...args)=>realSignal.emit(...args)} )
-
-}
-
 
 
 class Component {
@@ -1583,23 +1585,24 @@ class TextNodeComponent {
 
 class ConditionalComponent extends Component{
   visible = false
-
 }
 
 
 class SwitchConditionalComponent extends Component{
   visible = false
-
 }
 
 class IterableViewComponent{
   visible = false
-
 }
 
 
 
 
+
+
+// // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // //
+// TESTING
 
 
 // "testing" Mutation Observer to handle 2wayPropertyBinding
