@@ -1046,7 +1046,7 @@ class Component {
       this.$le[this.id] = this
       this.$ctx[this.id] = this
     }
-    else if (this._id !== undefined){
+    if (this._id !== undefined){
       this.$ctx[this._id] = this
     }
 
