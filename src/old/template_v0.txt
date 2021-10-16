@@ -1,0 +1,38 @@
+{ id: "app_root", div: { _: [
+
+    { h1: { __: "hello world!" } },
+
+    { div: { _: [
+      
+      { id: "inc_button", button: { 
+          
+          __: "Inc. Counter", 
+
+          props: { 
+            onclick: self=>self.v.counter += 1
+          },
+          _LE_: { 
+            vars: { counter: 0 },
+            binding: {
+              onclick: self => self.v.counter += 1
+            }
+          },
+          LE_customStuff: "bla bla"
+        }
+      }
+    ]}},
+    
+    MySubComponent()
+    
+  ],
+
+  props: { 
+    onclick: self=>console.log(self)
+  },
+  LE: { 
+    init: self=> {
+      console.log("helloooo")
+    }
+  }
+}
+}
