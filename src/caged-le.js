@@ -574,6 +574,35 @@ const debug = { log: (...args)=> DEBUG_ENABLED && console.log(...args) }
 const pass = undefined
 const none = ()=>undefined
 
+// utils
+const copyObjPropsInplace = (copy_from, copy_into, props) => {
+  Object.keys(copy_from).forEach(p=>{
+    if (props.includes(p)){
+      copy_into[p] = copy_from[p]
+    }
+  })
+}
+
+const toInlineStyle = /** @param {CSSStyleDeclaration | ()=>CSSStyleDeclaration} styles - use "::" on single style name to specify no name translation! */(styles)=>{ 
+  if((typeof styles) === "function"){styles=styles()}; 
+
+  let style = ""
+
+  Object.keys(styles).forEach(s=>{
+      if (s.startsWith("::")){
+          style += s+":"+styles[s]+";"
+      }
+      else {
+          style += s.split(/(?=[A-Z])/).join('-').toLowerCase()+":"+styles[s]+";"
+      }
+  })
+
+  return style
+}
+
+const isFunction = (what)=>typeof what === "function"
+
+
 //const Use = (component, redefinition, initialization_args=$=>({p1:1, p2:"bla"}), passed_props= $=>({prop1: $.this.prop1...}) )=>{ 
 const Use = (component, redefinitions=undefined, { strategy="override", init=undefined, passed_props=undefined }={})=>{ return new UseComponentDeclaration(component, redefinitions, { strategy:strategy, init:init, passed_props:passed_props } ) } // passed_props per puntare a una var autostored as passed_props e seguirne i changes, mentre init args per passare principalmente valori (magari anche props) ma che devi elaborare nel construct
 // todo: qui potrebbe starci una connect del signal con autopropagate, ovvero poter indicare che propago un certo segnale nel mio parent! subito dopo la redefinitions, in modo da avere una roba molto simile a quello che ha angular (Output) e chiudere il cerchio della mancanza di id..
@@ -716,33 +745,6 @@ const getComponentType = (template)=>{
   return elementType
   // return [elementType, componentDef ?? definition] // per i template veri restituisco la definizione (aka la definizione del componente), mentre per gli UseComponent il template/classe passata
 }
-
-const copyObjPropsInplace = (copy_from, copy_into, props) => {
-  Object.keys(copy_from).forEach(p=>{
-    if (props.includes(p)){
-      copy_into[p] = copy_from[p]
-    }
-  })
-}
-
-const toInlineStyle = /** @param {CSSStyleDeclaration | ()=>CSSStyleDeclaration} styles - use "::" on single style name to specify no name translation! */(styles)=>{ 
-  if((typeof styles) === "function"){styles=styles()}; 
-
-  let style = ""
-
-  Object.keys(styles).forEach(s=>{
-      if (s.startsWith("::")){
-          style += s+":"+styles[s]+";"
-      }
-      else {
-          style += s.split(/(?=[A-Z])/).join('-').toLowerCase()+":"+styles[s]+";"
-      }
-  })
-
-  return style
-}
-
-const isFunction = (what)=>typeof what === "function"
 
 class Property{
   constructor(valueFunc, onGet, onSet){
