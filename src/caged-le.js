@@ -765,14 +765,14 @@ class Property{
     this.isFunc = isFunction(v)
     this._valueFunc = v
     let _v = this.isFunc ? this._valueFunc() : this._valueFunc
-    this._onSet(_v)
-    this._latestResolvedValue = _v
+    this._onSet(_v, v, this)
+    this._latestResolvedValue = _v // in this way during the onSet we have the latest val in "_latestResolvedValue" fr caching strategy
   }
 
   markAsChanged(){
     debug.log("marked as changed!", this)
     let _v = this.isFunc ? this._valueFunc() : this._valueFunc
-    this._onSet(_v)
+    this._onSet(_v, v, this)
     this._latestResolvedValue = _v
   }
 }
@@ -1278,7 +1278,7 @@ class Component {
         this.properties[k] = new Property(
           _isFunc ? v.bind(undefined, this.$this) : v, 
           ()=>debug.log(k, "getted!!"), 
-          (v)=>{
+          (v, ojV, self)=>{
             debug.log(k, "setted!!", this, this.propertiesChanges); 
             "_"+k+"_changed" in this.properties && this.properties["_"+k+"_changed"](v, this.properties[k]._latestResolvedValue); 
             this.propertiesChanges[k].fireSignal()
