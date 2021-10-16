@@ -925,7 +925,7 @@ class ComponentsContainer {
 const RenderApp = (html_root, definition)=>{
 
   let component_tree_root = new ComponentsTreeRoot(html_root, definition)
-  component_tree_root.renderize()
+  component_tree_root.initAndRenderize()
 
   return component_tree_root
 
@@ -959,6 +959,7 @@ class ComponentsTreeRoot {
   $signalSubSystem
   $cssEngine
 
+  // step 1: build
   constructor(html_root, definition){
     this.html_root = html_root
     this.oj_definition = definition
@@ -967,18 +968,19 @@ class ComponentsTreeRoot {
     this.$signalSubSystem = new SignalSubSystem()
   }
 
-  buildSkeleton(){
-
-    this.components_root = Component.componentFactory(this.html_root, this.oj_definition, this.$le)
-    this.components_root.buildSkeleton()
-
-  }
-
-  renderize(){
+  // step 2 & 3: build skeleton (html pointer & child) and renderize
+  initAndRenderize(){
 
     this.buildSkeleton()
 
     this.components_root.create()
+
+  }
+
+  buildSkeleton(){
+
+    this.components_root = Component.componentFactory(this.html_root, this.oj_definition, this.$le)
+    this.components_root.buildSkeleton()
 
   }
 
@@ -1022,6 +1024,7 @@ class Component {
   html_pointer_element
   html_end_pointer_element // future use, per i componenti dinamici e liste..
 
+  // step 1: build
   constructor(parent, definition, $le){
     this.isA$ctxComponent = ((definition instanceof UseComponentDeclaration) || !(parent instanceof Component))
     this.parent = parent
@@ -1049,7 +1052,7 @@ class Component {
 
   }
   
-
+  // step 2: build skeleton (html pointer and child)
   buildSkeleton(){
 
     this.buildHtmlPointerElement()
@@ -1111,6 +1114,7 @@ class Component {
     debug.log("analysis: ", this, propK, this.staticAnDeps[propK])
   }
 
+  // step 3: create and renderize
   create(){
     // t.b.d
     this.properties.el = this.html_pointer_element // ha senso??? rischia di spaccare tutto..
@@ -1412,7 +1416,7 @@ class Component {
   // update(){
   //   this.childs.forEach(child=>child.update())
   // }
-  regenerate(){}
+  // regenerate(){}
   destroy(){
     this.childs.forEach(child=>child.destroy())
     this.html_pointer_element.remove()
@@ -1517,7 +1521,6 @@ class Component {
     return component
   }
   
-
 }
 
 class TextNodeComponent {
@@ -1526,11 +1529,30 @@ class TextNodeComponent {
   definition
   parent
 
-
+  // step 1: build
   constructor(parent, definition){
     this.parent = parent
 
     this.definition = definition
+  }
+
+
+  // step 2: build skeleton (html pointer)
+  buildSkeleton(){
+
+    this.buildHtmlPointerElement()
+
+  }
+
+  buildHtmlPointerElement(){
+
+    this.html_pointer_element = document.createTextNode("")
+    this.parent.html_pointer_element.appendChild(this.html_pointer_element)
+
+  }
+
+  _renderizeText(){
+    this.html_pointer_element.textContent = isFunction(this.definition) ? this.definition.bind(undefined, this.parent.$this)() : this.definition
   }
 
   staticAnDeps = {} // TEST, DEMO
@@ -1541,23 +1563,7 @@ class TextNodeComponent {
     }
 
   }
-
-  buildHtmlPointerElement(){
-
-    this.html_pointer_element = document.createTextNode("")
-    this.parent.html_pointer_element.appendChild(this.html_pointer_element)
-
-  }
-  buildSkeleton(){
-
-    this.buildHtmlPointerElement()
-
-  }
-
-  _renderizeText(){
-    this.html_pointer_element.textContent = isFunction(this.definition) ? this.definition.bind(undefined, this.parent.$this)() : this.definition
-  }
-
+  // step 3: create and renderize
   create(){
     
     this.analizeDeps()
@@ -1575,7 +1581,7 @@ class TextNodeComponent {
   //   this.childs.forEach(child=>child.update())
   // }
 
-  regenerate(){}
+  // regenerate(){}
   destroy(){
     this.html_pointer_element.remove()
   }
@@ -1583,10 +1589,10 @@ class TextNodeComponent {
 }
 
 
+
 class ConditionalComponent extends Component{
   visible = false
 }
-
 
 class SwitchConditionalComponent extends Component{
   visible = false
