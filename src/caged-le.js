@@ -864,12 +864,13 @@ const analizeDepsStatically = (f)=>{
 
 }
 
-class ComponentProxy_ {
-  constructor(obj){
-    Object.assign(this, obj)
-  }
-}
+// class ComponentProxySentinel {
+//   constructor(obj){
+//     Object.assign(this, obj)
+//   }
+// }
 
+// Property proxy, frontend for the dev of the component Property, usefull to hide the .value mechanism (get/set) of Property
 // let deps_stack = [];
 const ComponentProxy = (context, lvl=0)=>{
 
@@ -888,7 +889,7 @@ const ComponentProxy = (context, lvl=0)=>{
         // let prop_target = target[prop];
 
         // if (ret instanceof Property){
-        //   return ComponentProxy_(ret.value, lvl+1)
+        //   return ComponentProxySentinel(ret.value, lvl+1)
         // }
         // else{
         //   return ret
@@ -903,20 +904,24 @@ const ComponentProxy = (context, lvl=0)=>{
           // todo, intercept and setup dependency again
           prop_or_value_target.value = value
           return true
-        }
+        } // you can only set existing prpoerty value..to avoid stupid imperative tricks!
 
       }
   })
 }
 
-class ComponentsContainer {
+class ComponentsContainerProxy {
+  // public proxy
+
   constructor(){
+
     this.proxy = new Proxy(this, {
       get: function (target, prop, receiver){
         console.log(target, prop, target[prop], target[prop].$this.this)
         return target[prop].$this.this
       }
     })
+
   }
 }
 
@@ -955,7 +960,7 @@ class ComponentsTreeRoot {
   oj_definition
   components_root
 
-  $le // ComponentsContainer
+  $le // ComponentsContainerProxy
   $signalSubSystem
   $cssEngine
 
@@ -964,7 +969,7 @@ class ComponentsTreeRoot {
     this.html_root = html_root
     this.oj_definition = definition
 
-    this.$le = new ComponentsContainer()
+    this.$le = new ComponentsContainerProxy()
     this.$signalSubSystem = new SignalSubSystem()
   }
 
@@ -992,11 +997,9 @@ class ComponentsTreeRoot {
 
 
 class Component {
-  
-  htmlElementType
 
-  id
-  _id
+  id  // public id
+  _id // private (or $ctx) id
   
   oj_definition
   convertedDefinition
@@ -1005,19 +1008,21 @@ class Component {
   parent // Component
   childs // Component []
 
-  properties = {}// real Props Container
+  properties = {}// real Props Container, exposed (in a certain way) to the dev
   // attrPropertyes = {}// real attr Props Container // todo: qualcosa del genere per gli attr
   hooks = {}// hook alle onInit dei componenti etc..
 
-  $this  // ComponentProxy -> binded on user defined function
-  $parent // ComponentProxy ==> in realtà è this.parent.$this
-  $le // ComponentsContainer - passed
-  $ctx // ComponentsContainer - created if is a ctx_component
-  isA$ctxComponent = false
-  $bind // ComponentProoxy -> contains the property as "binding"..a sort of "sentinel" thet devs can use to signal "2WayBinding" on a property declaration/definition
-  $dbus 
 
+  // Frontend for Dev
+  $this  // ComponentProxy -> binded on user defined function, visible to the dev as $.this
+  $parent // ComponentProxy ==> in realtà è this.parent.$this, visible to the dev as $.parent
+  $le // ComponentsContainerProxy - passed, visible to the dev as $.le
+  $ctx // ComponentsContainerProxy - created if is a ctx_component, visible to the dev as $.ctx
+  isA$ctxComponent = false
+  // $bind // ComponentProoxy -> contains the property as "binding"..a sort of "sentinel" thet devs can use to signal "2WayBinding" on a property declaration/definition, visible to the dev as $.bind
+  $dbus 
   $meta
+
 
   htmlElementType
   isObjComponent
@@ -1094,7 +1099,7 @@ class Component {
 
   getMy$ctx(){ // as singleton/generator
     if(this.isA$ctxComponent){
-      return this.$ctx ?? new ComponentsContainer()
+      return this.$ctx ?? new ComponentsContainerProxy()
     }
 
     else{
@@ -1123,7 +1128,7 @@ class Component {
     // this.properties.attr = ComponentProxy(this.attrPropertyes)
 
     this.$parent = (this.parent instanceof Component) ? ComponentProxy(this.parent.properties) : undefined
-    this.$this = ComponentProxy(new ComponentProxy_({this: ComponentProxy(this.properties), parent: this.$parent, le: this.$le.proxy /*,, ctx: this.$ctx, dbus: this.$dbus, meta: this.$meta*/}))
+    this.$this = ComponentProxy(/*new ComponentProxySentinel(*/{this: ComponentProxy(this.properties), parent: this.$parent, le: this.$le.proxy /*,, ctx: this.$ctx, dbus: this.$dbus, meta: this.$meta*/} /*)*/ ) //tmp, removed ComponentProxySentinel (useless)
 
     // todo: proxy per le!!
     // todo: recursive this.parent.parent, parent.parent le.x.parent.. etc..
