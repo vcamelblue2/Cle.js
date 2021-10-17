@@ -1841,7 +1841,7 @@ RenderApp(document.body, {
             Use(
               Timer, {
                 id: "myTimer",
-                data: { ...Timer.Model.data,
+                data: {
                               
                   interval: 1000,
                   running: true,
@@ -1849,7 +1849,7 @@ RenderApp(document.body, {
                   count: 0,
                 },
 
-                def: { ...Timer.Model.def,
+                def: {
 
                   onTriggered: $=>{
                     console.log("heeeeey..sono timer!!!")
@@ -1860,8 +1860,8 @@ RenderApp(document.body, {
                     }
                   },
                 }
-              }
-            )
+              },
+            {strategy: "merge"} )
 
         ] 
     }
