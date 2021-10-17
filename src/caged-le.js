@@ -327,6 +327,8 @@ const component = {
       ... come sopra
     },
 
+    // todo: valutare anche i "transoformer/reducer" in quanto con il sistema di auto change propagation per fare una op in blocco dovrei avere un mega stato..ma poi ho il problema che ci sono troppi update inutili..i reducer/transformer aiuterebbero!
+
 
     "private:"? def: {
       resetCounter: $ => {
@@ -607,36 +609,101 @@ const isFunction = (what)=>typeof what === "function"
 // Framework
 
 class Property{
-  constructor(valueFunc, onGet, onSet){
+  constructor(valueFunc, onGet, onSet, registerToDepsHelper, init=true){
+    // "registerToDepsHelper..un qualcosa che mi fornisce il parent per registrarmi alle mie dpes..in modo da poter settare anche altro e fare in modo da non dover conoscere il mio padre, per evitare ref circolari"
+    this.registerToDepsHelper = registerToDepsHelper
+    this.onChangedHandlers = []
+    this.dipendency = undefined
+    this.registeredDependency = [] // container of depsRemoverFunc
+
+    if (init){
+      this.init(valueFunc, onGet, onSet) // helper, to separate prop definition from initializzation (for register)
+    }
+  }
+
+  init(valueFunc, onGet, onSet){
     this.isFunc = isFunction(valueFunc)
 
-    this._valueFunc = valueFunc
     this._onGet = onGet
     this._onSet = onSet
 
     this._latestResolvedValue = undefined
+    this._valueFunc = valueFunc
+    this.__analyzeAndConnectDeps()
 
-    try{ this._latestResolvedValue = this.isFunc ? this._valueFunc() : this._valueFunc } catch {} // with this trick (and setting on markAsChanged and set value) we can compare new and old!
+    try{ this._latestResolvedValue = this.__getRealVaule() } catch {} // with this trick (and setting on markAsChanged and set value) we can compare new and old!
+  }
+
+  __analyzeAndConnectDeps(){
+    // step 1: remove old deps (if any)
+    this.registeredDependency.forEach(depsRemoverFunc=>depsRemoverFunc())
+    this.registeredDependency = []
+    this.dependency = undefined
+    // step 2: compute the new deps and register to it
+    if (this.isFunc){
+      this.dependency = analizeDepsStatically(this._valueFunc)
+      this.registerToDepsHelper(this, this.dependency) // it's my parent competence to actually coonect deps!
+    }
+  }
+
+  destroy(alsoDependsOnMe=false){
+    this.init(undefined, undefined, undefined) // this will remove alse deps connection (but not who depends on me!)
+    this.registerToDepsHelper = undefined
+    if (alsoDependsOnMe){
+      return this.removeAllOnChengedHandler() // this will return the old deps (eg. to restore deps after a destroy/recreate cycle)
+    }
+  }
+
+  __getRealVaule(){
+    return this.isFunc ? this._valueFunc() : this._valueFunc
   }
 
   get value(){
-    this._onGet()
-    return this.isFunc ? this._valueFunc() : this._valueFunc
+    this._onGet() // this._onGet?.()
+    return this.__getRealVaule()
   }
   set value(v){
     this.isFunc = isFunction(v)
     this._valueFunc = v
-    let _v = this.isFunc ? this._valueFunc() : this._valueFunc
+    this.__analyzeAndConnectDeps()
+    let _v = this.__getRealVaule()
     this._onSet(_v, v, this)
+    this.fireOnChangedSignal()
     this._latestResolvedValue = _v // in this way during the onSet we have the latest val in "_latestResolvedValue" fr caching strategy
   }
 
+  // manually, useful for deps
   markAsChanged(){
     debug.log("marked as changed!", this)
-    let _v = this.isFunc ? this._valueFunc() : this._valueFunc
+    let _v = this.__getRealVaule()
     this._onSet(_v, v, this)
+    this.fireOnChangedSignal()
     this._latestResolvedValue = _v
   }
+
+
+  // registered changes handler, deps and notify system
+  fireOnChangedSignal(){
+    this.onChangedHandlers.forEach(h=>h.handler(this.__getRealVaule(), this._latestResolvedValue))
+  }
+  hasOnChangedHandler(who){
+    return this.onChangedHandlers.find(h=>h.who === who) !== undefined
+  }
+  addOnChangedHandler(who, handler){ // return the remove function!
+    if(!this.hasOnChangedHandler(who)){
+      this.onChangedHandlers.push({who: who, handler: handler})
+    }
+    return ()=>this.removeOnChangedHandler(who)
+  }
+  removeOnChangedHandler(who){
+    this.onChangedHandlers = this.onChangedHandlers.filter(h=>h.who !== who)
+  }
+  removeAllOnChengedHandler(){
+    let oldChangedHandlers = this.onChangedHandlers
+    this.onChangedHandlers = []
+    return oldChangedHandlers
+  }
+
 }
 
 // signalHandler = {
@@ -1112,7 +1179,6 @@ class Component {
   }
 
   signals = {} // type {signalX: Signal}
-  propertiesChanges = {} // TEST DEMO..logica NON DBUS, solo per provare..
   staticAnDeps = {}
   analizeDeps(propK, f){ // TODO: rimuovere i duplicati..
     this.staticAnDeps[propK] = analizeDepsStatically(f)
@@ -1127,6 +1193,7 @@ class Component {
     // todo: qualcosa del genere per gli attr
     // this.properties.attr = ComponentProxy(this.attrPropertyes)
 
+    // todo: parent and le visible properties only..
     this.$parent = (this.parent instanceof Component) ? ComponentProxy(this.parent.properties) : undefined
     this.$this = ComponentProxy(/*new ComponentProxySentinel(*/{this: ComponentProxy(this.properties), parent: this.$parent, le: this.$le.proxy /*,, ctx: this.$ctx, dbus: this.$dbus, meta: this.$meta*/} /*)*/ ) //tmp, removed ComponentProxySentinel (useless)
 
@@ -1143,7 +1210,24 @@ class Component {
     // first of all: declare all "data" possible property changes handler (in this way ww are sure that exist in the future for deps analysis)
     if (this.convertedDefinition.data !== undefined){
       Object.entries(this.convertedDefinition.data).forEach(([k,v])=>{
-        this.propertiesChanges[k] = {registered:[], fireSignal: ()=>this.propertiesChanges[k].registered.forEach(f=>f())}
+        // create but do not init
+        this.properties[k] = new Property(pass, pass, pass, (thisProp, deps)=>{
+
+          deps.$this_deps?.forEach(d=>{
+            debug.log("pushooooo")
+            this.properties[d]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() ) // qui il ? server affinche si ci registri solo alle props (e non alle func etc!)
+          }) // supporting multiple deps, but only of first order..
+
+          deps.$parent_deps?.forEach(d=>{
+            debug.log("pushooooo")
+            this.parent.properties[d]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+          })
+
+          deps.$le_deps?.forEach(d=>{ // [le_id, property]
+            debug.log("pushooooo")
+            this.$le[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+          })
+        }, false)
       })
     }
 
@@ -1215,7 +1299,7 @@ class Component {
       })
     }
 
-    // on (property) def
+    // on (property) def // todo: al momento non va bene..sovrascrivo l'riginale self gestita nei parente ed le!!
     if (this.convertedDefinition.on !== undefined){
       Object.entries(this.convertedDefinition.on).forEach(([typologyNamespace, defs ])=>{
         if (typologyNamespace === "this"){
@@ -1266,38 +1350,17 @@ class Component {
     if (this.convertedDefinition.data !== undefined){
       Object.entries(this.convertedDefinition.data).forEach(([k,v])=>{
         let _isFunc = isFunction(v)
-        
-        if(_isFunc) {
 
-          this.analizeDeps(k, v)
-
-          this.staticAnDeps.$this_deps?.forEach(d=>{
-            debug.log("pushooooo")
-            this.propertiesChanges[d]?.registered.push( ()=>this.properties[k].markAsChanged() ) // qui il ? server affinche si ci registri solo alle props (e non alle func etc!)
-          }) // supporting multiple deps, but only of first order..
-
-          this.staticAnDeps.$parent_deps?.forEach(d=>{
-            debug.log("pushooooo")
-            this.parent.propertiesChanges[d]?.registered.push( ()=>this.properties[k].markAsChanged() )
-          })
-
-          this.staticAnDeps.$le_deps?.forEach(d=>{ // [le_id, property]
-            debug.log("pushooooo")
-            this.$le[d[0]].propertiesChanges[d[1]]?.registered.push( ()=>this.properties[k].markAsChanged() )
-          })
-
-        }
-
-        this.properties[k] = new Property(
+        // finally init!
+        this.properties[k].init(
           _isFunc ? v.bind(undefined, this.$this) : v, 
           ()=>debug.log(k, "getted!!"), 
           (v, ojV, self)=>{
-            debug.log(k, "setted!!", this, this.propertiesChanges); 
-            "_"+k+"_changed" in this.properties && this.properties["_"+k+"_changed"](v, this.properties[k]._latestResolvedValue); 
-            this.propertiesChanges[k].fireSignal()
+            debug.log(k, "setted!!", this); 
+            "_"+k+"_changed" in this.properties && this.properties["_"+k+"_changed"](v, this.properties[k]._latestResolvedValue);
           }
         )
-        debug.log("!!!!!", this, this.properties, this.propertiesChanges)
+        debug.log("!!!!!", this, this.properties)
       })
     }
 
@@ -1317,17 +1380,17 @@ class Component {
 
             staticDeps.$this_deps?.forEach(d=>{
               debug.log("pushooooo")
-              this.propertiesChanges[d]?.registered.push( ()=>setupStyle(v) )
+              this.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupStyle(v) ) // questa cosa da rivdere...il who non lo salviam ma in generale ora questa roba deve essere una prop, fully automated!
             }) // supporting multiple deps, but only of first order..
 
             staticDeps.$parent_deps?.forEach(d=>{
               debug.log("pushooooo")
-              this.parent.propertiesChanges[d]?.registered.push( ()=>setupStyle(v) )
+              this.parent.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupStyle(v) )
             })
 
             staticDeps.$le_deps?.forEach(d=>{ // [le_id, property]
               debug.log("pushooooo")
-              this.$le[d[0]].propertiesChanges[d[1]]?.registered.push( ()=>setupStyle(v) )
+              this.$le[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k], ()=>setupStyle(v) )
             })
 
           }
@@ -1348,17 +1411,17 @@ class Component {
 
             staticDeps.$this_deps?.forEach(d=>{
               debug.log("pushooooo")
-              this.propertiesChanges[d]?.registered.push( ()=>setupValue() )
+              this.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
             }) // supporting multiple deps, but only of first order..
 
             staticDeps.$parent_deps?.forEach(d=>{
               debug.log("pushooooo")
-              this.parent.propertiesChanges[d]?.registered.push( ()=>setupValue() )
+              this.parent.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
             })
 
             staticDeps.$le_deps?.forEach(d=>{ // [le_id, property]
               debug.log("pushooooo")
-              this.$le[d[0]].propertiesChanges[d[1]]?.registered.push( ()=>setupValue() )
+              this.$le[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
             })
 
             setupValue()
@@ -1574,9 +1637,9 @@ class TextNodeComponent {
     this.analizeDeps()
     debug.log("createeed")
 
-    this.staticAnDeps.$this_deps?.forEach(d=>this.parent.propertiesChanges[d].registered.push(()=>this._renderizeText())) // take it easy for now..one deps
-    this.staticAnDeps.$parent_deps?.forEach(d=>this.parent.parent.propertiesChanges[d].registered.push(()=>this._renderizeText())) // take it easy for now..one deps
-    this.staticAnDeps.$le_deps?.forEach(d=>this.parent.$le[d[0]].propertiesChanges[d[1]].registered.push(()=>this._renderizeText())) // take it easy for now..one deps
+    this.staticAnDeps.$this_deps?.forEach(d=>this.parent.properties[d].addOnChangedHandler(this, ()=>this._renderizeText())) // take it easy for now..one deps
+    this.staticAnDeps.$parent_deps?.forEach(d=>this.parent.parent.properties[d].addOnChangedHandler(this, ()=>this._renderizeText())) // take it easy for now..one deps
+    this.staticAnDeps.$le_deps?.forEach(d=>this.parent.$le[d[0]].properties[d[1]].addOnChangedHandler(this, ()=>this._renderizeText())) // take it easy for now..one deps
 
     this._renderizeText()
     
