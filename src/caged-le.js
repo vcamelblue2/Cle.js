@@ -426,7 +426,9 @@ const component = {
 }
 
 // COMPONENT REDEFINITION SEPARATION
-direct_lvl = ["id", "private:id", "constructor", "beforeInit", "onInit", "afterInit", "onUpdate", "onDestroy"]
+
+impossible_to_redefine = ["private:id"]
+direct_lvl = ["id", "constructor", "beforeInit", "onInit", "afterInit", "onUpdate", "onDestroy"]
 first_lvl = ["signals", "dbus_signals", "data", "private:data", "props", "private:props", "alias", "handle"]
 second_lvl = ["on", "on_s", "on_a"]
 first_or_second_lvl = ["def", "private:def"] // check for function (may exist "first lvl namespace")
@@ -805,7 +807,8 @@ class UseComponentDeclaration{
       else if (this.strategy === "merge") {
 
         // throw new Error("Not Implemented Yet!")
-        const direct_lvl = ["id", "private:id", "constructor", "beforeInit", "onInit", "afterInit", "onUpdate", "onDestroy"] // direct copy
+        const impossible_to_redefine = ["private:id"]
+        const direct_lvl = ["id", "constructor", "beforeInit", "onInit", "afterInit", "onUpdate", "onDestroy"] // direct copy
         const first_lvl = ["signals", "dbus_signals", "data", "private:data", "props", "private:props", "alias", "handle"] // on first lvl direct
         const second_lvl = ["on", "on_s", "on_a"]
         const first_or_second_lvl = ["def", "private:def"] // check for function (may exist "first lvl namespace")
@@ -878,6 +881,9 @@ class UseComponentDeclaration{
             })
           
           }
+          else if (impossible_to_redefine.includes(k)){
+            console.log("WARNING!!!", k, "cannot be redefined!!")
+          }
           else {
             console.log("WARNING!!! ACTUALLY", k, "is not supported in merge strategy! i simply override it!! assuming you can control the amount of override..")
             resolved[k] = v
@@ -925,12 +931,36 @@ const analizeDepsStatically = (f)=>{
   // replace va perchè fa la replace solo della prima roba..alternativa un bel cut al numero di caratteri che sappiamo già
   let $this_deps = to_inspect.match(/\$.this\.([_$a-zA-Z]+[0-9]*[.]?)+/g)
   $this_deps = $this_deps?.map(d=>d.replace("$.this.", "").split("."))
+  
   let $parent_deps = to_inspect.match(/\$.parent\.([_$a-zA-Z]+[0-9]*[.]?)+/g)
   $parent_deps = $parent_deps?.map(d=>d.replace("$.parent.", "").split("."))
+
   let $le_deps = to_inspect.match(/\$.le\.([_$a-zA-Z]+[0-9]*[.]?)+/g)
   $le_deps = $le_deps?.map(d=>d.replace("$.le.", "").split(".")) 
 
-  return {$this_deps:$this_deps, $parent_deps:$parent_deps, $le_deps:$le_deps}
+  let $ctx_deps = to_inspect.match(/\$.ctx\.([_$a-zA-Z]+[0-9]*[.]?)+/g)
+  $ctx_deps = $ctx_deps?.map(d=>d.replace("$.ctx.", "").split(".")) 
+
+  let $meta_deps = to_inspect.match(/\$.meta\.([_$a-zA-Z]+[0-9]*[.]?)+/g)
+  $meta_deps = $meta_deps?.map(d=>d.replace("$.meta.", "").split(".")) 
+
+  return {
+    // todo: vedere se hanno senso
+    $this_deps: $this_deps, 
+    // $pure_this_deps: $this_deps.length === 1 && $this_deps[0]==="", 
+
+    $parent_deps: $parent_deps, 
+    // $pure_parent_deps: $parent_deps.length === 1 && $parent_deps[0]==="", 
+
+    $le_deps: $le_deps, 
+    // $pure_le_depss: $le_deps.length === 1 && $le_deps[0]==="", 
+
+    $ctx_deps: $ctx_deps, 
+    // $pure_ctx_deps: $ctx_deps.length === 1 && $ctx_deps[0]==="", 
+
+    $meta_deps: $meta_deps, 
+    // $pure_meta_deps: $meta_deps.length === 1 && $meta_deps[0]==="", 
+  }
 
 }
 
@@ -1198,7 +1228,7 @@ class Component {
 
     // todo: parent and le visible properties only..
     this.$parent = (this.parent instanceof Component) ? ComponentProxy(this.parent.properties) : undefined
-    this.$this = ComponentProxy(/*new ComponentProxySentinel(*/{this: ComponentProxy(this.properties), parent: this.$parent, le: this.$le.proxy /*,, ctx: this.$ctx, dbus: this.$dbus, meta: this.$meta*/} /*)*/ ) //tmp, removed ComponentProxySentinel (useless)
+    this.$this = ComponentProxy(/*new ComponentProxySentinel(*/{this: ComponentProxy(this.properties), parent: this.$parent, le: this.$le.proxy, ctx: this.$ctx.proxy /*, dbus: this.$dbus, meta: this.$meta*/} /*)*/ ) //tmp, removed ComponentProxySentinel (useless)
 
     // todo: proxy per le!!
     // todo: recursive this.parent.parent, parent.parent le.x.parent.. etc..
@@ -1230,6 +1260,12 @@ class Component {
             debug.log("pushooooo")
             this.$le[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
           })
+
+          deps.$ctx_deps?.forEach(d=>{ // [le_id, property]
+            debug.log("pushooooo")
+            this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+          })
+
         }, false)
       })
     }
@@ -1266,6 +1302,29 @@ class Component {
                 try{
                   // console.log("provo ad agganciare signal", leItem, s)
                   this.$le[leItem].signals[s].addHandler(this, (...args)=>fun.bind(undefined, this.$this, ...args)())
+                }
+                catch{
+                  if (num_retry < 5) {
+                    setTimeout(()=>setUpSignalHandler(num_retry++), Math.min(1*(num_retry+1), 5))
+                  }
+                  else{
+                    console.log("WARNING!! unable to connect to the signal!! -> ", this, defs,)
+                  }
+                }
+              }
+              setUpSignalHandler()
+            })
+          })
+        }
+        // todo: fattorizzare con le, se possibile!
+        if (typologyNamespace === "ctx"){
+          Object.entries(defs).forEach(([ctxItem, ctxItemDefs])=>{ // get requested element name
+            Object.entries(ctxItemDefs).forEach(([s, fun])=>{
+              // exponential retry to handle signal
+              const setUpSignalHandler = (num_retry=0)=>{
+                try{
+                  // console.log("provo ad agganciare signal", leItem, s)
+                  this.$ctx[ctxItem].signals[s].addHandler(this, (...args)=>fun.bind(undefined, this.$this, ...args)())
                 }
                 catch{
                   if (num_retry < 5) {
@@ -1345,7 +1404,32 @@ class Component {
             })
           })
         }
-
+        // todo: fattorizzare con le
+        if (typologyNamespace === "ctx"){
+          Object.entries(defs).forEach(([ctxItem, ctxItemDefs])=>{ // get requested element name
+            Object.entries(ctxItemDefs).forEach(([k, v])=>{
+              // remove xxxChanged:
+              k = (k.split("").reverse().join("").replace("Changed".split("").reverse().join(""), "")).split("").reverse().join("") //replace from right stupid implementation
+              
+              // exponential retry to handle signal
+              const setUpProppChangeHandler = (num_retry=0)=>{
+                try{
+                  // console.log("provo ad agganciare signal", leItem, s)
+                  this.$ctx[ctxItem].properties["_"+k+"_changed"] = (newVal, oldVal)=>v.bind(undefined, this.$this, newVal, oldVal)() // store the on change function as "_xxxxpropnamexxx_changed"..so you can always manually trigger "$.this._propertyX_changed("
+                }
+                catch{
+                  if (num_retry < 5) {
+                    setTimeout(()=>setUpProppChangeHandler(num_retry++), Math.min(1*(num_retry+1), 5))
+                  }
+                  else{
+                    console.log("WARNING!! unable to connect to the prop!! -> ", this, defs,)
+                  }
+                }
+              }
+              setUpProppChangeHandler()
+            })
+          })
+        }
       })
     }
 
@@ -1395,6 +1479,11 @@ class Component {
               this.$le[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k], ()=>setupStyle(v) )
             })
 
+            staticDeps.$ctx_deps?.forEach(d=>{ // [ctx_id, property]
+              debug.log("pushooooo")
+              this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k], ()=>setupStyle(v) )
+            })
+
           }
           else {
 
@@ -1424,6 +1513,11 @@ class Component {
             staticDeps.$le_deps?.forEach(d=>{ // [le_id, property]
               debug.log("pushooooo")
               this.$le[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
+            })
+
+            staticDeps.$ctx_deps?.forEach(d=>{ // [ctx_id, property]
+              debug.log("pushooooo")
+              this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
             })
 
             setupValue()
@@ -1490,7 +1584,8 @@ class Component {
   destroy(){
     this.childs.forEach(child=>child.destroy())
     this.html_pointer_element.remove()
-    delete this.$ctx[this.id || this._id]
+    try { delete this.$ctx[this.id] } catch {}
+    try { delete this.$ctx[this._id] } catch {}
     delete this.$le[this.id]
   }
 
@@ -1642,6 +1737,7 @@ class TextNodeComponent {
     this.staticAnDeps.$this_deps?.forEach(d=>this.parent.properties[d].addOnChangedHandler(this, ()=>this._renderizeText())) // take it easy for now..one deps
     this.staticAnDeps.$parent_deps?.forEach(d=>this.parent.parent.properties[d].addOnChangedHandler(this, ()=>this._renderizeText())) // take it easy for now..one deps
     this.staticAnDeps.$le_deps?.forEach(d=>this.parent.$le[d[0]].properties[d[1]].addOnChangedHandler(this, ()=>this._renderizeText())) // take it easy for now..one deps
+    this.staticAnDeps.$ctx_deps?.forEach(d=>this.parent.$ctx[d[0]].properties[d[1]].addOnChangedHandler(this, ()=>this._renderizeText())) // take it easy for now..one deps
 
     this._renderizeText()
     
@@ -1801,6 +1897,43 @@ const InputComponent = {
 	}
 }
 
+const CtxEnabledComponent = {
+  div: { "private:id": "myCtxRoot",
+
+    data: {
+      todo: ["todo1", "todo2", "todo3"]
+    },
+
+    "=>": [
+
+      { button: { "private:id": "removeBtn",
+        text: "remove final todo",
+        def: {
+          removeLastTodo: $ => {
+            if ($.ctx.myCtxRoot.todo.length > 0) {
+              let copy = [...$.ctx.myCtxRoot.todo]
+              copy.pop()
+              $.ctx.myCtxRoot.todo = copy
+            }
+          }
+        },
+        handle: {
+          onclick: $ => $.this.removeLastTodo()
+        }
+      }},
+
+      { div: { 
+          "private:id": "listPresenter",
+          text: $ => "--" + $.ctx.myCtxRoot.todo.toString(),
+          onInit: $ => {
+            console.log("heeeeeey sono visibile solo nel contestooooo", $.ctx, $.ctx.myCtxRoot, $.le)
+          }
+      }}
+
+    ]
+
+  }
+}
 
 console.log(
 RenderApp(document.body, {
@@ -1931,7 +2064,14 @@ RenderApp(document.body, {
                   },
                 }
               },
-            {strategy: "merge"} )
+            {strategy: "merge"} ),
+
+            Use(
+              CtxEnabledComponent
+            ),
+            Use(
+              CtxEnabledComponent
+            )
 
         ] 
     }
