@@ -564,7 +564,8 @@ const TodoList = { // automatic root div!
 
 
 
-
+// TODO: ragionare se ci piace davveero "private: xxx": "blabla"   o è meglio un   private_xxx: "blibli"
+// allo stesso tempo potrebbe eanche essere utile invertire: normalmente tutto è privato (aka by $ctx), con public: si va in modalità pubblica..quantomeno per gli id!
 
 
 // ricorda il trick del comment node: in pratica sapendo già tutto il modello statico (cioè senza ngif, ngfor e ngswitch) definisco tutto (almeno la struct di base, cioè div->span, div...) e piazzo al posto degli el dinamici un commento, puntando a quell'elemento li. a quel punto ho un puntamento alla "posizione" dove farò replace e insert after/before...potenzialmente per le liste ne avrò 2: uno di apertura e uno di chiusura, così da poter cancellare tutti gli el associati alla lista anche da li (scorrendo i child)
@@ -1119,7 +1120,7 @@ class Component {
   $le // ComponentsContainerProxy - passed, visible to the dev as $.le
   $ctx // ComponentsContainerProxy - created if is a ctx_component, visible to the dev as $.ctx
   isA$ctxComponent = false
-  // $bind // ComponentProoxy -> contains the property as "binding"..a sort of "sentinel" thet devs can use to signal "2WayBinding" on a property declaration/definition, visible to the dev as $.bind
+  // $bind // ComponentProoxy -> contains the property as "binding"..a sort of "sentinel" that devs can use to signal "2WayBinding" on a property declaration/definition, visible to the dev as $.bind, usefull also to define intra-property "alias"
   $dbus 
   $meta
 
@@ -1528,6 +1529,23 @@ class Component {
           }
         }
       })
+
+      // first: convert as property.. then, create mutation observer, and watch for changes (when value is different than ours in property)
+
+      //   observer = new MutationObserver(function(mutations) {
+      //     mutations.forEach(function(mutation) {
+      //       if (mutation.type == "attributes") {
+      //         console.log("attributes changed", mutation)
+      //         if(XXXXX !== mutation.target[mutation.attributeName]){ // aka is from usr input [or direct html manipulation..]
+      //           XXXXX = mutation.target[mutation.attributeName]
+      //           console.log("setted!!")
+      //         } // else, we are editing the value..
+      //       }
+      //     });
+      //   });
+      //   observer.observe($.this.el, {
+      //     attributes: true //configure it to listen to attribute changes
+      //   });
     }
 
 
@@ -1777,24 +1795,7 @@ class IterableViewComponent{
 // TESTING
 
 
-// "testing" Mutation Observer to handle 2wayPropertyBinding
-// afterInit: $=>{
-//   observer = new MutationObserver(function(mutations) {
-//     mutations.forEach(function(mutation) {
-//       if (mutation.type == "attributes") {
-//         console.log("attributes changed", mutation)
-//         if($.le.myInput.text !== mutation.target[mutation.attributeName]){
-//           $.le.myInput.text = mutation.target[mutation.attributeName]
-//           console.log("setted!!")
-//         }
-//       }
-//     });
-//   });
-//   observer.observe($.this.el, {
-//     attributes: true //configure it to listen to attribute changes
-//   });
-// }
-
+// TODO: Mutation Observer to handle 2wayPropertyBinding
 
 const Timer = {
   Model: {
@@ -1898,16 +1899,20 @@ const InputComponent = {
 }
 
 const CtxEnabledComponent = {
-  div: { "private:id": "myCtxRoot",
+  div: { 
+    "private:id": "myCtxRoot",
 
     data: {
       todo: ["todo1", "todo2", "todo3"]
     },
 
-    "=>": [
+    "=>" : [
 
-      { button: { "private:id": "removeBtn",
+      { button: { 
+        "private:id": "removeBtn",
+
         text: "remove final todo",
+
         def: {
           removeLastTodo: $ => {
             if ($.ctx.myCtxRoot.todo.length > 0) {
@@ -1917,14 +1922,18 @@ const CtxEnabledComponent = {
             }
           }
         },
-        handle: {
-          onclick: $ => $.this.removeLastTodo()
+
+        handle: { 
+          onclick: $ => $.this.removeLastTodo() 
         }
+
       }},
 
       { div: { 
           "private:id": "listPresenter",
+
           text: $ => "--" + $.ctx.myCtxRoot.todo.toString(),
+          
           onInit: $ => {
             console.log("heeeeeey sono visibile solo nel contestooooo", $.ctx, $.ctx.myCtxRoot, $.le)
           }
