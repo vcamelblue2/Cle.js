@@ -609,8 +609,10 @@ const isFunction = (what)=>typeof what === "function"
 // Framework
 
 class Property{
-  constructor(valueFunc, onGet, onSet, registerToDepsHelper, init=true){
+  constructor(valueFunc, onGet, onSet, executionContext, registerToDepsHelper, init=true){
+    // execution context per fare la bind poco prima di chiamare (o per non bindare e chiamare direttamente..)
     // "registerToDepsHelper..un qualcosa che mi fornisce il parent per registrarmi alle mie dpes..in modo da poter settare anche altro e fare in modo da non dover conoscere il mio padre, per evitare ref circolari"
+    this.executionContext = (Array.isArray(executionContext) ? executionContext : [executionContext]).map(ec=>isFunction(ec) ? ec : ()=>ec) // interface for "dynamic execution context"..wrap in lambda aslo if not passed..
     this.registerToDepsHelper = registerToDepsHelper
     this.onChangedHandlers = []
     this.dipendency = undefined
@@ -642,6 +644,7 @@ class Property{
     // step 2: compute the new deps and register to it
     if (this.isFunc){
       this.dependency = analizeDepsStatically(this._valueFunc)
+      console.log("dependency!!!!", this, this.dependency)
       this.registerToDepsHelper(this, this.dependency) // it's my parent competence to actually coonect deps!
     }
   }
@@ -655,7 +658,7 @@ class Property{
   }
 
   __getRealVaule(){
-    return this.isFunc ? this._valueFunc() : this._valueFunc
+    return this.isFunc ? this._valueFunc(...this.executionContext.map(ec=>ec())) : this._valueFunc
   }
 
   get value(){
@@ -676,7 +679,7 @@ class Property{
   markAsChanged(){
     debug.log("marked as changed!", this)
     let _v = this.__getRealVaule()
-    this._onSet(_v, v, this)
+    this._onSet(_v, this._valueFunc, this)
     this.fireOnChangedSignal()
     this._latestResolvedValue = _v
   }
@@ -1211,7 +1214,7 @@ class Component {
     if (this.convertedDefinition.data !== undefined){
       Object.entries(this.convertedDefinition.data).forEach(([k,v])=>{
         // create but do not init
-        this.properties[k] = new Property(pass, pass, pass, (thisProp, deps)=>{
+        this.properties[k] = new Property(pass, pass, pass, ()=>this.$this, (thisProp, deps)=>{
 
           deps.$this_deps?.forEach(d=>{
             debug.log("pushooooo")
@@ -1349,11 +1352,10 @@ class Component {
     // data, TODO: check deps on set, "cached get", support function etc
     if (this.convertedDefinition.data !== undefined){
       Object.entries(this.convertedDefinition.data).forEach(([k,v])=>{
-        let _isFunc = isFunction(v)
 
         // finally init!
         this.properties[k].init(
-          _isFunc ? v.bind(undefined, this.$this) : v, 
+          v,
           ()=>debug.log(k, "getted!!"), 
           (v, ojV, self)=>{
             debug.log(k, "setted!!", this); 
