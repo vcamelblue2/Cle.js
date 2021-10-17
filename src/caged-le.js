@@ -1302,7 +1302,7 @@ class Component {
       })
     }
 
-    // on (property) def // todo: al momento non va bene..sovrascrivo l'riginale self gestita nei parente ed le!!
+    // on (property) def            // todo: al momento non va bene..sovrascrivo l'riginale self gestita nei parente ed le!!  qui devo passare a qualcosa dentro le Property, e inoltre fare in modo che nel proxy se riconosco il pattern "_xxxxpropnamexxx_changed" allora parlo della funzione di prop..alternativa al proxy gestisco come una var secondoaria di this.properties..ma poi la devo gestire!
     if (this.convertedDefinition.on !== undefined){
       Object.entries(this.convertedDefinition.on).forEach(([typologyNamespace, defs ])=>{
         if (typologyNamespace === "this"){
@@ -1791,6 +1791,7 @@ const InputComponent = {
 			oninput: ($, e) => { console.log("ipt!!!"); $.this.text = e.target.value },
       
 			// onkeypress: ($, e) => { if (e.key === "Enter") { console.log("sono child, sto per emettere il segnale!"); $.this.newInputConfirmed.emit($.this.text) } },
+      // DEMO DIRECTIVES
       ...$D.onKeyPressed("Enter", 
           ($, e) => { console.log("sono child, sto per emettere il segnale!"); $.this.newInputConfirmed.emit($.this.text) } 
       )
@@ -1832,7 +1833,8 @@ RenderApp(document.body, {
             { div: {text: "hello! world!"} }, { div: {text: $ => $.parent.counter+20} }, { div: {text: "!!"} },
 
             { div: { 
-              
+              id: "future_counter",
+
               data: {
                 futureCounter: $ => $.parent.counter + 100
               },
@@ -1919,9 +1921,12 @@ RenderApp(document.body, {
                   onTriggered: $=>{
                     console.log("heeeeey..sono timer!!!")
                     $.this.count += 1
-
+                    if ($.this.count === 5){
+                      $.le.future_counter.futureCounter = 0
+                    }
                     if ($.this.count > 10){
                       $.this.stop()
+                      $.le.future_counter.futureCounter = $ => $.parent.counter + 100
                     }
                   },
                 }
