@@ -777,7 +777,7 @@ class SignalSubSystem {
 
 
 //const Use = (component, redefinition, initialization_args=$=>({p1:1, p2:"bla"}), passed_props= $=>({prop1: $.this.prop1...}) )=>{ 
-const Use = (component, redefinitions=undefined, { strategy="override", init=undefined, passed_props=undefined }={})=>{ return new UseComponentDeclaration(component, redefinitions, { strategy:strategy, init:init, passed_props:passed_props } ) } // passed_props per puntare a una var autostored as passed_props e seguirne i changes, mentre init args per passare principalmente valori (magari anche props) ma che devi elaborare nel construct
+const Use = (component, redefinitions=undefined, { strategy="merge", init=undefined, passed_props=undefined }={})=>{ return new UseComponentDeclaration(component, redefinitions, { strategy:strategy, init:init, passed_props:passed_props } ) } // passed_props per puntare a una var autostored as passed_props e seguirne i changes, mentre init args per passare principalmente valori (magari anche props) ma che devi elaborare nel construct
 // todo: qui potrebbe starci una connect del signal con autopropagate, ovvero poter indicare che propago un certo segnale nel mio parent! subito dopo la redefinitions, in modo da avere una roba molto simile a quello che ha angular (Output) e chiudere il cerchio della mancanza di id..
 // di fatto creiamo un nuovo segnale e lo connettiamo in modo semplice..nel parent chiamo "definePropagatedSignal"
 // perdo solo un po di descrittività, in favore di un meccanismo comodo e facile..
@@ -785,7 +785,7 @@ const Use = (component, redefinitions=undefined, { strategy="override", init=und
 // nella init il punto di vista del this E' SEMPRE IL MIO
 
 class UseComponentDeclaration{
-  constructor(component, redefinitions=undefined, { strategy="override", init=undefined, passed_props=undefined }={}){
+  constructor(component, redefinitions=undefined, { strategy="merge", init=undefined, passed_props=undefined }={}){
     this.component = component
     this.init = init
     this.passed_props = passed_props
@@ -2030,7 +2030,9 @@ RenderApp(document.body, {
                 def: {
                   myFunc1: $=>console.log("hellooooo sono un func merged")
                 }
-            }, {strategy: "merge"}),
+            }),
+
+            $ => $.le.myInput3.text,
 
 
             { Model: {
@@ -2072,14 +2074,16 @@ RenderApp(document.body, {
                     }
                   },
                 }
-              },
-            {strategy: "merge"} ),
+              }
+            ),
 
             Use(
-              CtxEnabledComponent
+              CtxEnabledComponent,
+              { id: "nowIsGlobalComponent1" }
             ),
             Use(
-              CtxEnabledComponent
+              CtxEnabledComponent,
+              { id: "nowIsGlobalComponent2" }
             )
 
         ] 
