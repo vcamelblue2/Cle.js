@@ -2113,10 +2113,145 @@ RenderApp(document.body, {
 
 
 
+// TODO LIST DEMO
+/*
+const TodoListModel = { 
+  Model: {
+    id: "model",
 
+    data: {
+      todolist: []
+    },
 
+    def: {
+      add: ($, todo) =>{
+        $.this.todolist = [...$.this.todolist, todo]
+      },
+      remove: ($, todo) =>{
+        $.this.todolist = $.this.todolist.filter(t=>t !== todo)
+      }
+    },
+  }
+}
 
+const TodoListController = {
+  Controller: {
+    id: "controller",
 
+    def: {
+      addTodoFromInput: $ => { 
+        $.le.model.add($.le.input.text);
+        setTimeout(()=>{
+          $.le.input.text = ""
+          $.le.input.el.value = ""
+        }, 1)
+      }
+    },
+    
+    on_s: { le: { input: {
+      newInputConfirmed: $ => {
+        $.this.addTodoFromInput();
+      }
+    }}}
+  }
+}
 
+const TodoInput = { 
+	input: {
+		id: "input",
 
+		data: { 
+      text: "" 
+    },
 
+		signals: {
+			newInputConfirmed: "stream => (text: string)"
+		},
+
+		attrs: {
+			value: $ => $.this.text
+		},
+
+		handle: {
+			oninput: ($, e) => { $.this.text = e.target.value },
+      
+			onkeypress: ($, e) => { e.key === "Enter" && $.this.newInputConfirmed.emit($.this.text) },
+		},
+
+	}
+}
+
+const AddTodoButton = { 
+  button: {  
+    text: "Add Todo", 
+    handle: { onclick: $ => $.le.controller.addTodoFromInput() },
+  }
+}
+
+const TodoListContainer = { 
+  div: {
+    id: "todoContainer",
+
+    data: {
+      oldRenderized: undefined
+    },
+
+    on: { le: { model: {
+      todolistChanged: $ => {
+
+        console.log("changeeeeed")
+        let $$ = $
+
+        $.this.oldRenderized?.map(r=>r?.destroy())
+        $.this.el.innerText = ""
+
+        $.this.oldRenderized = $.le.model.todolist.map(todo=>{
+
+          RenderApp($$.this.el, {
+            div: { "=>": [
+
+              { button: {
+                text: "remove",
+                handle: {
+                  onclick: $ => $$.le.model.remove(todo)
+                }
+              }},
+
+              { span: {text: todo, attrs: { style: {marginLeft:"15px"}}}},
+            ]}
+          })
+
+        })
+
+      }
+    }}}
+  }
+}
+
+RenderApp(document.body, {
+  div: {
+    id: "appRoot",
+
+    ["=>"]: [
+
+      // Model & Controller
+      Use(TodoListModel),
+      Use(TodoListController),
+
+      // Gui
+      Use(TodoInput, { 
+        attrs: { ...TodoInput.input.attrs,  style: {width: "calc(100% - 90px)"}}
+      }),
+
+      Use(AddTodoButton, { 
+        attrs: { style: {width: "80px"}} 
+      }),
+      
+      { hr: {} },
+
+      Use(TodoListContainer)
+
+    ]
+  }
+})
+*/
