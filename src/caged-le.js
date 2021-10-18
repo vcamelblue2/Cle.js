@@ -418,7 +418,22 @@ const component = {
           init: { childPropToInitInConstructor: $ => $.meta.idx }
         }, 
         // todo: qui potrebbe starci una connect del signal con autopropagate, ovvero poter indicare che propago un certo segnale nel mio parent!
-      )
+      ),
+
+
+      { Model | Controller: { // OBJECT
+        data: {prop1: 23},
+
+        ["=>"]: [
+
+          { Model: { // sub model/obj
+            data: {prop2: 25},
+            afterInit: $ => console.log($.this.prop2),
+            text: $ => $.parent.prop1,
+          }
+        },
+        ]
+      }},
 
     ],
 
@@ -816,6 +831,11 @@ class UseComponentDeclaration{
  
         Object.entries(this.redefinitions).forEach(([k,v])=>{
           if (direct_lvl.includes(k)){
+            // todo: use null to delete 
+            // if (v === null)
+            //   delete resolved[k]
+            // else
+            //   resolved[k] = v
             resolved[k] = v
           }
           else if (first_lvl.includes(k)){ //copio il primo lvl
@@ -1142,7 +1162,7 @@ class Component {
     this.oj_definition = definition
 
     this.htmlElementType = getComponentType(definition)
-    this.isObjComponent = this.htmlElementType === "Model"
+    this.isObjComponent = ["Model", "Controller"].includes(this.htmlElementType)
     this.convertedDefinition = Component.parseComponentDefinition( (definition instanceof UseComponentDeclaration ? definition.computedTemplate : definition) [this.htmlElementType])
 
     this.id = this.convertedDefinition.id
@@ -1246,6 +1266,8 @@ class Component {
       Object.entries(this.convertedDefinition.data).forEach(([k,v])=>{
         // create but do not init
         this.properties[k] = new Property(pass, pass, pass, ()=>this.$this, (thisProp, deps)=>{
+
+          // deps connection logic
 
           deps.$this_deps?.forEach(d=>{
             debug.log("pushooooo")
@@ -1499,7 +1521,7 @@ class Component {
             let setupValue = ()=>this.html_pointer_element.setAttribute(k, v.bind(undefined, this.$this)().toString()) 
 
             let staticDeps = analizeDepsStatically(v) // WARNING actally w're bypassing the "deps storage" machenism..this wil break deps update in future!!!
-            debug.log("attr static deps", staticDeps)
+            console.log("attr static deps", staticDeps)
 
             staticDeps.$this_deps?.forEach(d=>{
               debug.log("pushooooo")
@@ -1800,10 +1822,6 @@ class IterableViewComponent{
 const Timer = {
   Model: {
 
-    // "==>": { Model: {
-    //   data: 
-    // }},
-
     data: {
       interval: 1000,
       running: false,
@@ -2016,7 +2034,7 @@ RenderApp(document.body, {
                 on: { this: {
                   textChanged: $=>{ console.log("text cambiatoooo by ipt2!", $.le); $.le.myInput.newInputConfirmed.emit("oh no! hacked!") }
                 }}
-            }),
+            }, {strategy: "override"}),
 
             Use(
               InputComponent, {
@@ -2030,7 +2048,7 @@ RenderApp(document.body, {
                 def: {
                   myFunc1: $=>console.log("hellooooo sono un func merged")
                 }
-            }),
+            }, {strategy: "merge"}),
 
             $ => $.le.myInput3.text,
 
@@ -2040,7 +2058,7 @@ RenderApp(document.body, {
               afterInit: $ => console.log($.this.el),
               ["=>"]: [
 
-                { Model: {
+                { Model: { // sub model/obj
                   data: {prop2: 25},
                   afterInit: $ => console.log($.this.el),
                   text: "oleeeee",
@@ -2075,7 +2093,7 @@ RenderApp(document.body, {
                   },
                 }
               }
-            ),
+            ), // default is merge strategy!
 
             Use(
               CtxEnabledComponent,
