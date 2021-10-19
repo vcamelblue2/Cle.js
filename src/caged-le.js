@@ -1240,6 +1240,7 @@ class Component {
   create(){
     // t.b.d
     this.properties.el = this.html_pointer_element // ha senso??? rischia di spaccare tutto..
+    this.properties.parent = this.parent?.$this?.this // ha senso??? rischia di spaccare tutto.. recursive this.parent.parent & parent.parent le.x.parent.. etc..
 
     // todo: qualcosa del genere per gli attr
     // this.properties.attr = ComponentProxy(this.attrPropertyes)
@@ -1248,8 +1249,7 @@ class Component {
     this.$parent = (this.parent instanceof Component) ? ComponentProxy(this.parent.properties) : undefined
     this.$this = ComponentProxy(/*new ComponentProxySentinel(*/{this: ComponentProxy(this.properties), parent: this.$parent, le: this.$le.proxy, ctx: this.$ctx.proxy /*, dbus: this.$dbus, meta: this.$meta*/} /*)*/ ) //tmp, removed ComponentProxySentinel (useless)
 
-    // todo: proxy per le!!
-    // todo: recursive this.parent.parent, parent.parent le.x.parent.. etc..
+    // mettere private stuff in "private_properties" e "private_signal", a quel punto una strada potrebbe essere quella di avere un "private_this" qui su..ma in teoria dovrebbe essere qualcosa di context, e non solo in me stesso..
 
     // html event
     if (this.convertedDefinition.handle !== undefined){
@@ -2040,7 +2040,10 @@ RenderApp(document.body, {
             Use(
               CtxEnabledComponent,
               { id: "nowIsGlobalComponent2" }
-            )
+            ),
+            
+            // demo visible parent chain
+            { div: { "=>": { div: { "=>": { div: { "=>": {div: { afterInit: $ => console.log("ooooooooooooooooo", $.this, $.this.parent.parent.parent.parent.counter, $.this, $.parent.parent.parent.parent.counter)}}}}}}}}
 
         ] 
     }
