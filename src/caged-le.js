@@ -1131,6 +1131,7 @@ class Component {
 
   properties = {}// real Props Container, exposed (in a certain way) to the dev
   // attrPropertyes = {}// real attr Props Container // todo: qualcosa del genere per gli attr
+  signals = {} // type {signalX: Signal}
   hooks = {}// hook alle onInit dei componenti etc..
 
 
@@ -1232,12 +1233,6 @@ class Component {
     }
   }
 
-  signals = {} // type {signalX: Signal}
-  staticAnDeps = {}
-  analizeDeps(propK, f){ // TODO: rimuovere i duplicati..
-    this.staticAnDeps[propK] = analizeDepsStatically(f)
-    debug.log("analysis: ", this, propK, this.staticAnDeps[propK])
-  }
 
   // step 3: create and renderize
   create(){
@@ -1878,6 +1873,8 @@ const Timer = {
   }
 }
 
+//// TODO OOOOO: tutto è un signal: ovvero le prop hanno dei signal associati (signal particolari, che portano con se il vecchio e il nuovo valore al triggher.. ergo: on, on_s e on_a sono solo degli alias (sovrapponibili a differenza di children etc) che servono allo sviluppatore pià che altro.
+// conseguenza esistono solo due cose da gestire: i dati (le property) e i signal. da qui va da se che anche gli attr sono property, con tutto quello che ne derive (signal etc)
 
 /** Directives Demo */
 const $D = {
