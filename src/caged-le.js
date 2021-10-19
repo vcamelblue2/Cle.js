@@ -627,7 +627,7 @@ const isFunction = (what)=>typeof what === "function"
 // Framework
 
 class Property{
-  constructor(valueFunc, onGet, onSet, executionContext, registerToDepsHelper, init=true){
+  constructor(valueFunc, onGet, onSet, onDestroy, executionContext, registerToDepsHelper, init=true){
     // execution context per fare la bind poco prima di chiamare (o per non bindare e chiamare direttamente..)
     // "registerToDepsHelper..un qualcosa che mi fornisce il parent per registrarmi alle mie dpes..in modo da poter settare anche altro e fare in modo da non dover conoscere il mio padre, per evitare ref circolari"
     this.executionContext = (Array.isArray(executionContext) ? executionContext : [executionContext]).map(ec=>isFunction(ec) ? ec : ()=>ec) // interface for "dynamic execution context"..wrap in lambda aslo if not passed..
@@ -637,15 +637,16 @@ class Property{
     this.registeredDependency = [] // container of depsRemoverFunc
 
     if (init){
-      this.init(valueFunc, onGet, onSet) // helper, to separate prop definition from initializzation (for register)
+      this.init(valueFunc, onGet, onSet, onDestroy) // helper, to separate prop definition from initializzation (for register)
     }
   }
 
-  init(valueFunc, onGet, onSet){
+  init(valueFunc, onGet, onSet, onDestroy){
     this.isFunc = isFunction(valueFunc)
 
     this._onGet = onGet
     this._onSet = onSet
+    this._onDestroy = onDestroy
 
     this._latestResolvedValue = undefined
     this._valueFunc = valueFunc
@@ -673,6 +674,7 @@ class Property{
     if (alsoDependsOnMe){
       return this.removeAllOnChengedHandler() // this will return the old deps (eg. to restore deps after a destroy/recreate cycle)
     }
+    this._onDestroy && this._onDestroy()
   }
 
   __getRealVaule(){
@@ -1256,11 +1258,12 @@ class Component {
       })
     }
 
-    // first of all: declare all "data" possible property changes handler (in this way ww are sure that exist in the future for deps analysis)
+    // first of all: declare all "data" possible property changes handler (in this way ww are sure that exist in the future for deps analysis) - they also decalre a signal!
     if (this.convertedDefinition.data !== undefined){
       Object.entries(this.convertedDefinition.data).forEach(([k,v])=>{
-        // create but do not init
-        this.properties[k] = new Property(pass, pass, pass, ()=>this.$this, (thisProp, deps)=>{
+
+        // Create but do not init
+        this.properties[k] = new Property(pass, pass, pass, pass, ()=>this.$this, (thisProp, deps)=>{
 
           // deps connection logic
 
@@ -1285,7 +1288,14 @@ class Component {
           })
 
         }, false)
+
+        // Create associated Signal -> Every property has an associated signal, fired on change, that we use to notify interested components
+        let signalName = k+"Changed" // nomde del segnale che useranno i dev per definirlo nelle on.. name used to store signal
+        let manualMarkSignalName = "_"+k+"_changed" // nome visible ai dev per marcare manualmente la property come changed
+        this.signals[k+"Changed"] = new Signal(signalName, "stream => (newValue: any, oldValue: any) - property change signal")
+        this.properties[manualMarkSignalName] = ()=>this.properties[k].markAsChanged()
       })
+      console.log(this, this.signals, this.properties)
     }
 
     // signals def
@@ -1298,68 +1308,6 @@ class Component {
       console.log(this, this.signals, this.properties)
     }
 
-    // on_s (signal) def
-    if (this.convertedDefinition.on_s !== undefined){
-      console.log("ho un on_s definito", this)
-      Object.entries(this.convertedDefinition.on_s).forEach(([typologyNamespace, defs ])=>{
-        if (typologyNamespace === "this"){
-          Object.entries(defs).forEach(([s, fun])=>{
-            this.signals[s].addHandler(this, (...args)=>fun.bind(undefined, this.$this, ...args)())
-          })
-        }
-        if (typologyNamespace === "parent"){
-          Object.entries(defs).forEach(([s, fun])=>{
-            this.parent.signals[s].addHandler(this, (...args)=>fun.bind(undefined, this.$this, ...args)())
-          })
-        }
-        if (typologyNamespace === "le"){
-          Object.entries(defs).forEach(([leItem, leItemDefs])=>{ // get requested element name
-            Object.entries(leItemDefs).forEach(([s, fun])=>{
-              // exponential retry to handle signal
-              const setUpSignalHandler = (num_retry=0)=>{
-                try{
-                  // console.log("provo ad agganciare signal", leItem, s)
-                  this.$le[leItem].signals[s].addHandler(this, (...args)=>fun.bind(undefined, this.$this, ...args)())
-                }
-                catch{
-                  if (num_retry < 5) {
-                    setTimeout(()=>setUpSignalHandler(num_retry++), Math.min(1*(num_retry+1), 5))
-                  }
-                  else{
-                    console.log("WARNING!! unable to connect to the signal!! -> ", this, defs,)
-                  }
-                }
-              }
-              setUpSignalHandler()
-            })
-          })
-        }
-        // todo: fattorizzare con le, se possibile!
-        if (typologyNamespace === "ctx"){
-          Object.entries(defs).forEach(([ctxItem, ctxItemDefs])=>{ // get requested element name
-            Object.entries(ctxItemDefs).forEach(([s, fun])=>{
-              // exponential retry to handle signal
-              const setUpSignalHandler = (num_retry=0)=>{
-                try{
-                  // console.log("provo ad agganciare signal", leItem, s)
-                  this.$ctx[ctxItem].signals[s].addHandler(this, (...args)=>fun.bind(undefined, this.$this, ...args)())
-                }
-                catch{
-                  if (num_retry < 5) {
-                    setTimeout(()=>setUpSignalHandler(num_retry++), Math.min(1*(num_retry+1), 5))
-                  }
-                  else{
-                    console.log("WARNING!! unable to connect to the signal!! -> ", this, defs,)
-                  }
-                }
-              }
-              setUpSignalHandler()
-            })
-          })
-        }
-      })
-    }
-    
     // function def // NO DEPS SCAN AT THIS TIME
     if (this.convertedDefinition.def !== undefined){
       Object.entries(this.convertedDefinition.def).forEach(([k,v])=>{
@@ -1379,77 +1327,70 @@ class Component {
       })
     }
 
-    // on (property) def            // todo: al momento non va bene..sovrascrivo l'riginale self gestita nei parente ed le!!  qui devo passare a qualcosa dentro le Property, e inoltre fare in modo che nel proxy se riconosco il pattern "_xxxxpropnamexxx_changed" allora parlo della funzione di prop..alternativa al proxy gestisco come una var secondoaria di this.properties..ma poi la devo gestire!
-    if (this.convertedDefinition.on !== undefined){
-      Object.entries(this.convertedDefinition.on).forEach(([typologyNamespace, defs ])=>{
-        if (typologyNamespace === "this"){
-          Object.entries(defs).forEach(([k,v])=>{
-            // remove xxxChanged:
-            k = (k.split("").reverse().join("").replace("Changed".split("").reverse().join(""), "")).split("").reverse().join("") //replace from right stupid implementation
-            this.properties["_"+k+"_changed"] = (newVal, oldVal)=>v.bind(undefined, this.$this, newVal, oldVal)() // store the on change function as "_xxxxpropnamexxx_changed"..so you can always manually trigger "$.this._propertyX_changed("
-          })
-        }
-
-        if (typologyNamespace === "parent"){
-          Object.entries(defs).forEach(([k, v])=>{
-            // remove xxxChanged:
-            k = (k.split("").reverse().join("").replace("Changed".split("").reverse().join(""), "")).split("").reverse().join("") //replace from right stupid implementation
-            this.parent.properties["_"+k+"_changed"] = (newVal, oldVal)=>v.bind(undefined, this.$this, newVal, oldVal)() // store the on change function as "_xxxxpropnamexxx_changed"..so you can always manually trigger "$.this._propertyX_changed("
-          })
-        }
-        if (typologyNamespace === "le"){
-          Object.entries(defs).forEach(([leItem, leItemDefs])=>{ // get requested element name
-            Object.entries(leItemDefs).forEach(([k, v])=>{
-              // remove xxxChanged:
-              k = (k.split("").reverse().join("").replace("Changed".split("").reverse().join(""), "")).split("").reverse().join("") //replace from right stupid implementation
-              
-              // exponential retry to handle signal
-              const setUpProppChangeHandler = (num_retry=0)=>{
-                try{
-                  // console.log("provo ad agganciare signal", leItem, s)
-                  this.$le[leItem].properties["_"+k+"_changed"] = (newVal, oldVal)=>v.bind(undefined, this.$this, newVal, oldVal)() // store the on change function as "_xxxxpropnamexxx_changed"..so you can always manually trigger "$.this._propertyX_changed("
-                }
-                catch{
-                  if (num_retry < 5) {
-                    setTimeout(()=>setUpProppChangeHandler(num_retry++), Math.min(1*(num_retry+1), 5))
-                  }
-                  else{
-                    console.log("WARNING!! unable to connect to the prop!! -> ", this, defs,)
-                  }
-                }
-              }
-              setUpProppChangeHandler()
+    // on (property) | on_s (signal) def // todo: trigger on inti?
+    [this.convertedDefinition.on, this.convertedDefinition.on_s /*, this.convertedDefinition.on_a*/].forEach( handle_on_definition => {
+      if (handle_on_definition !== undefined){
+        console.log("ho un on/on_s/on_a definito", this)
+        Object.entries(handle_on_definition).forEach(([typologyNamespace, defs ])=>{
+          if (typologyNamespace === "this"){
+            Object.entries(defs).forEach(([s, fun])=>{
+              this.signals[s].addHandler(this, (...args)=>fun.bind(undefined, this.$this, ...args)())
             })
-          })
-        }
-        // todo: fattorizzare con le
-        if (typologyNamespace === "ctx"){
-          Object.entries(defs).forEach(([ctxItem, ctxItemDefs])=>{ // get requested element name
-            Object.entries(ctxItemDefs).forEach(([k, v])=>{
-              // remove xxxChanged:
-              k = (k.split("").reverse().join("").replace("Changed".split("").reverse().join(""), "")).split("").reverse().join("") //replace from right stupid implementation
-              
-              // exponential retry to handle signal
-              const setUpProppChangeHandler = (num_retry=0)=>{
-                try{
-                  // console.log("provo ad agganciare signal", leItem, s)
-                  this.$ctx[ctxItem].properties["_"+k+"_changed"] = (newVal, oldVal)=>v.bind(undefined, this.$this, newVal, oldVal)() // store the on change function as "_xxxxpropnamexxx_changed"..so you can always manually trigger "$.this._propertyX_changed("
-                }
-                catch{
-                  if (num_retry < 5) {
-                    setTimeout(()=>setUpProppChangeHandler(num_retry++), Math.min(1*(num_retry+1), 5))
-                  }
-                  else{
-                    console.log("WARNING!! unable to connect to the prop!! -> ", this, defs,)
-                  }
-                }
-              }
-              setUpProppChangeHandler()
+          }
+          if (typologyNamespace === "parent"){
+            Object.entries(defs).forEach(([s, fun])=>{
+              this.parent.signals[s].addHandler(this, (...args)=>fun.bind(undefined, this.$this, ...args)())
             })
-          })
-        }
-      })
-    }
+          }
+          if (typologyNamespace === "le"){
+            Object.entries(defs).forEach(([leItem, leItemDefs])=>{ // get requested element name
+              Object.entries(leItemDefs).forEach(([s, fun])=>{
+                // exponential retry to handle signal
+                const setUpSignalHandler = (num_retry=0)=>{
+                  try{
+                    // console.log("provo ad agganciare signal", leItem, s)
+                    this.$le[leItem].signals[s].addHandler(this, (...args)=>fun.bind(undefined, this.$this, ...args)())
+                  }
+                  catch{
+                    if (num_retry < 5) {
+                      setTimeout(()=>setUpSignalHandler(num_retry++), Math.min(1*(num_retry+1), 5))
+                    }
+                    else{
+                      console.log("WARNING!! unable to connect to the signal!! -> ", this, defs,)
+                    }
+                  }
+                }
+                setUpSignalHandler()
+              })
+            })
+          }
+          // todo: fattorizzare con le, se possibile!
+          if (typologyNamespace === "ctx"){
+            Object.entries(defs).forEach(([ctxItem, ctxItemDefs])=>{ // get requested element name
+              Object.entries(ctxItemDefs).forEach(([s, fun])=>{
+                // exponential retry to handle signal
+                const setUpSignalHandler = (num_retry=0)=>{
+                  try{
+                    // console.log("provo ad agganciare signal", leItem, s)
+                    this.$ctx[ctxItem].signals[s].addHandler(this, (...args)=>fun.bind(undefined, this.$this, ...args)())
+                  }
+                  catch{
+                    if (num_retry < 5) {
+                      setTimeout(()=>setUpSignalHandler(num_retry++), Math.min(1*(num_retry+1), 5))
+                    }
+                    else{
+                      console.log("WARNING!! unable to connect to the signal!! -> ", this, defs,)
+                    }
+                  }
+                }
+                setUpSignalHandler()
+              })
+            })
+          }
+        })
+      }
+    })
+    
 
     // data, TODO: check deps on set, "cached get", support function etc
     if (this.convertedDefinition.data !== undefined){
@@ -1459,10 +1400,10 @@ class Component {
         this.properties[k].init(
           v,
           ()=>debug.log(k, "getted!!"), 
-          (v, ojV, self)=>{
-            debug.log(k, "setted!!", this); 
-            "_"+k+"_changed" in this.properties && this.properties["_"+k+"_changed"](v, this.properties[k]._latestResolvedValue);
-          }
+          (v, ojV, self)=>{ debug.log(k, "setted!!", this); 
+            this.signals[k+"Changed"].emit(v, this.properties[k]._latestResolvedValue);
+          },
+          //()=>{console.log("TODO: on destroy clear stuff and signal!!")}
         )
         debug.log("!!!!!", this, this.properties)
       })
@@ -1572,7 +1513,7 @@ class Component {
       let args = {}
       if (this.oj_definition.init !== undefined){
         Object.entries(this.oj_definition.init).forEach(([p, v])=>{
-          args[p] = isFunction(v) ? v.bind(undefined, this.$this) : v
+          args[p] = isFunction(v) ? v.bind(undefined, this.$this) : v // todo: questo è un mezzo errore..perchè in questo modo non ruisciro a parsare le dipendenze nel caso di set di una prop..perchè è già bindata! d'altro canto a me potrebbero servire i valori..qui è da capire..
         })
       }
       this.hooks.constructor = this.convertedDefinition.constructor.bind(undefined, this.$this, args)
