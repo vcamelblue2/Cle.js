@@ -2129,6 +2129,34 @@ const AddTodoButton = {
   }
 }
 
+const ReGenTodoView = $ => {
+
+    let $$ = $
+
+    $.this.oldRenderized?.destroy()
+    $.this.el.innerText = "" // simple clear all content..[without remove handlers etc..] to be sure all is clear!
+
+    $.this.oldRenderized = RenderApp($$.this.el, {
+      
+      div: { 
+        "=>": $.le.model.todolist.map( todo => ( {
+          
+          div: { "=>": [
+
+            { button: {
+              text: "remove",
+              handle: {
+                onclick: $ => $$.le.model.remove(todo)
+              }
+            }},
+
+            { span: {text: todo, attrs: { style: {marginLeft:"15px"}}}},
+          ]}
+
+        })) 
+      }
+    })
+}
 const TodoListContainer = { 
   div: {
     id: "todoContainer",
@@ -2138,33 +2166,7 @@ const TodoListContainer = {
     },
 
     on: { le: { model: {
-      todolistChanged: $ => {
-
-        console.log("changeeeeed")
-        let $$ = $
-
-        $.this.oldRenderized?.map(r=>r?.destroy())
-        $.this.el.innerText = ""
-
-        $.this.oldRenderized = $.le.model.todolist.map(todo=>{
-
-          RenderApp($$.this.el, {
-            div: { "=>": [
-
-              { button: {
-                text: "remove",
-                handle: {
-                  onclick: $ => $$.le.model.remove(todo)
-                }
-              }},
-
-              { span: {text: todo, attrs: { style: {marginLeft:"15px"}}}},
-            ]}
-          })
-
-        })
-
-      }
+      todolistChanged: ReGenTodoView
     }}}
   }
 }
@@ -2181,7 +2183,7 @@ RenderApp(document.body, {
 
       // Gui
       Use(TodoInput, { 
-        attrs: { ...TodoInput.input.attrs,  style: {width: "calc(100% - 90px)"}}
+        attrs: { style: {width: "calc(100% - 90px)"} }
       }),
 
       Use(AddTodoButton, { 
