@@ -1132,7 +1132,7 @@ class Component {
   childs // Component []
 
   properties = {}// real Props Container, exposed (in a certain way) to the dev
-  // attrPropertyes = {}// real attr Props Container // todo: qualcosa del genere per gli attr
+  // attrProperties = {}// real attr Props Container // todo: qualcosa del genere per gli attr
   signals = {} // type {signalX: Signal}
   hooks = {}// hook alle onInit dei componenti etc..
 
@@ -1243,7 +1243,7 @@ class Component {
     this.properties.parent = this.parent?.$this?.this // ha senso??? rischia di spaccare tutto.. recursive this.parent.parent & parent.parent le.x.parent.. etc..
 
     // todo: qualcosa del genere per gli attr
-    // this.properties.attr = ComponentProxy(this.attrPropertyes)
+    // this.properties.attr = ComponentProxy(this.attrProperties)
 
     // todo: parent and le visible properties only..
     this.$parent = (this.parent instanceof Component) ? ComponentProxy(this.parent.properties) : undefined
@@ -1313,13 +1313,14 @@ class Component {
       Object.entries(this.convertedDefinition.def).forEach(([k,v])=>{
         let _isFunc = isFunction(v)
         if (!_isFunc){ // is a namespace
-          this.properties[k] = ComponentProxy({}) // maby is a normal obj??
+          this.properties[k] = {}
           Object.entries(v).forEach(([kk,vv])=>{
             this.properties[k][kk] = (...args)=>vv.bind(undefined, this.$this, ...args)()
 
             // let staticDeps = analizeDepsStatically(vv) // TODO: static deps analysis
 
           })
+          this.properties[k] = ComponentProxy(this.properties[k]) // maby is a normal obj??
         }
         else{
           this.properties[k] = (...args)=>v.bind(undefined, this.$this, ...args)()
