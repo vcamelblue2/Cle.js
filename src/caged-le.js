@@ -1418,7 +1418,16 @@ class Component {
         if (k === "style"){
 
           const resolveObjStyle = (o)=> typeof o === "object" ? toInlineStyle(o) : o
-          const setupStyle = (s)=>this.html_pointer_element.setAttribute("style", resolveObjStyle( isFunction(s) ? s.bind(undefined, this.$this)() : s ).toString()) 
+          const setupStyle = (s)=>{ 
+            let val = isFunction(s) ? s.bind(undefined, this.$this)() : s
+            if ((val === null || val === undefined)) { 
+              if(this.html_pointer_element.hasAttribute("style")) { 
+                this.html_pointer_element.removeAttribute("style") 
+              }
+            } else { 
+              this.html_pointer_element.setAttribute("style", resolveObjStyle( val ).toString())
+            } 
+          }
 
           if (isFunction(v)){
             let staticDeps = analizeDepsStatically(v) // WARNING actally w're bypassing the "deps storage" machanism..this wil break deps update in future!!!
@@ -1455,7 +1464,16 @@ class Component {
         else {
 
           if (isFunction(v)){
-            let setupValue = ()=>this.html_pointer_element.setAttribute(k, v.bind(undefined, this.$this)().toString()) 
+            const setupValue = ()=>{ 
+              const val = v.bind(undefined, this.$this)(); 
+              if ((val === null || val === undefined)) { 
+                if (this.html_pointer_element.hasAttribute(k)) { 
+                  this.html_pointer_element.removeAttribute(k)
+                }
+              } else { 
+                this.html_pointer_element.setAttribute(k, val.toString())
+              } 
+            }
 
             let staticDeps = analizeDepsStatically(v) // WARNING actally w're bypassing the "deps storage" machenism..this wil break deps update in future!!!
             console.log("attr static deps", staticDeps)
@@ -1484,7 +1502,13 @@ class Component {
 
           }
           else {
-            this.html_pointer_element.setAttribute(k, v.toString()) 
+            if ((v === null || v === undefined)) { 
+              if (this.html_pointer_element.hasAttribute(k)) { 
+                this.html_pointer_element.removeAttribute(k) 
+              }
+            } else { 
+              this.html_pointer_element.setAttribute(k, v.toString())
+            } 
           }
         }
       })
@@ -1952,11 +1976,11 @@ RenderApp(document.body, {
                 onclick: ($, e) => { $.this.bgColor = $.this.bgColor === "red" ? "blue" : "red"; e.stopPropagation();}
               },
               attrs: {
-                style: $ => ({
+                style: $ => ($.parent.counter % 11 !== 0 ? {
                   width: 100,
                   height: ( $.parent.counter * 2 )  + "px",
                   backgroundColor: $.this.bgColor
-                })
+                } : undefined)
               },
               text: "gooo",
             }},
