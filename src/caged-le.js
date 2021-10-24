@@ -1291,7 +1291,7 @@ class Component {
 
         // Create associated Signal -> Every property has an associated signal, fired on change, that we use to notify interested components
         let signalName = k+"Changed" // nomde del segnale che useranno i dev per definirlo nelle on.. name used to store signal
-        let manualMarkSignalName = "_"+k+"_changed" // nome visible ai dev per marcare manualmente la property come changed
+        let manualMarkSignalName = "_mark_"+k+"_as_changed" // nome visible ai dev per marcare manualmente la property come changed
         this.signals[signalName] = new Signal(signalName, "stream => (newValue: any, oldValue: any) - property change signal")
         this.properties[manualMarkSignalName] = ()=>this.properties[k].markAsChanged() // via on set scatenerà il signal etc!
       })
