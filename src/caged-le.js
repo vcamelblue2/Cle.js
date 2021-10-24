@@ -421,7 +421,7 @@ const component = {
       ),
 
 
-      { Model | Controller: { // OBJECT
+      { Model | Controller | Connector: { // OBJECT, invisible, usefull for app logic and data manipulation
         data: {prop1: 23},
 
         ["=>"]: [
@@ -1165,7 +1165,7 @@ class Component {
     this.oj_definition = definition
 
     this.htmlElementType = getComponentType(definition)
-    this.isObjComponent = ["Model", "Controller"].includes(this.htmlElementType)
+    this.isObjComponent = ["Model", "Controller", "Connector"].includes(this.htmlElementType)
     this.convertedDefinition = Component.parseComponentDefinition( (definition instanceof UseComponentDeclaration ? definition.computedTemplate : definition) [this.htmlElementType])
 
     this.id = this.convertedDefinition.id
