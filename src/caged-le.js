@@ -1048,6 +1048,16 @@ class ComponentsContainerProxy {
   }
 }
 
+// TODO: manually specify the remap event, throttling, lazy..
+class Binding {
+  constructor(bindFunc, remap, event){
+    this.bindFunc = bindFunc
+    this.remap = remap
+    this.event = event
+  }
+}
+const Bind = (bindFunc, {remap=undefined, event=undefined}={}) => new Binding(bindFunc, remap, event)
+
 
 
 const RenderApp = (html_root, definition)=>{
@@ -1413,6 +1423,10 @@ class Component {
     // attributes, TODO: support function etc
     if (this.convertedDefinition.attrs !== undefined){
       debug.log("attrs ", this.convertedDefinition.attrs)
+
+      // let has2WayBinding = Object.values(this.convertedDefinition.attrs).find(v=>v instanceof Binding) !== undefined
+      let _2WayPropertyBindingToHandle = {}
+
       Object.entries(this.convertedDefinition.attrs).forEach(([k,v])=>{
         debug.log("attr: ", k,v)
         if (k === "style"){
@@ -1461,9 +1475,7 @@ class Component {
           setupStyle(v)
 
         } 
-        else {
-
-          if (isFunction(v)){
+        else if (isFunction(v)){
             const setupValue = ()=>{ 
               const val = v.bind(undefined, this.$this)(); 
               if ((val === null || val === undefined)) { 
@@ -1500,19 +1512,125 @@ class Component {
 
             setupValue()
 
-          }
-          else {
-            if ((v === null || v === undefined)) { 
-              if (this.html_pointer_element.hasAttribute(k)) { 
-                this.html_pointer_element.removeAttribute(k) 
-              }
-            } else { 
-              this.html_pointer_element.setAttribute(k, v.toString())
-            } 
-          }
         }
+        else if (v instanceof Binding){ // todo: qui in realtà non va bene..perchè potenzialmente il 'type' di input lo parso dopo value se il programmatore me lo ha messo così..
+          console.log("binding attr: ", k,v, this)
+
+          const _binding = v;
+          v = v.bindFunc
+
+          const setupValue = ()=>{ 
+            const val = v.bind(undefined, this.$this)(); 
+            if (val !== this.html_pointer_element[k]){ //set only if different!
+              this.html_pointer_element[k] = val?.toString()
+            }
+            
+          }
+
+          let staticDeps = analizeDepsStatically(v) // WARNING actally w're bypassing the "deps storage" machenism..this wil break deps update in future!!!
+          console.log("attr static deps", staticDeps)
+          // todo: in realtà è mutualmente escusivo, e solo 1 dep il property binding!
+          staticDeps.$this_deps?.forEach(d=>{
+            debug.log("pushooooo")
+            this.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
+            _2WayPropertyBindingToHandle[k] = ()=>this.properties[d]
+          }) 
+
+          staticDeps.$parent_deps?.forEach(d=>{
+            debug.log("pushooooo")
+            this.parent.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
+            _2WayPropertyBindingToHandle[k] = ()=>this.parent.properties[d]
+          })
+
+          staticDeps.$le_deps?.forEach(d=>{ // [le_id, property]
+            debug.log("pushooooo")
+            this.$le[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
+            _2WayPropertyBindingToHandle[k] = ()=>this.$le[d[0]].properties[d[1]]
+          })
+
+          staticDeps.$ctx_deps?.forEach(d=>{ // [ctx_id, property]
+            debug.log("pushooooo")
+            this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
+            _2WayPropertyBindingToHandle[k] = ()=>this.$ctx[d[0]].properties[d[1]]
+          })
+
+          // now manually configure the binding
+          if ((this.htmlElementType === "input" || this.htmlElementType === "div") && ["value", "checked"].includes(k)){
+            if ( ( ! ["button", "hidden", "image", "reset", "submit", "file"].includes(this.convertedDefinition.attrs.type)) ){
+              console.log("2 way bidning, ci sonooooooooo", k, this)
+              let handlerFor2WayDataBinding = (e)=>{ 
+                console.log("changed handled!!")
+                // e.stopPropagation(); 
+                let bindedProps = _2WayPropertyBindingToHandle[k]()
+                let newValue = _binding.remap !== undefined ? _binding.remap.bind(undefined, this.$this)(e.target[k], e) : e.target[k]
+                if(bindedProps.value !== newValue) {
+                  bindedProps.value = newValue
+                }
+              }
+              console.log("scelgoooooooo", _binding.event ?? "input", k, this)
+              this.html_pointer_element.addEventListener(_binding.event ?? "input", handlerFor2WayDataBinding)
+              let remover = ()=>this.html_pointer_element.removeEventListener(_binding.event ?? "input", handlerFor2WayDataBinding) // per la destroy..
+            }
+          }
+          else if(this.htmlElementType === "textarea"){
+            // todo..in realtà basta anche qui oninput e accedere a .value ...in alternativa textContent.. ma qui ho il problema che non so ancora come settare il valore..visto che in realtà useri text e quindi i child..
+          }
+          else if(this.htmlElementType === "select" && k === 'value' && this.convertedDefinition.attrs.multiple === undefined){ // todo: multiple is not supported at this time.. https://stackoverflow.com/questions/11821261/how-to-get-all-selected-values-from-select-multiple-multiple
+            let handlerFor2WayDataBinding = (e)=>{ 
+              // e.stopPropagation(); 
+              let bindedProps = _2WayPropertyBindingToHandle[k]()
+              let newValue = _binding.remap !== undefined ? _binding.remap.bind(undefined, this.$this)(e.target[k], e) : e.target[k]
+              if(bindedProps.value !== newValue) {
+                bindedProps.value = newValue 
+              }
+            }
+            this.html_pointer_element.addEventListener(_binding.event ?? "change", handlerFor2WayDataBinding)
+            let remover = ()=>this.html_pointer_element.removeEventListener(_binding.event ?? "change", handlerFor2WayDataBinding) // per la destroy..
+          
+          }
+          else if(this.htmlElementType === "details" && k === "open"){
+            // todo
+          }
+
+          setupValue()
+
+        }
+        else {
+          if ((v === null || v === undefined)) { 
+            if (this.html_pointer_element.hasAttribute(k)) { 
+              this.html_pointer_element.removeAttribute(k) 
+            }
+          } else { 
+            this.html_pointer_element.setAttribute(k, v.toString())
+          } 
+        }
+        
       })
 
+    //   // todo: vedi https://stackoverflow.com/a/55737231 e/o https://stackoverflow.com/a/51056988
+    //   // observer non va a quanto pare..per il discorso che attr e prop sottostanti non viaggiano insieme!
+    //   // Now, watch 2 way binded attr for changes (when value is different than ours in property)
+    //   if (has2WayBinding){
+    //     console.log("has 2 way binding!!")
+    //     let observer = new MutationObserver(function(mutations) {
+    //       mutations.forEach(function(mutation) {
+    //         console.log("something changeddd", mutation)
+    //         if (mutation.type == "attributes") {
+    //           console.log("attributes changed", mutation)
+    //           let bindedProps = _2WayPropertyBindingToHandle[mutation.attributeName]()
+    //           if(bindedProps.value !== mutation.target[mutation.attributeName]){ //set only if different! aka is from usr input [or direct html manipulation..]
+    //             bindedProps.value = mutation.target[mutation.attributeName]
+    //             console.log("setted!!")
+    //           } // else, we are editing the value..
+    //         }
+    //       });
+    //     });
+    //     observer.observe(this.html_pointer_element, {
+    //       attributes: true //configure it to listen to attribute changes
+    //     });
+    //   }
+
+      // OLD::
       // first: convert as property.. then, create mutation observer, and watch for changes (when value is different than ours in property)
 
       //   observer = new MutationObserver(function(mutations) {
@@ -1778,8 +1896,14 @@ class IterableViewComponent{
 // TESTING
 
 
-// TODO: Mutation Observer to handle 2wayPropertyBinding
 
+//// TODO OOOOO: tutto è un signal: ovvero le prop hanno dei signal associati (signal particolari, che portano con se il vecchio e il nuovo valore al triggher.. ergo: on, on_s e on_a sono solo degli alias (sovrapponibili a differenza di children etc) che servono allo sviluppatore pià che altro.
+// conseguenza esistono solo due cose da gestire: i dati (le property) e i signal. da qui va da se che anche gli attr sono property, con tutto quello che ne derive (signal etc)
+
+
+const app0 = ()=>{
+
+// LIB COMPONENTS
 const Timer = {
   Model: {
 
@@ -1838,9 +1962,6 @@ const Timer = {
     }}
   }
 }
-
-//// TODO OOOOO: tutto è un signal: ovvero le prop hanno dei signal associati (signal particolari, che portano con se il vecchio e il nuovo valore al triggher.. ergo: on, on_s e on_a sono solo degli alias (sovrapponibili a differenza di children etc) che servono allo sviluppatore pià che altro.
-// conseguenza esistono solo due cose da gestire: i dati (le property) e i signal. da qui va da se che anche gli attr sono property, con tutto quello che ne derive (signal etc)
 
 /** Directives Demo */
 const $D = {
@@ -1925,8 +2046,7 @@ const CtxEnabledComponent = {
   }
 }
 
-console.log(
-RenderApp(document.body, {
+const app_root = RenderApp(document.body, {
     div: { 
         data: { counter: 10 },
 
@@ -2073,14 +2193,165 @@ RenderApp(document.body, {
         ] 
     }
 })
-)
+
+console.log(app_root)
+}
 
 
 
+const test2way = ()=>{ console.log(
+  RenderApp(document.body, { 
+    div: {
+      "=>": [
+        
+        { input: {
+          id: "myInput",
+      
+          data: { text: "Hello!" },
+      
+          on: { this: {
+            textChanged: ($, newText, oldText)=>console.log("text changeeeeeeddddd", newText, oldText) // le: { mySelect: {selectedChanged: ($, sel)=>$.this.text = sel}}},
+          }}, 
+      
+          attrs: {
+            id: "myInput",
+            value: Bind($ => $.this.text)
+          },
+      
+        }},
+
+        { select: {
+          id: "mySelect",
+      
+          data: { selected: "pirelli" },
+
+          on: { this: {
+            selectedChanged: ($, _new, _old)=>console.log("select changeeeeeeddddd", _new, _old)
+          }},
+
+          attrs: {
+            value: Bind($ => $.this.selected)
+          },
+          "=>": [
+            { option: { attrs: {value: "pirelli"}, text:"Pirelli"}},
+            { option: { attrs: {value: "dunlop"}, text:"Dunlop"}},
+            { option: { attrs: {value: "michelin"}, text:"Michelin"}},
+          ],
+
+          afterInit: $ => $.this._mark_selected_as_changed()
+        }},
+
+        { select: {
+          id: "mySelectAdvanced",
+
+          data: { 
+            options: [
+              {val:"-", label:"-"}, 
+              {val:"pirelli", label:"Pirelli"}, 
+              {val:"dunlop", label:"Dunlop"}, 
+              {val:"michelin", label:"Michelin"}
+            ], 
+            selected: undefined 
+          },
+      
+          on: { this: {
+            selectedChanged: ($, _new, _old)=>console.log("select advanced changeeeeeeddddd", _new, _old)
+          }},
+      
+          attrs: {
+            value: Bind($ => $.this.selected?.val,  { 
+                    remap: ($, v)=>$.this.options.find(o=>o.val===v) 
+            })
+          },
+
+          "=>": [
+            ...[0,1,2,3].map( i => ( // stupid generator untill le for
+              { option: { attrs: { value: $ => $.parent.options[i].val }, text: $ => $.parent.options[i].label}}
+            ))
+          ],
+
+          afterInit: $ => $.this.selected = $.this.options[1],
+
+        }},
+
+        { form: { 
+          "=>": { 
+            fieldset: { // fieldset solo per farlo più carino..l'importante è la form..per fare .value e non pippe strane di filtering del checked..
+              id: "myRadio",
+          
+              data: { selected: "dunlop" },
+              // così però devo riferinire un sengale se voglio rendere il componente riutilizzabile..
+              on: { this: {
+                selectedChanged: ($, _new, _old)=>{ $.parent.el.elements.company.value = $.this.selected; console.log("radio changeeeeeeddddd", _new, _old)}
+              }},
+
+              // todo..più potere ad attr..devo avere la possibilità di definirne i nested..del tipo "form.elements.company.value" .. mi basta il solito split col punto e via..
+              // attrs: {
+              //   value: Bind($ => { // qui value non ha alcun senso visto che devo puntare a value della form per avere i benefici
+              //     $.parent.el.elements.company.value = $.this.selected;
+              //     return $.this.selected;
+              //   }, {remap: ($, v)=>{
+              //     console.log($.this.el)
+              //     return $.parent.el.elements.company.value
+              //   }, event: "change"})
+              // },
+
+              handle: {
+                onchange: $ => { // si applicherà a tutti i sotto elementi..
+                  $.this.selected = $.parent.el.elements.company.value
+                  console.log($.this.el)
+                }
+              },
+              "=>": [
+                { legend: { text: "Select Company"}},
+                { input: { attrs: {type:"radio", name:"company", value: "pirelli"}}}, {label: { text: "Pirelli"}},
+                { input: { attrs: {type:"radio", name:"company", value: "dunlop"}}}, {label: { text: "Dunlop"}},
+                { input: { attrs: {type:"radio", name:"company", value: "michelin"}}}, {label: { text: "Michelin"}},
+              ],
+
+              afterInit: $ => $.this._mark_selected_as_changed()
+            }
+          } 
+        }},
+
+        { button: {
+
+          text: "reset",
+          
+          on: { le: { 
+            myInput: {
+              textChanged: $ => console.log("sono button, è cambiato il text in input!!")
+            },
+            mySelect: {
+              selectedChanged: $ => console.log("sono button, è cambiato il selected in input!!")
+            },
+            mySelectAdvanced: {
+              selectedChanged: $ => console.log("sono button, è cambiato il selected advanced in input!!")
+            },
+            myRadio: {
+              selectedChanged: $ => console.log("sono button, è cambiato il radio in input!!")
+            }
+          }},
+
+          handle: {
+            onclick: $ => {
+              $.le.myInput.text = "resetted!"
+              $.le.mySelect.selected = "dunlop"
+              $.le.mySelectAdvanced.selected = $.le.mySelectAdvanced.options.find(o=>o.val === "dunlop")
+              $.le.myRadio.selected = "dunlop"
+              $.le.myRadio2.selected = "dunlop"
+            }
+          }
+        }}
+      ]
+    }
+  })
+)}
 
 
 // TODO LIST DEMO
-/*
+const appTodolist = ()=> {
+
 const TodoListModel = { 
   Model: {
     id: "model",
@@ -2196,7 +2467,7 @@ const TodoListContainer = {
   }
 }
 
-RenderApp(document.body, {
+const app_root = RenderApp(document.body, {
   div: {
     id: "appRoot",
 
@@ -2222,4 +2493,11 @@ RenderApp(document.body, {
     ]
   }
 })
-*/
+console.log(app_root)
+
+}
+
+
+// app0()
+test2way()
+// appTodolist()
