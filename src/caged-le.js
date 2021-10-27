@@ -320,7 +320,7 @@ const component = {
       // è anche possibile "autopropagare" i segnali che elaboro, senza ridefinirli (per favorire sub child to parent flow, o evitare inutili remap), come?  con una classe/costante che instanziamo e dunque definire: ctx: {subchildSignal: Autopropagate}
     },
 
-    on_a {
+    on_a { /////// AL MOMENTO NON PREVISITO!!!
       this: {
         "class" | "style.width" : $ => ... 
       }
@@ -332,8 +332,8 @@ const component = {
 
     "private:"? def: {
       resetCounter: $ => {
-        $.counter = 0
-        $.counterReset.emit()
+        $.this.counter = 0
+        $.this.counterReset.emit()
       }, 
 
       utils: { // def namespace example
@@ -355,14 +355,23 @@ const component = {
       }, // oppure style: $ => ({ width... }) su questo devo ancora ragionare..
 
       class: "someclass"
+
+      "@lazy:scrollTop": 100 // con il prefisso '@lazy:' indico che quell'attributo lo voglio inizializzare lazy!
+
+      value: Bind($ => $.this.counter) // per effettuare 2 way data binding!
     
       // todo: style e class devono stare separati?? in roba apposita? in teoria si..perchè così potremmo anche andare a utilizzarli per creare l'anchors system definitivo..visto che starebbero in qualcosa di separato è anche più facile la sovrascrittura..
     },
     // NB: ricordarsi che è possibile osservare i changes degli attributi tramite un semplicissimo "mutationObserver"..questo ci permette di fare il 2 way binding in modo super semplice! infatti basta fare questa cosa: https://stackoverflow.com/a/41425087 unita al una classe che usiamo come trap per configurare il 2 way binding! ovviamente dovrà essere possibile configurare anche solo il flusso attr to property, in modo p.es da bindre la select a una nostra property in modo unidirezionale
 
 
-    // hAttr ... "harmfulAttr" todo, capire se ha senso..in pratica qui non settiamo via "setAttribute", ma direttamente via this.el.xxxx = 
-
+    // hattrs ... "harmfulAttr" todo, capire se ha senso..in pratica qui non settiamo via "setAttribute", ma direttamente via this.el.xxxx = e anche in ricorsione..
+    "private:"? hattrs | ha: {
+      scrollTop: "0px",
+      'style.backgroundColor': "red",
+      'myAttr.nested.prop': $ => "follow some stuff"
+      "@lazy:scrollTop": Bind($ => $.this.counter) // per lazy binding!
+    }
 
     handle: { // html event
       onclick: ($, e) => $.count++
@@ -377,7 +386,8 @@ const component = {
 
         attrs: {
           style: {
-            width: 400
+            width: 400,
+            backgroundColor: "red"
           }
         }
       }
@@ -448,7 +458,7 @@ first_lvl = ["signals", "dbus_signals", "data", "private:data", "props", "privat
 second_lvl = ["on", "on_s", "on_a"]
 first_or_second_lvl = ["def", "private:def"] // check for function (may exist "first lvl namespace")
 // TODO: actually merge unsupported
-"attrs", "private:attrs", "a", "private:a", define_css, states, state, stateChangeStrategy, onState, contains | childs | text | '>>' | '=>' | _???
+"hattrs", "ha", "private:hattrs", "private:ha", "attrs", "private:attrs", "a", "private:a", define_css, states, state, stateChangeStrategy, onState, contains | childs | text | '>>' | '=>' | _???
 
 
 
@@ -623,6 +633,15 @@ const toInlineStyle = /** @param {CSSStyleDeclaration | ()=>CSSStyleDeclaration}
 
 const isFunction = (what)=>typeof what === "function"
 
+const recursiveAccessor = (pointer, toAccess)=>{
+  // console.log("recursiveAccessor", pointer, toAccess)
+  if (toAccess.length === 1)
+    return [pointer, toAccess[0]]
+  else {
+    // console.log("ritornerò: ", pointer, toAccess[0], pointer[toAccess[0]])
+    return recursiveAccessor(pointer[toAccess[0]], toAccess.slice(1))
+  }
+}
 
 // Framework
 
@@ -1038,9 +1057,9 @@ class ComponentsContainerProxy {
 
   constructor(){
 
-    this.proxy = new Proxy(this, {
+    this.proxy = new Proxy(this, { // todo..proxy è visibile all'interno?????? bug???
       get: function (target, prop, receiver){
-        console.log(target, prop, target[prop], target[prop].$this.this)
+        debug.log(target, prop, target[prop], target[prop].$this.this)
         return target[prop].$this.this
       }
     })
@@ -1187,6 +1206,15 @@ class Component {
     }
     if (this._id !== undefined){
       this.$ctx[this._id] = this
+    }
+
+    // USE _root_ e _ctxroot_ per accedere alla root di tutto e alla root del context
+    if(this.isMyParentHtmlRoot){
+      this.$le["_root_"] = this
+    }
+
+    if(this.isA$ctxComponent){
+      this.$ctx["_ctxroot_"] = this
     }
 
   }
@@ -1428,183 +1456,201 @@ class Component {
       let _2WayPropertyBindingToHandle = {}
 
       Object.entries(this.convertedDefinition.attrs).forEach(([k,v])=>{
-        debug.log("attr: ", k,v)
-        if (k === "style"){
+        
+        const toExecMabyLazy = (k)=>{
+          debug.log("attr: ", k,v)
 
-          const resolveObjStyle = (o)=> typeof o === "object" ? toInlineStyle(o) : o
-          const setupStyle = (s)=>{ 
-            let val = isFunction(s) ? s.bind(undefined, this.$this)() : s
-            if ((val === null || val === undefined)) { 
-              if(this.html_pointer_element.hasAttribute("style")) { 
-                this.html_pointer_element.removeAttribute("style") 
-              }
-            } else { 
-              this.html_pointer_element.setAttribute("style", resolveObjStyle( val ).toString())
-            } 
-          }
-
-          if (isFunction(v)){
-            let staticDeps = analizeDepsStatically(v) // WARNING actally w're bypassing the "deps storage" machanism..this wil break deps update in future!!!
-            debug.log("attr static deps", staticDeps)
-
-            staticDeps.$this_deps?.forEach(d=>{
-              debug.log("pushooooo")
-              this.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupStyle(v) ) // questa cosa da rivdere...il who non lo salviam ma in generale ora questa roba deve essere una prop, fully automated!
-            }) // supporting multiple deps, but only of first order..
-
-            staticDeps.$parent_deps?.forEach(d=>{
-              debug.log("pushooooo")
-              this.parent.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupStyle(v) )
-            })
-
-            staticDeps.$le_deps?.forEach(d=>{ // [le_id, property]
-              debug.log("pushooooo")
-              this.$le[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k], ()=>setupStyle(v) )
-            })
-
-            staticDeps.$ctx_deps?.forEach(d=>{ // [ctx_id, property]
-              debug.log("pushooooo")
-              this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k], ()=>setupStyle(v) )
-            })
-
+          if (k.includes(".")){ // devo andare a settare l'attr as property dinamicamente [nested!]
+            console.log("WARNING!!! ATTRS does not support '.' property navigation!!")
           }
           else {
+            if (k === "style"){
 
-          }
+              const resolveObjStyle = (o)=> typeof o === "object" ? toInlineStyle(o) : o
+              const setupStyle = (s)=>{ 
+                let val = isFunction(s) ? s.bind(undefined, this.$this)() : s
+                if ((val === null || val === undefined)) { 
+                  if(this.html_pointer_element.hasAttribute("style")) { 
+                    this.html_pointer_element.removeAttribute("style") 
+                  }
+                } else { 
+                  this.html_pointer_element.setAttribute("style", resolveObjStyle( val ).toString())
+                } 
+              }
 
-          setupStyle(v)
+              if (isFunction(v)){
+                let staticDeps = analizeDepsStatically(v) // WARNING actally w're bypassing the "deps storage" machanism..this wil break deps update in future!!!
+                debug.log("attr static deps", staticDeps)
 
-        } 
-        else if (isFunction(v)){
-            const setupValue = ()=>{ 
-              const val = v.bind(undefined, this.$this)(); 
-              if ((val === null || val === undefined)) { 
+                staticDeps.$this_deps?.forEach(d=>{
+                  debug.log("pushooooo")
+                  this.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupStyle(v) ) // questa cosa da rivdere...il who non lo salviam ma in generale ora questa roba deve essere una prop, fully automated!
+                }) // supporting multiple deps, but only of first order..
+
+                staticDeps.$parent_deps?.forEach(d=>{
+                  debug.log("pushooooo")
+                  this.parent.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupStyle(v) )
+                })
+
+                staticDeps.$le_deps?.forEach(d=>{ // [le_id, property]
+                  debug.log("pushooooo")
+                  this.$le[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k], ()=>setupStyle(v) )
+                })
+
+                staticDeps.$ctx_deps?.forEach(d=>{ // [ctx_id, property]
+                  debug.log("pushooooo")
+                  this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k], ()=>setupStyle(v) )
+                })
+
+              }
+              else {
+
+              }
+
+              setupStyle(v)
+
+            } 
+            else if (isFunction(v)){
+                const setupValue = ()=>{ 
+                  const val = v.bind(undefined, this.$this)(); 
+                  if ((val === null || val === undefined)) { 
+                    if (this.html_pointer_element.hasAttribute(k)) { 
+                      this.html_pointer_element.removeAttribute(k)
+                    }
+                  } else { 
+                    this.html_pointer_element.setAttribute(k, val.toString())
+                  } 
+                }
+
+                let staticDeps = analizeDepsStatically(v) // WARNING actally w're bypassing the "deps storage" machenism..this wil break deps update in future!!!
+                console.log("attr static deps", staticDeps)
+
+                staticDeps.$this_deps?.forEach(d=>{
+                  debug.log("pushooooo")
+                  this.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
+                }) // supporting multiple deps, but only of first order..
+
+                staticDeps.$parent_deps?.forEach(d=>{
+                  debug.log("pushooooo")
+                  this.parent.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
+                })
+
+                staticDeps.$le_deps?.forEach(d=>{ // [le_id, property]
+                  debug.log("pushooooo")
+                  this.$le[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
+                })
+
+                staticDeps.$ctx_deps?.forEach(d=>{ // [ctx_id, property]
+                  debug.log("pushooooo")
+                  this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
+                })
+
+                setupValue()
+
+            }
+            else if (v instanceof Binding){ 
+              console.log("binding attr: ", k,v, this)
+
+              const _binding = v;
+              v = v.bindFunc
+
+              const setupValue = ()=>{ 
+                const val = v.bind(undefined, this.$this)(); 
+                if (val !== this.html_pointer_element[k]){ //set only if different!
+                  this.html_pointer_element[k] = val?.toString()
+                }
+                
+              }
+
+              let staticDeps = analizeDepsStatically(v) // WARNING actally w're bypassing the "deps storage" machenism..this wil break deps update in future!!!
+              console.log("attr static deps", staticDeps)
+              // todo: in realtà è mutualmente escusivo, e solo 1 dep il property binding!
+              staticDeps.$this_deps?.forEach(d=>{
+                debug.log("pushooooo")
+                this.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
+                _2WayPropertyBindingToHandle[k] = ()=>this.properties[d]
+              }) 
+
+              staticDeps.$parent_deps?.forEach(d=>{
+                debug.log("pushooooo")
+                this.parent.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
+                _2WayPropertyBindingToHandle[k] = ()=>this.parent.properties[d]
+              })
+
+              staticDeps.$le_deps?.forEach(d=>{ // [le_id, property]
+                debug.log("pushooooo")
+                this.$le[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
+                _2WayPropertyBindingToHandle[k] = ()=>this.$le[d[0]].properties[d[1]]
+              })
+
+              staticDeps.$ctx_deps?.forEach(d=>{ // [ctx_id, property]
+                debug.log("pushooooo")
+                this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
+                _2WayPropertyBindingToHandle[k] = ()=>this.$ctx[d[0]].properties[d[1]]
+              })
+
+              // now manually configure the binding
+              if ((this.htmlElementType === "input" || this.htmlElementType === "div") && ["value", "checked"].includes(k)){
+                if ( ( ! ["button", "hidden", "image", "reset", "submit", "file"].includes(this.convertedDefinition.attrs.type)) ){
+                  console.log("2 way bidning, ci sonooooooooo", k, this)
+                  let handlerFor2WayDataBinding = (e)=>{ 
+                    console.log("changed handled!!")
+                    // e.stopPropagation(); 
+                    let bindedProps = _2WayPropertyBindingToHandle[k]()
+                    let newValue = _binding.remap !== undefined ? _binding.remap.bind(undefined, this.$this)(e.target[k], e) : e.target[k]
+                    if(bindedProps.value !== newValue) {
+                      bindedProps.value = newValue
+                    }
+                  }
+                  console.log("scelgoooooooo", _binding.event ?? "input", k, this)
+                  this.html_pointer_element.addEventListener(_binding.event ?? "input", handlerFor2WayDataBinding)
+                  let remover = ()=>this.html_pointer_element.removeEventListener(_binding.event ?? "input", handlerFor2WayDataBinding) // per la destroy..
+                }
+              }
+              else if(this.htmlElementType === "textarea"){
+                // todo..in realtà basta anche qui oninput e accedere a .value ...in alternativa textContent.. ma qui ho il problema che non so ancora come settare il valore..visto che in realtà useri text e quindi i child..
+              }
+              else if(this.htmlElementType === "select" && k === 'value' && this.convertedDefinition.attrs.multiple === undefined){ // todo: multiple is not supported at this time.. https://stackoverflow.com/questions/11821261/how-to-get-all-selected-values-from-select-multiple-multiple
+                let handlerFor2WayDataBinding = (e)=>{ 
+                  // e.stopPropagation(); 
+                  let bindedProps = _2WayPropertyBindingToHandle[k]()
+                  let newValue = _binding.remap !== undefined ? _binding.remap.bind(undefined, this.$this)(e.target[k], e) : e.target[k]
+                  if(bindedProps.value !== newValue) {
+                    bindedProps.value = newValue 
+                  }
+                }
+                this.html_pointer_element.addEventListener(_binding.event ?? "change", handlerFor2WayDataBinding)
+                let remover = ()=>this.html_pointer_element.removeEventListener(_binding.event ?? "change", handlerFor2WayDataBinding) // per la destroy..
+              
+              }
+              else if(this.htmlElementType === "details" && k === "open"){
+                // todo
+              }
+
+              setupValue()
+
+            }
+            else {
+              if ((v === null || v === undefined)) { 
                 if (this.html_pointer_element.hasAttribute(k)) { 
-                  this.html_pointer_element.removeAttribute(k)
+                  this.html_pointer_element.removeAttribute(k) 
                 }
               } else { 
-                this.html_pointer_element.setAttribute(k, val.toString())
+                this.html_pointer_element.setAttribute(k, v.toString())
               } 
             }
-
-            let staticDeps = analizeDepsStatically(v) // WARNING actally w're bypassing the "deps storage" machenism..this wil break deps update in future!!!
-            console.log("attr static deps", staticDeps)
-
-            staticDeps.$this_deps?.forEach(d=>{
-              debug.log("pushooooo")
-              this.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
-            }) // supporting multiple deps, but only of first order..
-
-            staticDeps.$parent_deps?.forEach(d=>{
-              debug.log("pushooooo")
-              this.parent.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
-            })
-
-            staticDeps.$le_deps?.forEach(d=>{ // [le_id, property]
-              debug.log("pushooooo")
-              this.$le[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
-            })
-
-            staticDeps.$ctx_deps?.forEach(d=>{ // [ctx_id, property]
-              debug.log("pushooooo")
-              this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
-            })
-
-            setupValue()
+          }
 
         }
-        else if (v instanceof Binding){ // todo: qui in realtà non va bene..perchè potenzialmente il 'type' di input lo parso dopo value se il programmatore me lo ha messo così..
-          console.log("binding attr: ", k,v, this)
 
-          const _binding = v;
-          v = v.bindFunc
-
-          const setupValue = ()=>{ 
-            const val = v.bind(undefined, this.$this)(); 
-            if (val !== this.html_pointer_element[k]){ //set only if different!
-              this.html_pointer_element[k] = val?.toString()
-            }
-            
-          }
-
-          let staticDeps = analizeDepsStatically(v) // WARNING actally w're bypassing the "deps storage" machenism..this wil break deps update in future!!!
-          console.log("attr static deps", staticDeps)
-          // todo: in realtà è mutualmente escusivo, e solo 1 dep il property binding!
-          staticDeps.$this_deps?.forEach(d=>{
-            debug.log("pushooooo")
-            this.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
-            _2WayPropertyBindingToHandle[k] = ()=>this.properties[d]
-          }) 
-
-          staticDeps.$parent_deps?.forEach(d=>{
-            debug.log("pushooooo")
-            this.parent.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
-            _2WayPropertyBindingToHandle[k] = ()=>this.parent.properties[d]
-          })
-
-          staticDeps.$le_deps?.forEach(d=>{ // [le_id, property]
-            debug.log("pushooooo")
-            this.$le[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
-            _2WayPropertyBindingToHandle[k] = ()=>this.$le[d[0]].properties[d[1]]
-          })
-
-          staticDeps.$ctx_deps?.forEach(d=>{ // [ctx_id, property]
-            debug.log("pushooooo")
-            this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
-            _2WayPropertyBindingToHandle[k] = ()=>this.$ctx[d[0]].properties[d[1]]
-          })
-
-          // now manually configure the binding
-          if ((this.htmlElementType === "input" || this.htmlElementType === "div") && ["value", "checked"].includes(k)){
-            if ( ( ! ["button", "hidden", "image", "reset", "submit", "file"].includes(this.convertedDefinition.attrs.type)) ){
-              console.log("2 way bidning, ci sonooooooooo", k, this)
-              let handlerFor2WayDataBinding = (e)=>{ 
-                console.log("changed handled!!")
-                // e.stopPropagation(); 
-                let bindedProps = _2WayPropertyBindingToHandle[k]()
-                let newValue = _binding.remap !== undefined ? _binding.remap.bind(undefined, this.$this)(e.target[k], e) : e.target[k]
-                if(bindedProps.value !== newValue) {
-                  bindedProps.value = newValue
-                }
-              }
-              console.log("scelgoooooooo", _binding.event ?? "input", k, this)
-              this.html_pointer_element.addEventListener(_binding.event ?? "input", handlerFor2WayDataBinding)
-              let remover = ()=>this.html_pointer_element.removeEventListener(_binding.event ?? "input", handlerFor2WayDataBinding) // per la destroy..
-            }
-          }
-          else if(this.htmlElementType === "textarea"){
-            // todo..in realtà basta anche qui oninput e accedere a .value ...in alternativa textContent.. ma qui ho il problema che non so ancora come settare il valore..visto che in realtà useri text e quindi i child..
-          }
-          else if(this.htmlElementType === "select" && k === 'value' && this.convertedDefinition.attrs.multiple === undefined){ // todo: multiple is not supported at this time.. https://stackoverflow.com/questions/11821261/how-to-get-all-selected-values-from-select-multiple-multiple
-            let handlerFor2WayDataBinding = (e)=>{ 
-              // e.stopPropagation(); 
-              let bindedProps = _2WayPropertyBindingToHandle[k]()
-              let newValue = _binding.remap !== undefined ? _binding.remap.bind(undefined, this.$this)(e.target[k], e) : e.target[k]
-              if(bindedProps.value !== newValue) {
-                bindedProps.value = newValue 
-              }
-            }
-            this.html_pointer_element.addEventListener(_binding.event ?? "change", handlerFor2WayDataBinding)
-            let remover = ()=>this.html_pointer_element.removeEventListener(_binding.event ?? "change", handlerFor2WayDataBinding) // per la destroy..
-          
-          }
-          else if(this.htmlElementType === "details" && k === "open"){
-            // todo
-          }
-
-          setupValue()
-
+        if (k.startsWith("@lazy:")){
+          console.log("laaaaazyyyyyyy")
+          setTimeout(()=>toExecMabyLazy(k.replace("@lazy:", "")), 10)
         }
         else {
-          if ((v === null || v === undefined)) { 
-            if (this.html_pointer_element.hasAttribute(k)) { 
-              this.html_pointer_element.removeAttribute(k) 
-            }
-          } else { 
-            this.html_pointer_element.setAttribute(k, v.toString())
-          } 
+          toExecMabyLazy(k)
         }
-        
+
       })
 
     //   // todo: vedi https://stackoverflow.com/a/55737231 e/o https://stackoverflow.com/a/51056988
@@ -1647,6 +1693,237 @@ class Component {
       //   observer.observe($.this.el, {
       //     attributes: true //configure it to listen to attribute changes
       //   });
+    }
+
+
+    // attributes, TODO: support function etc
+    if (this.convertedDefinition.hattrs !== undefined){
+      debug.log("hattrs ", this.convertedDefinition.hattrs)
+
+      let _2WayPropertyBindingToHandle = {}
+
+      Object.entries(this.convertedDefinition.hattrs).forEach(([k,v])=>{
+        
+        const toExecMabyLazy = (k)=>{
+
+          
+          debug.log("attr: ", k,v)
+
+          let _oj_k = k
+
+          if (k.includes(".")){ // devo andare a settare l'attr as property dinamicamente [nested!]
+
+            if (isFunction(v)){
+              const setupValue = ()=>{ 
+                let [pointer, final_k] = recursiveAccessor(this.html_pointer_element, k.split("."))
+
+                const val = v.bind(undefined, this.$this)(); 
+                
+                pointer[final_k] = val
+              }
+
+              let staticDeps = analizeDepsStatically(v) // WARNING actally w're bypassing the "deps storage" machenism..this wil break deps update in future!!!
+              console.log("attr static deps", staticDeps)
+
+              staticDeps.$this_deps?.forEach(d=>{
+                debug.log("pushooooo")
+                this.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
+              }) // supporting multiple deps, but only of first order..
+
+              staticDeps.$parent_deps?.forEach(d=>{
+                debug.log("pushooooo")
+                this.parent.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
+              })
+
+              staticDeps.$le_deps?.forEach(d=>{ // [le_id, property]
+                debug.log("pushooooo")
+                this.$le[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
+              })
+
+              staticDeps.$ctx_deps?.forEach(d=>{ // [ctx_id, property]
+                debug.log("pushooooo")
+                this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
+              })
+
+              setupValue()
+
+            }
+            else if (v instanceof Binding){ 
+              console.log("binding attr: ", k,v, this)
+
+              const _binding = v;
+              v = v.bindFunc
+
+              const setupValue = ()=>{ 
+                let [pointer, final_k] = recursiveAccessor(this.html_pointer_element, k.split("."))
+                const val = v.bind(undefined, this.$this)(); 
+                if (val !== this.html_pointer_element[k]){ //set only if different!
+                  pointer[final_k] = val
+                }
+              }
+
+              let staticDeps = analizeDepsStatically(v) // WARNING actally w're bypassing the "deps storage" machenism..this wil break deps update in future!!!
+              console.log("attr static deps", staticDeps)
+              // todo: in realtà è mutualmente escusivo, e solo 1 dep il property binding!
+              staticDeps.$this_deps?.forEach(d=>{
+                debug.log("pushooooo")
+                this.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
+                _2WayPropertyBindingToHandle[k] = ()=>this.properties[d]
+              }) 
+
+              staticDeps.$parent_deps?.forEach(d=>{
+                debug.log("pushooooo")
+                this.parent.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
+                _2WayPropertyBindingToHandle[k] = ()=>this.parent.properties[d]
+              })
+
+              staticDeps.$le_deps?.forEach(d=>{ // [le_id, property]
+                debug.log("pushooooo")
+                this.$le[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
+                _2WayPropertyBindingToHandle[k] = ()=>this.$le[d[0]].properties[d[1]]
+              })
+
+              staticDeps.$ctx_deps?.forEach(d=>{ // [ctx_id, property]
+                debug.log("pushooooo")
+                this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
+                _2WayPropertyBindingToHandle[k] = ()=>this.$ctx[d[0]].properties[d[1]]
+              })
+
+
+              // now manually configure the binding
+              console.log("2 way bidning, ci sonooooooooo", k, this)
+              let handlerFor2WayDataBinding = (e)=>{ 
+                console.log("changed handled!!")
+                // e.stopPropagation(); 
+                let bindedProps = _2WayPropertyBindingToHandle[k]()
+
+                let [pointer, final_k] = recursiveAccessor(e.target, k.split("."))
+
+                let newValue = _binding.remap !== undefined ? _binding.remap.bind(undefined, this.$this)(pointer[final_k], e) : pointer[final_k]
+                if(bindedProps.value !== newValue) {
+                  bindedProps.value = newValue
+                }
+              }
+              console.log("scelgoooooooo", _binding.event ?? "input", k, this)
+              this.html_pointer_element.addEventListener(_binding.event ?? "input", handlerFor2WayDataBinding)
+              let remover = ()=>this.html_pointer_element.removeEventListener(_binding.event ?? "input", handlerFor2WayDataBinding) // per la destroy..
+
+              setupValue()
+
+            }
+            else {
+              let [pointer, final_k] = recursiveAccessor(this.html_pointer_element, k.split("."))
+              pointer[final_k] = v
+            }
+
+          }
+          else if (isFunction(v)){
+              const setupValue = ()=>{ 
+                this.html_pointer_element[k] = v.bind(undefined, this.$this)(); 
+              }
+
+              let staticDeps = analizeDepsStatically(v) // WARNING actally w're bypassing the "deps storage" machenism..this wil break deps update in future!!!
+              console.log("attr static deps", staticDeps)
+
+              staticDeps.$this_deps?.forEach(d=>{
+                debug.log("pushooooo")
+                this.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
+              }) // supporting multiple deps, but only of first order..
+
+              staticDeps.$parent_deps?.forEach(d=>{
+                debug.log("pushooooo")
+                this.parent.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
+              })
+
+              staticDeps.$le_deps?.forEach(d=>{ // [le_id, property]
+                debug.log("pushooooo")
+                this.$le[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
+              })
+
+              staticDeps.$ctx_deps?.forEach(d=>{ // [ctx_id, property]
+                debug.log("pushooooo")
+                this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
+              })
+
+              setupValue()
+
+          }
+          else if (v instanceof Binding){ 
+            console.log("binding attr: ", k,v, this)
+
+            const _binding = v;
+            v = v.bindFunc
+
+            const setupValue = ()=>{ 
+              const val = v.bind(undefined, this.$this)(); 
+              if (val !== this.html_pointer_element[k]){ //set only if different!
+                this.html_pointer_element[k] = val
+              }
+              
+            }
+
+            let staticDeps = analizeDepsStatically(v) // WARNING actally w're bypassing the "deps storage" machenism..this wil break deps update in future!!!
+            console.log("attr static deps", staticDeps)
+            // todo: in realtà è mutualmente escusivo, e solo 1 dep il property binding!
+            staticDeps.$this_deps?.forEach(d=>{
+              debug.log("pushooooo")
+              this.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
+              _2WayPropertyBindingToHandle[k] = ()=>this.properties[d]
+            }) 
+
+            staticDeps.$parent_deps?.forEach(d=>{
+              debug.log("pushooooo")
+              this.parent.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
+              _2WayPropertyBindingToHandle[k] = ()=>this.parent.properties[d]
+            })
+
+            staticDeps.$le_deps?.forEach(d=>{ // [le_id, property]
+              debug.log("pushooooo")
+              this.$le[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
+              _2WayPropertyBindingToHandle[k] = ()=>this.$le[d[0]].properties[d[1]]
+            })
+
+            staticDeps.$ctx_deps?.forEach(d=>{ // [ctx_id, property]
+              debug.log("pushooooo")
+              this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
+              _2WayPropertyBindingToHandle[k] = ()=>this.$ctx[d[0]].properties[d[1]]
+            })
+
+
+            // now manually configure the binding
+            console.log("2 way bidning, ci sonooooooooo", k, this)
+            let handlerFor2WayDataBinding = (e)=>{ 
+              console.log("changed handled!!")
+              // e.stopPropagation(); 
+              let bindedProps = _2WayPropertyBindingToHandle[k]()
+              let newValue = _binding.remap !== undefined ? _binding.remap.bind(undefined, this.$this)(e.target[k], e) : e.target[k]
+              if(bindedProps.value !== newValue) {
+                bindedProps.value = newValue
+              }
+            }
+            console.log("scelgoooooooo", _binding.event ?? "input", k, this)
+            this.html_pointer_element.addEventListener(_binding.event ?? "input", handlerFor2WayDataBinding)
+            let remover = ()=>this.html_pointer_element.removeEventListener(_binding.event ?? "input", handlerFor2WayDataBinding) // per la destroy..
+          
+
+
+            setupValue()
+
+          }
+          else {
+            this.html_pointer_elemen[k] = v 
+          }
+
+        }
+
+        if (k.startsWith("@lazy:")){
+          console.log("laaaaazyyyyyyy")
+          setTimeout(()=>toExecMabyLazy(k.replace("@lazy:", "")), 10)
+        }
+        else {
+          toExecMabyLazy(k)
+        }
+      })
     }
 
 
@@ -1741,6 +2018,8 @@ class Component {
       def, "private:def": _def, 
       attrs, "private:attrs":_attrs, 
       a, "private:a": _a, 
+      hattrs, "private:hattrs":_hattrs, 
+      ha, "private:ha": _ha, 
     } = definition
 
     unifiedDef.id = id || "TODO: RANDOM ID"
@@ -1751,6 +2030,9 @@ class Component {
     
     attrs && (unifiedDef.attrs = attrs || a)
     _attrs && (unifiedDef._attrs = _attrs || _a)
+
+    hattrs && (unifiedDef.hattrs = hattrs || ha)
+    _hattrs && (unifiedDef._hattrs = _hattrs || _ha)
 
 
     
@@ -1895,7 +2177,7 @@ class IterableViewComponent{
 // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // //
 // TESTING
 
-
+// todo: anche se non voglio farlo, potremmo usare un meccanismo per gestire anche le cose dei figli senza usare il nome..la prima cosa è andare alla angular maniera..ovvero aggiungere dettagli nel meta quando definisco un componente..in questo modo non ho problemi e posso risalire facile! -- altrimenti un qualcosa tipo  " on: {this: Child(0, {dataChanged: $=>...})} "..occhio che deve essere lazy!! o fatto dopo i child..
 
 //// TODO OOOOO: tutto è un signal: ovvero le prop hanno dei signal associati (signal particolari, che portano con se il vecchio e il nuovo valore al triggher.. ergo: on, on_s e on_a sono solo degli alias (sovrapponibili a differenza di children etc) che servono allo sviluppatore pià che altro.
 // conseguenza esistono solo due cose da gestire: i dati (le property) e i signal. da qui va da se che anche gli attr sono property, con tutto quello che ne derive (signal etc)
@@ -2035,6 +2317,15 @@ const CtxEnabledComponent = {
           "private:id": "listPresenter",
 
           text: $ => "--" + $.ctx.myCtxRoot.todo.toString(),
+
+          on: { // demo di _root_ e _ctxroot_
+            ctx: {"_ctxroot_": {
+              todoChanged: $=> console.log(" heeey sto puntanto al _ctxroot_ e ai sui aggiornamenti di todo!!")
+            }},
+            le: {"_root_": {
+              counterChanged: $=> console.log(" heeey sto puntanto al _root_ e ai sui aggiornamenti di counter!! essendo un componente è possibile che vengano lanciati più segnli")
+            }}
+          },
           
           onInit: $ => {
             console.log("heeeeeey sono visibile solo nel contestooooo", $.ctx, $.ctx.myCtxRoot, $.le)
@@ -2188,7 +2479,19 @@ const app_root = RenderApp(document.body, {
             ),
             
             // demo visible parent chain
-            { div: { "=>": { div: { "=>": { div: { "=>": {div: { afterInit: $ => console.log("ooooooooooooooooo", $.this, $.this.parent.parent.parent.parent.counter, $.this, $.parent.parent.parent.parent.counter)}}}}}}}}
+            { div: { "=>": { div: { "=>": { div: { "=>": {div: { afterInit: $ => console.log("ooooooooooooooooo", $.this, $.this.parent.parent.parent.parent.counter, $.this, $.parent.parent.parent.parent.counter)}}}}}}}},
+
+
+            { div: {
+              hattrs: {
+                "style.cssText": $=>toInlineStyle({
+                  color: "blue"
+                }), // this works only because exec order is mantained!
+                "style.backgroundColor": $=> $.parent.counter === 10 ? "red" : "white",
+                // textContent: $ => $.parent.counter // NEVER DO THIS!
+              },
+              text: $ => $.parent.counter
+            }},
 
         ] 
     }
@@ -2280,28 +2583,16 @@ const test2way = ()=>{ console.log(
               id: "myRadio",
           
               data: { selected: "dunlop" },
-              // così però devo riferinire un sengale se voglio rendere il componente riutilizzabile..
+
               on: { this: {
-                selectedChanged: ($, _new, _old)=>{ $.parent.el.elements.company.value = $.this.selected; console.log("radio changeeeeeeddddd", _new, _old)}
+                selectedChanged: ($, _new, _old)=>{ console.log("radio changeeeeeeddddd", _new, _old)}
               }},
 
-              // todo..più potere ad attr..devo avere la possibilità di definirne i nested..del tipo "form.elements.company.value" .. mi basta il solito split col punto e via..
-              // attrs: {
-              //   value: Bind($ => { // qui value non ha alcun senso visto che devo puntare a value della form per avere i benefici
-              //     $.parent.el.elements.company.value = $.this.selected;
-              //     return $.this.selected;
-              //   }, {remap: ($, v)=>{
-              //     console.log($.this.el)
-              //     return $.parent.el.elements.company.value
-              //   }, event: "change"})
-              // },
-
-              handle: {
-                onchange: $ => { // si applicherà a tutti i sotto elementi..
-                  $.this.selected = $.parent.el.elements.company.value
-                  console.log($.this.el)
-                }
+              // 2 way data binding con la proprietà "value" di una form della parte del gruppo dei soli radio button, che mi da il selected attuale!
+              hattrs: {
+                "@lazy:form.elements.company.value": Bind($ => $.this.selected, { event: "change" }) // lazy necessario..altriemnti non riesco ad accedere a "company"
               },
+
               "=>": [
                 { legend: { text: "Select Company"}},
                 { input: { attrs: {type:"radio", name:"company", value: "pirelli"}}}, {label: { text: "Pirelli"}},
@@ -2309,10 +2600,52 @@ const test2way = ()=>{ console.log(
                 { input: { attrs: {type:"radio", name:"company", value: "michelin"}}}, {label: { text: "Michelin"}},
               ],
 
-              afterInit: $ => $.this._mark_selected_as_changed()
+              // afterInit: $ => $.this._mark_selected_as_changed()
             }
           } 
         }},
+
+        { div: { 
+            id: "myRadio2",
+        
+            data: { selected: "dunlop" },
+
+            on: { this: {
+              selectedChanged: ($, _new, _old)=>{ console.log("radio changeeeeeeddddd", _new, _old)}
+            }},
+
+            "=>": [
+              { legend: { text: "Select Company"}},
+
+              ...[
+                    ["pirelli", "Pirelli"], 
+                    ["dunlop", "Dunlop"], 
+                    ["michelin", "Michelin"]
+
+              ].flatMap( ([val, label])=>[
+                  
+                  { input: { 
+
+                    attrs: {
+                      type:"radio", name:"company", value: val
+                    }, 
+                    hattrs: { // must be hattrs to update prop
+                      checked: $ => $.parent.selected === val
+                    }, 
+                    handle: {
+                      onclick: $=>{ $.parent.selected = val}
+                    }
+                  }}, 
+
+                  {label: { text: label}}
+
+                ]
+              )
+            ],
+
+            // afterInit: $ => $.this._mark_selected_as_changed()
+          }
+        },
 
         { button: {
 
@@ -2330,6 +2663,9 @@ const test2way = ()=>{ console.log(
             },
             myRadio: {
               selectedChanged: $ => console.log("sono button, è cambiato il radio in input!!")
+            },
+            myRadio2: {
+              selectedChanged: $ => console.log("sono button, è cambiato il radio2 in input!!")
             }
           }},
 
@@ -2498,6 +2834,6 @@ console.log(app_root)
 }
 
 
-// app0()
-test2way()
+app0()
+// test2way()
 // appTodolist()
