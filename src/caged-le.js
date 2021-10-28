@@ -298,12 +298,12 @@ const component = {
 
     on: { // on props | alias changes
       this: {
-        counterChanged: ($, newCounter, oldCounter) => console.log($.counter),
+        counterChanged: ($, newCounter, oldCounter) => console.log($.this.counter),
       }, 
       parent: ...
       le: ..byname.. : {props | alias changed},
       ctx: ...qui mettiamo solo i nomi dei sub_componenti + this di questo componente! 
-      // ci vorrebbe anche un $.subel, (un array, non obj con in le) in cui è possibile filtrare by type: es $.subel.get("div")[0]..oppure il concetto di tref di le..o magari questa in realtà con ctx si risolve..
+      // ci vorrebbe anche un $.subel, (un array, non obj con in le) in cui è possibile filtrare by type: es $.subel.get("div")[0]..oppure il concetto di tref di le..o magari questa in realtà con ctx si risolve.. vedi sotto che ho descritto bene
     },
 
     on_s: { // on signal
@@ -374,7 +374,7 @@ const component = {
     }
 
     handle: { // html event
-      onclick: ($, e) => $.count++
+      onclick: ($, e) => $.this.count++
     },
 
     define_css: ".class { bla:bli ... }" // todo..magari qualcosa di più complesso..come hoisting (via replacer, o anche per i subel), or namaed definition (tipo le)
@@ -2714,17 +2714,12 @@ const TodoListController = {
     def: {
       addTodoFromInput: $ => { 
         $.le.model.add($.le.input.text);
-        setTimeout(()=>{
-          $.le.input.text = ""
-          $.le.input.el.value = ""
-        }, 1)
+        $.le.input.text = ""
       }
     },
     
     on_s: { le: { input: {
-      newInputConfirmed: $ => {
-        $.this.addTodoFromInput();
-      }
+      newInputConfirmed: $ => $.this.addTodoFromInput()
     }}}
   }
 }
@@ -2741,13 +2736,11 @@ const TodoInput = {
 			newInputConfirmed: "stream => (text: string)"
 		},
 
-		attrs: {
-			value: $ => $.this.text
+		hattrs: {
+			value: Bind($ => $.this.text)
 		},
 
 		handle: {
-			oninput: ($, e) => { $.this.text = e.target.value },
-      
 			onkeypress: ($, e) => { e.key === "Enter" && $.this.newInputConfirmed.emit($.this.text) },
 		},
 
@@ -2755,11 +2748,9 @@ const TodoInput = {
 }
 
 const AddTodoButton = { 
-  button: {  
-    text: "Add Todo", 
-    handle: { onclick: $ => $.le.controller.addTodoFromInput() },
-  }
+  button: {  text: "Add Todo",  handle: { onclick: $ => $.le.controller.addTodoFromInput() }  }
 }
+
 
 const ReGenTodoView = $ => {
 
@@ -2771,18 +2762,15 @@ const ReGenTodoView = $ => {
     $.this.oldRenderized = RenderApp($$.this.el, {
       
       div: { 
-        "=>": $.le.model.todolist.map( todo => ( {
+        ["=>"]: $.le.model.todolist.map( todo => ( {
           
-          div: { "=>": [
+          div: { 
+            ["=>"]: [
 
-            { button: {
-              text: "remove",
-              handle: {
-                onclick: $ => $$.le.model.remove(todo)
-              }
-            }},
+              { button: {  text: "remove",  handle: { onclick: $ => $$.le.model.remove(todo) }  }},
 
-            { span: {text: todo, attrs: { style: {marginLeft:"15px"}}}},
+              { span: {text: todo, attrs: { style: {marginLeft:"15px"}}}}
+
           ]}
 
         })) 
@@ -2829,11 +2817,12 @@ const app_root = RenderApp(document.body, {
     ]
   }
 })
+
 console.log(app_root)
 
 }
 
 
-app0()
+// app0()
 // test2way()
-// appTodolist()
+appTodolist()
