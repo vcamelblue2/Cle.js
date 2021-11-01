@@ -231,7 +231,7 @@ class AppRoot {
 // ricordati che è sempre possibile segnalare una change in una prop facendo esplicitamente $.this.xxxpropNamexxxChanged()
 
 // todo: signal subsystem, un qualcosa tipo dbus, per cui tutte le props e signal notificano al sottositema il cambiamento..nient'altro che un msg broker / dispatcher. così da svincolare sender e reciver. più semplicie eliminare i segnali e gli "ascoltatori" post destroy
-// todo: funzione F in cui dichiarare una lambda e le sue deps (per magheggi strani..) ---> const f = (lambda, deps=[])=>...   ---> { div: {text: f($ => $.le.qualcosa.prop + 123, ["le.qualcosa.prop"])}}
+// todo: funzione F in cui dichiarare una lambda e le sue deps (per magheggi strani..) ---> const f = (lambda, deps=[])=>...   ---> { div: {text: f($ => $.le.qualcosa.prop + 123, ["le.qualcosa.prop"])}} oppure vere e proprie Property istanziate a parte..con js scope
 
 
 // NOTE DONE:
@@ -287,6 +287,7 @@ const component = {
       counterReset: "stream => (void)" // definiamo il tipo di segnale (es: stream [per indicare chi c'è c'è], observable [per indicare che chi non c'è riceverà tutti i next e poi stream]) "=>" una descrizione dei params (es il tipo dei parametry, la signature etc etc..è solo testo che documenta!)
     },
 
+    // ne abbiamo davvero bisogno?? alla fin fine basterebbe definire un componente/constroller global che definisce i global signal..
     dbus_signals: { // qui definiamo i segnali globali..un modo per creare uno stream su un canale comune con un compagno che non riesco a raggiungere facilmente "by name", e che entrambi conosciamo
       iEmitThisGlobalSignal_UniqueName: "stream => (int: counter status)"
     }
@@ -343,7 +344,7 @@ const component = {
 
     alias: { // nice to have, alias, per permettere di vedere all'esterno alcune proprietà interne e ridefinirle con la use senza toccare la logica o via prop extra!
       ctx: {
-        counter_txt: $ => $.ctx.counter_value.text
+        counter_txt: $ => $.ctx.counter_value.text // qui probabilmente devo andare con la tecnica retry untill..
       }
     }
 
@@ -377,10 +378,10 @@ const component = {
       onclick: ($, e) => $.this.count++
     },
 
-    define_css: ".class { bla:bli ... }" // todo..magari qualcosa di più complesso..come hoisting (via replacer, o anche per i subel), or namaed definition (tipo le)
+    define_css: ".class { bla:bli ... }" // todo..magari qualcosa di più complesso..come hoisting (via replacer, o anche per i subel), or namaed definition (tipo le)..oppure per automatizzare l'hoisting =>  define_css: [ ".class { bla:bli ... }", ".class2 { foo:bar; ...", NoHoisting("sostanzialmente ::ng-dep..")]
 
     states: {
-      // "initial": "this", // implicit, always chang
+      // "default": "this", // implicit, always chang
 
       "bigger": { // 
 
@@ -394,7 +395,7 @@ const component = {
 
     },
 
-    state: "initial" // optional different starting state
+    state: "default" // optional different starting state
     stateChangeStrategy: "merge XXXstatenameXXX" | "replace" | "remove" // magari questa cosa va dentro i singoli state..
 
     onState: ($, newState, oldState)=> {
@@ -542,7 +543,7 @@ const TodoList = { // automatic root div!
 
     { hr: {} },
 
-    { div: { meta: [{ forEach:"todo",  of: $ => $.parent.todolist, ,  index:"idx", first:"isFirst", last:"isLast", length:"len", key/comparer: el=>... }], // opzionale, per fare es Obj.keys --> extractor:($, blabla)=>Object.keys(blabla)
+    { div: { meta: [{ forEach:"todo",  of: $ => $.parent.todolist, ,  index:"idx", first:"isFirst", last:"isLast", length:"len", key,comparer: el=>... }], // opzionale, per fare es Obj.keys --> extractor:($, blabla)=>Object.keys(blabla) e i comparer per identificare i changes
       
       "=>": [
 
@@ -573,12 +574,31 @@ const TodoList = { // automatic root div!
     }},
 
     // oppure
-    { div: { meta: { swich: $ => $.ctx.root.todolist.length, cases: new Map([
+    { div: { meta: { 
+      swich: $ => $.ctx.root.todolist.length, 
+      cases: [
         [($, len) => len > 50, { div: { text: "ohhh nooo, hai molti todo"} }]
         [($, len) => len == 0, { div: { text: "hurrraaa, non hai nulla da fare!"} }]
-        ["default", undefined]
-      ])},
-    }},
+      ], 
+      default: undefined
+    },
+    }}, // così però devo per forza wrappare in un div etc..
+    
+    // alternativa: lo switche non è ninent'altro che una trasfromazione identificata a beckend (con classe sentinel) e riconvertita in le-if da noi
+    Switch( $ => $.ctx.root.todolist.length, 
+
+      Case( ($, len) => len > 50,  
+      { 
+        div: { text: "ohhh nooo, hai molti todo"} 
+      }),
+
+      Case( ($, len) => len == 0, 
+      { 
+        div: { text: "hurrraaa, non hai nulla da fare!"} 
+      }),
+
+      Default( pass )
+    )
 
   ],
 
@@ -652,7 +672,7 @@ class Property{
     this.executionContext = (Array.isArray(executionContext) ? executionContext : [executionContext]).map(ec=>isFunction(ec) ? ec : ()=>ec) // interface for "dynamic execution context"..wrap in lambda aslo if not passed..
     this.registerToDepsHelper = registerToDepsHelper
     this.onChangedHandlers = []
-    this.dipendency = undefined
+    this.dependency = undefined
     this.registeredDependency = [] // container of depsRemoverFunc
 
     if (init){
@@ -1197,6 +1217,26 @@ class Component {
     this.isObjComponent = ["Model", "Controller", "Connector"].includes(this.htmlElementType)
     this.convertedDefinition = Component.parseComponentDefinition( (definition instanceof UseComponentDeclaration ? definition.computedTemplate : definition) [this.htmlElementType])
 
+    this.defineAndRegisterId()
+
+  }
+
+  getMy$ctx(){ // as singleton/generator
+    if(this.isA$ctxComponent){
+      return this.$ctx ?? new ComponentsContainerProxy()
+    }
+
+    else{
+      if (this.parent !== undefined && (this.parent instanceof Component)){
+        return this.parent.getMy$ctx()
+      }
+      
+      return undefined
+    }
+  }
+
+  defineAndRegisterId(){
+
     this.id = this.convertedDefinition.id
     this._id = this.convertedDefinition._id
 
@@ -1216,16 +1256,19 @@ class Component {
     if(this.isA$ctxComponent){
       this.$ctx["_ctxroot_"] = this
     }
-
   }
   
-  // step 2: build skeleton (html pointer and child)
+
+  // step 2: build skeleton (html pointer and child), then properties ref
   buildSkeleton(){
 
     this.buildHtmlPointerElement()
 
 
     this.buildChildsSkeleton()
+
+    
+    this.buildPropertiesRef()
 
   }
 
@@ -1259,25 +1302,10 @@ class Component {
 
   }
 
-  getMy$ctx(){ // as singleton/generator
-    if(this.isA$ctxComponent){
-      return this.$ctx ?? new ComponentsContainerProxy()
-    }
+  buildPropertiesRef(){
 
-    else{
-      if (this.parent !== undefined && (this.parent instanceof Component)){
-        return this.parent.getMy$ctx()
-      }
-      
-      return undefined
-    }
-  }
-
-
-  // step 3: create and renderize
-  create(){
     // t.b.d
-    this.properties.el = this.html_pointer_element // ha senso??? rischia di spaccare tutto..
+    this.properties.el = this.html_pointer_element // ha senso??? rischia di spaccare tutto..nella parte di sotto..
     this.properties.parent = this.parent?.$this?.this // ha senso??? rischia di spaccare tutto.. recursive this.parent.parent & parent.parent le.x.parent.. etc..
 
     // todo: qualcosa del genere per gli attr
@@ -1288,6 +1316,10 @@ class Component {
     this.$this = ComponentProxy(/*new ComponentProxySentinel(*/{this: ComponentProxy(this.properties), parent: this.$parent, le: this.$le.proxy, ctx: this.$ctx.proxy /*, dbus: this.$dbus, meta: this.$meta*/} /*)*/ ) //tmp, removed ComponentProxySentinel (useless)
 
     // mettere private stuff in "private_properties" e "private_signal", a quel punto una strada potrebbe essere quella di avere un "private_this" qui su..ma in teoria dovrebbe essere qualcosa di context, e non solo in me stesso..
+  }
+
+  // step 3: create and renderize
+  create(){
 
     // html event
     if (this.convertedDefinition.handle !== undefined){
@@ -1911,7 +1943,7 @@ class Component {
 
           }
           else {
-            this.html_pointer_elemen[k] = v 
+            this.html_pointer_element[k] = v 
           }
 
         }
@@ -1982,6 +2014,8 @@ class Component {
     this.html_pointer_element.remove()
     try { delete this.$ctx[this.id] } catch {}
     try { delete this.$ctx[this._id] } catch {}
+    try { if(this.isMyParentHtmlRoot){ delete this.$le["_root_"] } } catch {}
+    try { if(this.isA$ctxComponent){ delete this.$ctx["_ctxroot_"] } } catch {}
     delete this.$le[this.id]
   }
 
@@ -2045,6 +2079,10 @@ class Component {
 
     unifiedDef.data = data || props || {}
     unifiedDef._data = _data || _props || {}
+
+    let {meta} = definition
+
+    unifiedDef.meta = meta
 
 
     return unifiedDef
@@ -2159,6 +2197,93 @@ class TextNodeComponent {
 
 class ConditionalComponent extends Component{
   visible = false
+
+  html_pointer_element_anchor
+
+  constructor(...args){
+    super(...args)
+
+  }
+
+  // generate the comment/anchor for the real conditional element (that will be create "after" the anchor)
+  buildHtmlPointerElementAnchor(){
+    
+    this.html_pointer_element_anchor = document.createComment("le-if")
+
+    if (this.isMyParentHtmlRoot){
+      this.parent.appendChild(this.html_pointer_element_anchor)
+    }
+    else {
+      this.parent.html_pointer_element.appendChild(this.html_pointer_element_anchor)
+    }
+  }
+
+  // overwrite to do not execut during creation..execpt for the generation of the "anchor", a pointer in the DOOM where we inserte later the real node (if condition is meet)
+  // @overwrite
+  buildSkeleton(){  this.buildHtmlPointerElementAnchor()  }
+  // @overwrite
+  buildChildsSkeleton(){ }
+
+  // overwrite to insert the real component after the "anchor", instead of the "append" on child
+  // @overwrite
+  buildHtmlPointerElement(){
+
+    if ( this.isObjComponent ){
+
+      this.html_pointer_element = document.createElement("obj")
+
+    }
+    else {
+
+      this.html_pointer_element = document.createElement(this.htmlElementType)
+
+      this.html_pointer_element_anchor.after(this.html_pointer_element)
+
+      console.log("inserted after commenttttttt!!!!")
+
+    }
+
+  }
+
+  // real "create", wrapped in the conditional system
+  _create(){
+    super.buildSkeleton()
+    super.buildChildsSkeleton()
+    super.create()
+  }
+  // @overwrite
+  create(){
+    this.buildPropertiesRef()
+    // step 1: geenrate If property, and configure to create (that build) or destry component!
+    this.visible = new Property(this.convertedDefinition.meta.if, none, (v, _, prop)=>{ console.log("seeeetttinnggggggg", v, _, prop); if (v !== prop._latestResolvedValue) { v ? this._create() : this.destroy() } }, pass, ()=>this.$this, (thisProp, deps)=>{
+
+      console.log("calculating deeeeeepsssssss!!!!!")
+      // deps connection logic
+      deps.$parent_deps?.forEach(d=>{
+        debug.log("pushooooo")
+        this.parent.properties[d]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+      })
+
+      deps.$le_deps?.forEach(d=>{ // [le_id, property]
+        debug.log("pushooooo")
+        this.$le[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+      })
+
+      deps.$ctx_deps?.forEach(d=>{ // [le_id, property]
+        debug.log("pushooooo")
+        this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+      })
+    }, true)
+
+    console.log("ultimooooooooooo", this, this.convertedDefinition.meta.if)
+    // try {
+      this.visible.value && this._create()
+    // }
+    // catch {
+    // }
+
+  }
+
 }
 
 class SwitchConditionalComponent extends Component{
@@ -2177,7 +2302,27 @@ class IterableViewComponent{
 // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // //
 // TESTING
 
+// todo: private..come realizzo il meccanismo dei private? name mangling in python style? (più semplice ma "inutile") o reale (e quindi tentare di capire come filtrare le properties visibili..)
+
+// todo: dipendenze delle def..perchè al momento non posso usare in una Property e avere l'autoaggiornamneto
+
+// todo: define css, state
+
 // todo: anche se non voglio farlo, potremmo usare un meccanismo per gestire anche le cose dei figli senza usare il nome..la prima cosa è andare alla angular maniera..ovvero aggiungere dettagli nel meta quando definisco un componente..in questo modo non ho problemi e posso risalire facile! -- altrimenti un qualcosa tipo  " on: {this: Child(0, {dataChanged: $=>...})} "..occhio che deve essere lazy!! o fatto dopo i child..
+// ---v
+// todooo: in realtà la cosa migliore sarebbe utilizare una nomencalutura particolare per tutti i figli (che non hanno definito un id e un _id). ovvero dare il nome del padre + indice figlio (contanto eventuale figli con nome as ++) es: Root => [ undefeined => [undefined], myElementName, undefined ] diventerebbe: Root => [Root_cld_0 => [Root_cld_0_cld_0], myElementName, Root_cld_2]  oppure: Root => [Root.0 => [Root.0.0], myElementName, Root.2]
+// un'altra cosa figa di questa cosa è che ora possiamo avere il "full name", ovvero il nome completo di un elemento, come Root.Root_cld_0.Root_cld_0_cld_0  oppure  Root.0.0 (prendendo solo index)
+// todo: quindi a questo punto gli elementi dovrebbero stare anche anche in una property "child", accessibile sia come array che by name (realizzabile tramite "proxy", tenendo gli elementi come dict [solo se unordered] altrimenti come array)
+
+// todo: iniziare a pensare alla questione che posso definire e usare anche pezzi dei children nel parent (se quello di sopra dovesse realizzarsi), in partiolare gli alias..portano dritto questo problema alla luce
+
+// todo: iniziare a strutturare come funziona "meta" lato dev, nel senso che il mio meta è in realtà l'insieme di tutti i meta dei miei parent (nello stesso componente? in teoria si, perchè il il compoente è entità "atomica", non dividibile, quindi dentro e fuori non si "conoscono") compreso il mio..a questo punto tutto deve andare con retry incrementale?
+
+// todo: visto che il punto di vista nella redefine dei componenent è sempre se stessi..quando faccio una use component non posso in alcun modo usare $.ctx per riferirmi al mio contesto visibile al momento della definizione..quindi forse ho due "problemi", il primo è che i context dovrebbero essere inclusivi (ovvero il mio as subchild è l'insieme del mio e di tutti quelli sopra di me. in alternativa devo avere il concetto di "supctx" ovvero ctx di mio padre (che deve rimanere tale anche per i miei child interni al componente). in effetti è semplice da fare, sostanzialmente è: this.getMyCtx().parent.getMyCtx())
+
+// todo: ng if, ng for, ng switch.. => per poter fare questa cosa c'è bisogno di un refactoring abbastanza importante, affiche ogni componente sia di fatto un contenitore per N elementi. questa è la base. per i componenti nomrmali ho solo 1 elemento, mentre per gli ngfor ne ho N. questo è l'uncio modo per poter continuare ad andare in questa direzione. altrimenti l'albero perde completamente di senso, a meno di non creare una sorta di "wrapper" per tutte le proprietà e quindi far diventare trasparente quell'operazione
+// di fatto questa visione torna con l'originale dell'idea di avere dei "pointer html" via commento. ovvero ho un albero di componenti virtuali, nella quale in ogni fogli posso avere un albero di componenti reali. i cui sottocomponenti sono ancora una volta virtuali.
+// in alternativa: devo agire a livello di factory..creando un qualcosa che wrappa ma solo per l'ng for..visto che switch e if sono già ok..ma a quel punto il controllo della situazione chi ce l'ha??
 
 //// TODO OOOOO: tutto è un signal: ovvero le prop hanno dei signal associati (signal particolari, che portano con se il vecchio e il nuovo valore al triggher.. ergo: on, on_s e on_a sono solo degli alias (sovrapponibili a differenza di children etc) che servono allo sviluppatore pià che altro.
 // conseguenza esistono solo due cose da gestire: i dati (le property) e i signal. da qui va da se che anche gli attr sono property, con tutto quello che ne derive (signal etc)
@@ -2812,7 +2957,16 @@ const app_root = RenderApp(document.body, {
       
       { hr: {} },
 
-      Use(TodoListContainer)
+      Use(TodoListContainer),
+
+      // Testing le IF
+      { div: {   meta: { if: $ => $.le.model.todolist.length <= 0 },
+
+        text: $ => "Hurraa! Non ci sono todo! (" + $.le.model.todolist.length + ")"
+
+      }},
+
+      $ => "here to stay!" // simple text node to dimostrate that le-if works as expected (keeping order)
 
     ]
   }
