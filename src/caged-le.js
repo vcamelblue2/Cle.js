@@ -543,7 +543,8 @@ const TodoList = { // automatic root div!
 
     { hr: {} },
 
-    { div: { meta: [{ forEach:"todo",  of: $ => $.parent.todolist, ,  index:"idx", first:"isFirst", last:"isLast", length:"len", key,comparer: el=>... }], // opzionale, per fare es Obj.keys --> extractor:($, blabla)=>Object.keys(blabla) e i comparer per identificare i changes
+
+    { div: { meta: [{ forEach:"todo",  of: $ => $.parent.todolist,   index:"idx", first:"isFirst", last:"isLast", length:"len", easy_alias:{ // my_var_extracted_with_meta_identifier..easy alias! //, todo_label: $ => $.this.todo_label_mapping[$.meta.todo]},  key,comparer: el=>... // opzionale, per fare es Obj.keys --> extractor:($, blabla)=>Object.keys(blabla) e i comparer per identificare i changes // }], 
       
       "=>": [
 
@@ -565,6 +566,7 @@ const TodoList = { // automatic root div!
 
     }},
 
+
     { div: { meta: { if: $ => $.ctx.root.todolist.length > 50},
       text: "ohhh nooo, hai molti todo"
     }},
@@ -572,6 +574,7 @@ const TodoList = { // automatic root div!
     { div: { meta: { if: $ => $.ctx.root.todolist.length === 0},
       text: "hurrraaa, non hai nulla da fare!"
     }},
+
 
     // oppure
     { div: { meta: { 
@@ -661,6 +664,13 @@ const recursiveAccessor = (pointer, toAccess)=>{
     // console.log("ritornerò: ", pointer, toAccess[0], pointer[toAccess[0]])
     return recursiveAccessor(pointer[toAccess[0]], toAccess.slice(1))
   }
+}
+
+const cloneDefinitionWithoutMeta = (definition)=>{
+  let componentType = getComponentType(definition)
+    
+  let {meta, ...oj_definition_no_meta} = definition[componentType]
+  return {[componentType]: oj_definition_no_meta}
 }
 
 // Framework
@@ -792,9 +802,16 @@ class Signal {
     if(!this.hasHandler(who)){
       this.handlers.push({who: who, handler: handler})
     }
+    return ()=>this.removeHandler(who)
   }
   removeHandler(who){
     this.handlers = this.handlers.filter(h=>h.who !== who)
+  }
+
+  destroy(){ // todo: integrare todo per bene!
+    let to_notify_of_destroy = this.handlers.map(h=>h.who)
+    this.handlers = []
+    return to_notify_of_destroy
   }
 
   // proxy dei signal esposto agli user, che possono fare solo $.this.signalName.emit(...)
@@ -962,6 +979,19 @@ class UseComponentDeclaration{
     return { [componentType]: resolved }
   }
 
+  cloneWithoutMeta(){
+    let redefinitions_no_meta = undefined
+
+    if (this.redefinitions !== undefined){
+      let {meta, ..._redefinitions_no_meta} = this.redefinitions
+      redefinitions_no_meta = _redefinitions_no_meta
+    }
+
+    return new UseComponentDeclaration(
+      cloneDefinitionWithoutMeta(this.component), redefinitions_no_meta, { strategy:this.strategy, init:this.init, passed_props:this.passed_props }
+    )
+  }
+
 }
 
 
@@ -1108,7 +1138,7 @@ const RenderApp = (html_root, definition)=>{
 
 }
 
-
+// todo: routing (also partial!)
 // class VDoom {
 //   constructor(renderRoot, route){
 //     this.renderRoot = renderRoot
@@ -1167,6 +1197,15 @@ class ComponentsTreeRoot {
 
 }
 
+// @interface Component base defintion
+class IComponent {
+  constructor(parent, definition, $le){}
+  
+  buildSkeleton(){}
+  create(){}
+  destroy(){}
+
+}
 
 class Component {
 
@@ -1184,6 +1223,7 @@ class Component {
   // attrProperties = {}// real attr Props Container // todo: qualcosa del genere per gli attr
   signals = {} // type {signalX: Signal}
   hooks = {}// hook alle onInit dei componenti etc..
+  meta = {} // container of "local" meta variable (le-for)
 
 
   // Frontend for Dev
@@ -1194,7 +1234,7 @@ class Component {
   isA$ctxComponent = false
   // $bind // ComponentProoxy -> contains the property as "binding"..a sort of "sentinel" that devs can use to signal "2WayBinding" on a property declaration/definition, visible to the dev as $.bind, usefull also to define intra-property "alias"
   $dbus 
-  $meta
+  $meta // ComponentProxy => contains all "meta", local and from parents, in the same Component
 
 
   htmlElementType
@@ -1210,6 +1250,7 @@ class Component {
 
     this.$le = $le
     this.$ctx = this.getMy$ctx()
+    this.$meta = this.getMy$meta()
 
     this.oj_definition = definition
 
@@ -1229,6 +1270,20 @@ class Component {
     else{
       if (this.parent !== undefined && (this.parent instanceof Component)){
         return this.parent.getMy$ctx()
+      }
+      
+      return undefined
+    }
+  }
+
+  getMy$meta(){ // as singleton/generator
+    if(this.isA$ctxComponent){
+      return ComponentProxy(this.meta)
+    }
+
+    else{
+      if (this.parent !== undefined && (this.parent instanceof Component)){
+        return ComponentProxy({...this.parent.meta, ...this.meta})
       }
       
       return undefined
@@ -1313,7 +1368,7 @@ class Component {
 
     // todo: parent and le visible properties only..
     this.$parent = (this.parent instanceof Component) ? ComponentProxy(this.parent.properties) : undefined
-    this.$this = ComponentProxy(/*new ComponentProxySentinel(*/{this: ComponentProxy(this.properties), parent: this.$parent, le: this.$le.proxy, ctx: this.$ctx.proxy /*, dbus: this.$dbus, meta: this.$meta*/} /*)*/ ) //tmp, removed ComponentProxySentinel (useless)
+    this.$this = ComponentProxy(/*new ComponentProxySentinel(*/{this: ComponentProxy(this.properties), parent: this.$parent, le: this.$le.proxy, ctx: this.$ctx.proxy /*, dbus: this.$dbus*/, meta: this.$meta} /*)*/ ) //tmp, removed ComponentProxySentinel (useless)
 
     // mettere private stuff in "private_properties" e "private_signal", a quel punto una strada potrebbe essere quella di avere un "private_this" qui su..ma in teoria dovrebbe essere qualcosa di context, e non solo in me stesso..
   }
@@ -1405,12 +1460,12 @@ class Component {
         Object.entries(handle_on_definition).forEach(([typologyNamespace, defs ])=>{
           if (typologyNamespace === "this"){
             Object.entries(defs).forEach(([s, fun])=>{
-              this.signals[s].addHandler(this, (...args)=>fun.bind(undefined, this.$this, ...args)())
+              let remover = this.signals[s].addHandler(this, (...args)=>fun.bind(undefined, this.$this, ...args)())
             })
           }
           if (typologyNamespace === "parent"){
             Object.entries(defs).forEach(([s, fun])=>{
-              this.parent.signals[s].addHandler(this, (...args)=>fun.bind(undefined, this.$this, ...args)())
+              let remover = this.parent.signals[s].addHandler(this, (...args)=>fun.bind(undefined, this.$this, ...args)())
             })
           }
           if (typologyNamespace === "le"){
@@ -1420,7 +1475,7 @@ class Component {
                 const setUpSignalHandler = (num_retry=0)=>{
                   try{
                     // console.log("provo ad agganciare signal", leItem, s)
-                    this.$le[leItem].signals[s].addHandler(this, (...args)=>fun.bind(undefined, this.$this, ...args)())
+                    let remover = this.$le[leItem].signals[s].addHandler(this, (...args)=>fun.bind(undefined, this.$this, ...args)())
                   }
                   catch{
                     if (num_retry < 5) {
@@ -1443,7 +1498,7 @@ class Component {
                 const setUpSignalHandler = (num_retry=0)=>{
                   try{
                     // console.log("provo ad agganciare signal", leItem, s)
-                    this.$ctx[ctxItem].signals[s].addHandler(this, (...args)=>fun.bind(undefined, this.$this, ...args)())
+                    let remover = this.$ctx[ctxItem].signals[s].addHandler(this, (...args)=>fun.bind(undefined, this.$this, ...args)())
                   }
                   catch{
                     if (num_retry < 5) {
@@ -2017,6 +2072,16 @@ class Component {
     try { if(this.isMyParentHtmlRoot){ delete this.$le["_root_"] } } catch {}
     try { if(this.isA$ctxComponent){ delete this.$ctx["_ctxroot_"] } } catch {}
     delete this.$le[this.id]
+
+    Object.values(this.signals).forEach(s=>{
+      try{s.destroy()} catch{}
+    })
+    Object.values(this.properties).forEach(p=>{
+      try{p.destroy(true)} catch{}
+    })
+
+    // todo: destroy properties and signal well..
+
   }
 
   static parseComponentDefinition = (definition) => {
@@ -2247,6 +2312,7 @@ class ConditionalComponent extends Component{
 
   // real "create", wrapped in the conditional system
   _create(){
+    console.log("sto per ricreare", this)
     super.buildSkeleton()
     super.buildChildsSkeleton()
     super.create()
@@ -2255,7 +2321,7 @@ class ConditionalComponent extends Component{
   create(){
     this.buildPropertiesRef()
     // step 1: geenrate If property, and configure to create (that build) or destry component!
-    this.visible = new Property(this.convertedDefinition.meta.if, none, (v, _, prop)=>{ console.log("seeeetttinnggggggg", v, _, prop); if (v !== prop._latestResolvedValue) { v ? this._create() : this.destroy() } }, pass, ()=>this.$this, (thisProp, deps)=>{
+    this.visible = new Property(this.convertedDefinition.meta.if, none, (v, _, prop)=>{ console.log("seeeetttinnggggggg", v, _, prop); if (v !== prop._latestResolvedValue) { v ? this._create() : this._destroy() } }, pass, ()=>this.$this, (thisProp, deps)=>{
 
       console.log("calculating deeeeeepsssssss!!!!!")
       // deps connection logic
@@ -2284,14 +2350,212 @@ class ConditionalComponent extends Component{
 
   }
 
+  _destroy(){
+    super.destroy()
+  }
+
+  // real destroy
+  destroy(){
+    this.html_pointer_element_anchor.remove()
+    this.visible.destroy(true)
+    super.destroy()
+  }
+
 }
 
 class SwitchConditionalComponent extends Component{
   visible = false
 }
 
+
+class IterableComponent extends Component{
+  
+  constructor(parent, definition, $le, parentIterableView, iterableIndex, meta_config){
+    super(parent, definition, $le)
+
+    this.parentIterableView = parentIterableView
+    this.iterableIndex = iterableIndex
+    this.meta_config = meta_config
+
+    this.meta[this.meta_config.iterablePropertyIdentifier] = new Property(this.meta_config.value, none, none, none, ()=>this.$this, none, true)
+
+    this.$meta = this.getMy$meta() // rebuild
+  }
+
+  // ridefinisco la crezione dell'html pointer, e definisco anche se devo autoeliminarmi..o ci pensa il parent
+  // @overwrite, delegate html el construction to the Iterable View Hanlder (real parent)
+  buildHtmlPointerElement(){
+
+    this.parentIterableView.buildChildHtmlPointerElement(this, this.iterableIndex)
+
+  }
+  // la destroy funziona già bene, perchè rimuoverò me stesso (pointer)..!
+
+}
+
 class IterableViewComponent{
-  visible = false
+  iterableProperty
+  iterablePropertyIdentifier
+
+  parent
+  $le
+
+  oj_definition
+  real_iterable_definition
+  meta_def
+
+  properties = {} // only for the "of" execution context, as child instead of parent!
+  $this
+  $parent
+
+  childs = []
+
+  html_pointer_element_anchor
+  html_end_pointer_element_anchor
+
+  // step 1: build
+  constructor(parent, definition, $le){
+    this.parent = parent
+    this.$le = $le
+
+    this.oj_definition = definition
+    this.meta_def = ((definition instanceof UseComponentDeclaration ? definition.computedTemplate : definition)[getComponentType(definition)]).meta
+    this.real_iterable_definition = (definition instanceof UseComponentDeclaration ? definition.cloneWithoutMeta() : cloneDefinitionWithoutMeta(definition))
+  }
+
+  // generate the comment/anchor for the real conditional element (that will be create "after" the first or "before" the last "anchor")
+  buildHtmlPointerElementAnchor(){
+    
+    this.html_pointer_element_anchor = document.createComment("le-for")
+    this.html_end_pointer_element_anchor = document.createComment("le-for-end")
+
+    if (this.isMyParentHtmlRoot){
+      this.parent.appendChild(this.html_pointer_element_anchor)
+      this.parent.appendChild(this.html_end_pointer_element_anchor)
+    }
+    else {
+      this.parent.html_pointer_element.appendChild(this.html_pointer_element_anchor)
+      this.parent.html_pointer_element.appendChild(this.html_end_pointer_element_anchor)
+    }
+  }
+
+  buildChildHtmlPointerElement(child, childIndex){
+
+    child.html_pointer_element = document.createElement(child.htmlElementType)
+
+    this.html_end_pointer_element_anchor.before(child.html_pointer_element)
+    // todo, child index to insert in right position
+  }
+
+  // step 2: build skeleton (only the anchors & exec context for 'of' evaluation!)
+  buildSkeleton(){
+
+    this.buildHtmlPointerElementAnchor()
+    
+    this.buildPropertiesRef()
+
+  }
+
+  // properties to execute "of" clausole as subel (always child point of view!)
+  buildPropertiesRef(){
+
+    // here super simplyfied execution context! only parent, le, and my parent ctx & meta is allowed..ob how can i refer to this if this does not exist already?
+
+    // TODO: meta anche qui..
+
+    this.properties.parent = this.parent?.$this?.this
+
+    this.$parent = (this.parent instanceof Component) ? ComponentProxy(this.parent.properties) : undefined
+    this.$this = ComponentProxy({parent: this.$parent, le: this.$le.proxy, ctx: this.parent.$ctx.proxy, meta: this.parent.$meta})
+  }
+
+
+  //@override, per utilizzare nella Factory this.parent come parent e non this. inoltre qui in realtà parlo dei children come entità replicate, e non i child del template..devo passare una versione del template senza meta alla component factory! altrimenti errore..
+  // in realtà dovrebbe essere un "build child skeleton and create child"
+  buildChildsSkeleton(){
+    this._destroyChilds()
+
+    // todo, algoritmo reale euristico, che confronta itmet per item (via this.iterableProperty.value._latestResolvedValue[idx] !== arrValue)
+    this.childs = (this.iterableProperty.value?.map((arrValue, idx)=>new IterableComponent(this.parent, this.real_iterable_definition, this.$le, this, idx, {iterablePropertyIdentifier:this.iterablePropertyIdentifier, value: arrValue})) || [] )
+
+    // devo sicuramente fare una roba come per il conditional..un componente che estende component, perchè devo per forza gestire meglio la parte di append all'html pointer..
+
+    this.childs.forEach(child=>child.buildSkeleton())
+    this.childs.forEach(child=>child.create())
+
+  }
+
+  _destroyChilds(){
+    if (this.childs.length > 0){
+      this.childs.map(c=>c.destroy())
+      this.childs = []
+    }
+  }
+
+  // real "create", wrapped in the conditional system
+  _create(){
+    console.log("sto per ricreare", this)
+    this.buildChildsSkeleton()
+  }
+
+  // @overwrite
+  create(){
+
+    // step 1: generate Of clausole property, and configure to create (build) or destry component!
+    this.iterablePropertyIdentifier = this.meta_def.forEach
+
+    this.iterableProperty = new Property(
+      this.meta_def.of, 
+      none, 
+      (v, _, prop)=>{ 
+        console.log("seeeetttinnggggggg", v, _, prop); 
+        if (v !== prop._latestResolvedValue) { 
+          this._create()
+        } 
+      }, 
+      pass, 
+      // aggancio gli autoaggiornamenti della property per far in modo che la set vada a buon fine senza una "set" reale e diretta
+      ()=>this.$this, (thisProp, deps)=>{
+
+        console.log("calculating deeeeeepsssssss!!!!!")
+        // deps connection logic
+        deps.$parent_deps?.forEach(d=>{
+          debug.log("pushooooo")
+          this.parent.properties[d]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+        })
+
+        deps.$le_deps?.forEach(d=>{ // [le_id, property]
+          debug.log("pushooooo")
+          this.$le[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+        })
+
+        deps.$ctx_deps?.forEach(d=>{ // [le_id, property]
+          debug.log("pushooooo")
+          this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+        })
+      }, 
+      true
+    )
+
+    console.log("ultimooooooooooo", this, this.meta_def.of)
+    
+    // try {
+    this.iterableProperty.value.length > 0 && this._create()
+    // }
+    // catch {
+    // }
+
+  }
+  destroy(){
+    this._destroyChilds()
+
+    this.html_pointer_element_anchor.remove()
+    this.html_end_pointer_element_anchor.remove()
+
+    this.iterableProperty.destroy(true)
+
+  }
+
 }
 
 
@@ -2301,6 +2565,13 @@ class IterableViewComponent{
 
 // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // //
 // TESTING
+
+// todo: anche se abbiamo fatto una prima versione di le-for, in realtà molto è da fare..al momento distruggo e ricreo, e dunque non posso neanche legarmi agli aggiornamenti delle property in meta..anche perchè non è semplice recuperare il who/what id-metaOfComponent. anche perchè i componenti non sopravvivono mai ad un aggiornamento!
+
+// todo: forse per le-for la cosa migliore è andare con una classe sentinel apposita, ForEach($=>blabla, {options}, {...component to repeat..}) perchè altrimenti devo eliminare dal meta prima di replicare e non è facile..a quel punto nella factory ricevo la sentinel e creo la classe che wrappa come pensavo in modo semplice..riutilizzando molto codice
+
+// todo: le dipendenze in cascata devono avere il meccanismo della retry, altrimenti al primo undefined ciaone
+// todo: destroy delle dipendenze, properties, signal, attr etc alla destroy!
 
 // todo: private..come realizzo il meccanismo dei private? name mangling in python style? (più semplice ma "inutile") o reale (e quindi tentare di capire come filtrare le properties visibili..)
 
@@ -2922,7 +3193,7 @@ const ReGenTodoView = $ => {
       }
     })
 }
-const TodoListContainer = { 
+const TodoListContainer_v0 = { 
   div: {
     id: "todoContainer",
 
@@ -2936,9 +3207,32 @@ const TodoListContainer = {
   }
 }
 
+
+const TodoListItems_v1 = { 
+  div: {  // { meta: { forEach: "todo", of: $ => $.le.model.todolist } }
+
+    "=>": [
+      { button: {  text: "remove",  handle: { onclick: $ => $.le.model.remove($.meta.todo) }  }},
+
+      { span: {text: $ => $.meta.todo, attrs: { style: {marginLeft:"15px"}}}}
+    ]
+  }
+}
+
+const TodoListContainer_v1 = { 
+  div: {
+    id: "todoContainer_with_lefor",
+
+    "=>": Use(TodoListItems_v1,  { meta: { forEach: "todo", of: $ => $.le.model.todolist } } )
+  }
+}
+
+
 const app_root = RenderApp(document.body, {
   div: {
     id: "appRoot",
+
+    data: { arr: [1,2,3] },
 
     ["=>"]: [
 
@@ -2957,7 +3251,9 @@ const app_root = RenderApp(document.body, {
       
       { hr: {} },
 
-      Use(TodoListContainer),
+      Use(TodoListContainer_v0),
+
+
 
       // Testing le IF
       { div: {   meta: { if: $ => $.le.model.todolist.length <= 0 },
@@ -2966,7 +3262,43 @@ const app_root = RenderApp(document.body, {
 
       }},
 
-      $ => "here to stay!" // simple text node to dimostrate that le-if works as expected (keeping order)
+      { div: {   meta: { if: $ => $.le.model.todolist.length >= 5 },
+
+        "=>": { span: { text: [ 
+          "Oh no! hai molti todo! (",  {b: { text: $ => $.le.model.todolist.length}},  ")"
+        ]}}
+      }},
+
+      $ => "---" // simple text node to dimostrate that le-if works as expected (keeping order)
+
+
+      // Testing le for
+      ,{ div: { meta: {forEach:"todo", of: $ => $.le.model.todolist}, 
+        text: $ => $.meta.todo
+      }},
+      
+      $ => "---", // simple text node to dimostrate that le-for works as expected (keeping order)
+      
+      Use(TodoListContainer_v1),
+
+      $ => "---", // simple text node to dimostrate that le-for works as expected (keeping order)
+
+      // testing nested le-for
+      { Model: { id: "test_lefor", data: { arr:[1,2,3] }}},
+
+      { div: {   meta: {forEach:"arr_val", of: $ => $.le.test_lefor.arr}, 
+        "=>": { div: {   meta: {forEach:"todo", of: $ => $.le.model.todolist}, 
+          text: $ => $.meta.arr_val + ") " + $.meta.todo
+        }}
+      }},
+
+      // here testing component "meta" sapeartion
+      { div: {   meta: {forEach:"arr_val", of: $ => $.le.test_lefor.arr}, 
+
+        "=>": Use({ div: {   meta: {forEach:"todo", of: $ => $.le.model.todolist}, 
+          text: $ => $.meta.arr_val + ") " + $.meta.todo
+        }})
+      }},
 
     ]
   }
