@@ -3232,8 +3232,6 @@ const app_root = RenderApp(document.body, {
   div: {
     id: "appRoot",
 
-    data: { arr: [1,2,3] },
-
     ["=>"]: [
 
       // Model & Controller
