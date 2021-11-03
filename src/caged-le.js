@@ -3307,6 +3307,44 @@ console.log(app_root)
 }
 
 
+const appNestedData = ()=>{
+
+const app_root = RenderApp(document.body, {
+  div: {
+    id: "appRoot",
+
+    data: {
+      fruits:[
+        {name: "orange", tags: ["orange", "agrume", "sphere"]},
+        {name: "strawberry", tags: ["red"]},
+        {name: "lemon", tags: ["yellow", "agrume"]}
+      ]
+    },
+
+    ["=>"]: {
+      div: {  meta: { forEach: "fruit", of: $ => $.parent.fruits },
+
+        "=>": { 
+          div: {
+
+            "=>": [
+              $ => "- name:" + $.meta.fruit.name + " ",
+
+              { b: {  meta: { forEach: "tag", of: $ => $.meta.fruit.tags },
+                "=>": $ => "(#" + $.meta.tag + ") ", 
+              }}
+            ]
+          }
+        }
+        
+
+      }
+    }
+  }
+})
+}
+
 // app0()
 // test2way()
-appTodolist()
+// appTodolist()
+appNestedData()
