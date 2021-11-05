@@ -544,7 +544,7 @@ const TodoList = { // automatic root div!
     { hr: {} },
 
 
-    { div: { meta: [{ forEach:"todo",  of: $ => $.parent.todolist,   index:"idx", first:"isFirst", last:"isLast", length:"len", easy_alias:{ // my_var_extracted_with_meta_identifier..easy alias! //, todo_label: $ => $.this.todo_label_mapping[$.meta.todo]},  key,comparer: el=>... // opzionale, per fare es Obj.keys --> extractor:($, blabla)=>Object.keys(blabla) e i comparer per identificare i changes // }], 
+    { div: { meta: [{ forEach:"todo",  of: $ => $.parent.todolist,  define:{ index:"idx", first:"isFirst", last:"isLast", length:"len" }, define_alias:{ // my_var_extracted_with_meta_identifier..easy alias! //, todo_label: $ => $.this.todo_label_mapping[$.meta.todo]},  key,comparer: el=>... extractor/converter: $=> // opzionale, per fare es Obj.keys --> extractor:($, blabla)=>Object.keys(blabla) e i comparer per identificare i changes // }], 
       
       "=>": [
 
@@ -1276,14 +1276,30 @@ class Component {
     }
   }
 
+  getMyFullMeta(){
+    if(this.isA$ctxComponent){
+      return this.meta
+    }
+
+    else{
+      if (this.parent !== undefined && (this.parent instanceof Component)){
+        return {...this.parent.getMyFullMeta(), ...this.meta}
+      }
+      
+      return {}
+    }
+
+  }
   getMy$meta(){ // as singleton/generator
     if(this.isA$ctxComponent){
+      console.log("Component metaaaaaaaaa", this.meta, this.oj_definition, this)
       return ComponentProxy(this.meta)
     }
 
     else{
       if (this.parent !== undefined && (this.parent instanceof Component)){
-        return ComponentProxy({...this.parent.meta, ...this.meta})
+        console.log("parernt metaaaaaaaaa", this.parent.meta, this.oj_definition, this)
+        return ComponentProxy(this.getMyFullMeta())
       }
       
       return undefined
@@ -2378,8 +2394,9 @@ class IterableComponent extends Component{
     this.meta_config = meta_config
 
     this.meta[this.meta_config.iterablePropertyIdentifier] = new Property(this.meta_config.value, none, none, none, ()=>this.$this, none, true)
-
+    // console.log("prima del meta", this.$meta, this.parent.$meta, this.meta, this.parent.meta, this.parent)
     this.$meta = this.getMy$meta() // rebuild
+    // console.log("dopo del meta", this.$meta, this.parent.$meta, this.meta, this.parent.meta, this.parent)
   }
 
   // ridefinisco la crezione dell'html pointer, e definisco anche se devo autoeliminarmi..o ci pensa il parent
@@ -2508,7 +2525,7 @@ class IterableViewComponent{
       this.meta_def.of, 
       none, 
       (v, _, prop)=>{ 
-        console.log("seeeetttinnggggggg", v, _, prop); 
+        console.log("seeeetttinnggggggg iterablee", v, _, prop); 
         if (v !== prop._latestResolvedValue) { 
           this._create()
         } 
@@ -3321,25 +3338,33 @@ const app_root = RenderApp(document.body, {
       ]
     },
 
-    ["=>"]: {
-      div: {  meta: { forEach: "fruit", of: $ => $.parent.fruits },
+    ["=>"]: [
+      { div: {  meta: { forEach: "fruit", of: $ => $.parent.fruits },
+          "=>": { 
+            div: {
 
-        "=>": { 
-          div: {
-
-            "=>": [
-              $ => "- name:" + $.meta.fruit.name + " ",
-
-              { b: {  meta: { forEach: "tag", of: $ => $.meta.fruit.tags },
-                "=>": $ => "(#" + $.meta.tag + ") ", 
-              }}
-            ]
+              "=>": [
+                "- name:", $ => $.meta.fruit.name, " ",
+                { br:{} },
+                "-->[", 
+                { b: {  meta: { forEach: "tag", of: $ => $.meta.fruit.tags },
+                  text: $ => "(#" + $.meta.tag + ($.meta.fruit.tags.indexOf($.meta.tag) !== ($.meta.fruit.tags.length-1) ? "), " : ")"), //TODO: QUESTA COSA DEVE FUNZIONARE.. I META IN CASCATA NON STANNO ANDANDO! 
+                  afterInit: $ => console.log($.meta, $.parent.meta)
+                }}, 
+                "]"
+              ]
+            }
           }
-        }
         
+        }
+      },
 
-      }
-    }
+      // test key/value
+      { div: {  meta: { forEach: "fruit_entries", of: $ => Object.entries($.parent.fruits[0]) },
+        text: $ => $.meta.fruit_entries + "..", 
+      }}
+    ]
+
   }
 })
 }
