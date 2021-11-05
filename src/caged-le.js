@@ -859,7 +859,7 @@ const Use = (component, redefinitions=undefined, { strategy="merge", init=undefi
 
 class UseComponentDeclaration{
   constructor(component, redefinitions=undefined, { strategy="merge", init=undefined, passed_props=undefined }={}){
-    this.component = component
+    this.component = component // Todo: e se voglio ridefinire un componente già Use??
     this.init = init
     this.passed_props = passed_props
     this.redefinitions = redefinitions
@@ -2590,18 +2590,18 @@ class IterableViewComponent{
 // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // //
 // TESTING
 
-// todo: anche se abbiamo fatto una prima versione di le-for, in realtà molto è da fare..al momento distruggo e ricreo, e dunque non posso neanche legarmi agli aggiornamenti delle property in meta..anche perchè non è semplice recuperare il who/what id-metaOfComponent. anche perchè i componenti non sopravvivono mai ad un aggiornamento!
+// todo: al momento la catena dei parent non è contemplata nella risoluzione delle dipendenze..migliorare
 
-// todo: forse per le-for la cosa migliore è andare con una classe sentinel apposita, ForEach($=>blabla, {options}, {...component to repeat..}) perchè altrimenti devo eliminare dal meta prima di replicare e non è facile..a quel punto nella factory ricevo la sentinel e creo la classe che wrappa come pensavo in modo semplice..riutilizzando molto codice
+// todo: anche se abbiamo fatto una prima versione di le-for, in realtà molto è da fare..al momento distruggo e ricreo, e dunque non posso neanche legarmi agli aggiornamenti delle property in meta..anche perchè non è semplice recuperare il who/what id-metaOfComponent. anche perchè i componenti non sopravvivono mai ad un aggiornamento!
 
 // todo: le dipendenze in cascata devono avere il meccanismo della retry, altrimenti al primo undefined ciaone
 // todo: destroy delle dipendenze, properties, signal, attr etc alla destroy!
 
-// todo: private..come realizzo il meccanismo dei private? name mangling in python style? (più semplice ma "inutile") o reale (e quindi tentare di capire come filtrare le properties visibili..)
+// todo: define css, state
 
 // todo: dipendenze delle def..perchè al momento non posso usare in una Property e avere l'autoaggiornamneto
 
-// todo: define css, state
+// todo: private..come realizzo il meccanismo dei private? name mangling in python style? (più semplice ma "inutile") o reale (e quindi tentare di capire come filtrare le properties visibili..)
 
 // todo: anche se non voglio farlo, potremmo usare un meccanismo per gestire anche le cose dei figli senza usare il nome..la prima cosa è andare alla angular maniera..ovvero aggiungere dettagli nel meta quando definisco un componente..in questo modo non ho problemi e posso risalire facile! -- altrimenti un qualcosa tipo  " on: {this: Child(0, {dataChanged: $=>...})} "..occhio che deve essere lazy!! o fatto dopo i child..
 // ---v
@@ -2613,331 +2613,335 @@ class IterableViewComponent{
 
 // todo: iniziare a strutturare come funziona "meta" lato dev, nel senso che il mio meta è in realtà l'insieme di tutti i meta dei miei parent (nello stesso componente? in teoria si, perchè il il compoente è entità "atomica", non dividibile, quindi dentro e fuori non si "conoscono") compreso il mio..a questo punto tutto deve andare con retry incrementale?
 
-// todo: visto che il punto di vista nella redefine dei componenent è sempre se stessi..quando faccio una use component non posso in alcun modo usare $.ctx per riferirmi al mio contesto visibile al momento della definizione..quindi forse ho due "problemi", il primo è che i context dovrebbero essere inclusivi (ovvero il mio as subchild è l'insieme del mio e di tutti quelli sopra di me. in alternativa devo avere il concetto di "supctx" ovvero ctx di mio padre (che deve rimanere tale anche per i miei child interni al componente). in effetti è semplice da fare, sostanzialmente è: this.getMyCtx().parent.getMyCtx())
+// todo: visto che il punto di vista nella redefine dei componenent è sempre se stessi..quando faccio una use component non posso in alcun modo usare $.ctx per riferirmi al mio contesto visibile al momento della definizione..quindi forse ho due "problemi", il primo è che i context dovrebbero essere inclusivi (ovvero il mio as subchild è l'insieme del mio e di tutti quelli sopra di me. in alternativa devo avere il concetto di "supctx" ovvero ctx di mio padre (che deve rimanere tale anche per i miei child interni al componente). in effetti è semplice da fare, sostanzialmente è: this.getMyCtx().parent.getMyCtx()). in alternativa devo poter andare in cascata come per parent..
 
-// todo: ng if, ng for, ng switch.. => per poter fare questa cosa c'è bisogno di un refactoring abbastanza importante, affiche ogni componente sia di fatto un contenitore per N elementi. questa è la base. per i componenti nomrmali ho solo 1 elemento, mentre per gli ngfor ne ho N. questo è l'uncio modo per poter continuare ad andare in questa direzione. altrimenti l'albero perde completamente di senso, a meno di non creare una sorta di "wrapper" per tutte le proprietà e quindi far diventare trasparente quell'operazione
+// todo (old?): ng if, ng for, ng switch.. => per poter fare questa cosa c'è bisogno di un refactoring abbastanza importante, affiche ogni componente sia di fatto un contenitore per N elementi. questa è la base. per i componenti nomrmali ho solo 1 elemento, mentre per gli ngfor ne ho N. questo è l'uncio modo per poter continuare ad andare in questa direzione. altrimenti l'albero perde completamente di senso, a meno di non creare una sorta di "wrapper" per tutte le proprietà e quindi far diventare trasparente quell'operazione
 // di fatto questa visione torna con l'originale dell'idea di avere dei "pointer html" via commento. ovvero ho un albero di componenti virtuali, nella quale in ogni fogli posso avere un albero di componenti reali. i cui sottocomponenti sono ancora una volta virtuali.
 // in alternativa: devo agire a livello di factory..creando un qualcosa che wrappa ma solo per l'ng for..visto che switch e if sono già ok..ma a quel punto il controllo della situazione chi ce l'ha??
 
-//// TODO OOOOO: tutto è un signal: ovvero le prop hanno dei signal associati (signal particolari, che portano con se il vecchio e il nuovo valore al triggher.. ergo: on, on_s e on_a sono solo degli alias (sovrapponibili a differenza di children etc) che servono allo sviluppatore pià che altro.
+
+
+//// note: tutto è un signal: ovvero le prop hanno dei signal associati (signal particolari, che portano con se il vecchio e il nuovo valore al triggher.. ergo: on, on_s e on_a sono solo degli alias (sovrapponibili a differenza di children etc) che servono allo sviluppatore pià che altro.
 // conseguenza esistono solo due cose da gestire: i dati (le property) e i signal. da qui va da se che anche gli attr sono property, con tutto quello che ne derive (signal etc)
+
+// note: forse per le-for la cosa migliore è andare con una classe sentinel apposita, ForEach($=>blabla, {options}, {...component to repeat..}) perchè altrimenti devo eliminare dal meta prima di replicare e non è facile..a quel punto nella factory ricevo la sentinel e creo la classe che wrappa come pensavo in modo semplice..riutilizzando molto codice
 
 
 const app0 = ()=>{
 
-// LIB COMPONENTS
-const Timer = {
-  Model: {
+  // LIB COMPONENTS
+  const Timer = {
+    Model: {
 
-    data: {
-      interval: 1000,
-      running: false,
-      
-      __interval: undefined
-    },
-
-    def: {
-      onTriggered: $=>{},
-
-      start: $=>{
-        $.this.__interval = setInterval(()=>$.this.onTriggered(), $.this.interval)
+      data: {
+        interval: 1000,
+        running: false,
+        
+        __interval: undefined
       },
-      stop: $=>{
-        clearInterval($.this.__interval)
-        $.this.__interval = undefined
-      },
-      completeAndStop: $=>{
-        $.this.stop();
-        $.this.onTriggered();
-      }
-    },
 
-    afterInit: $=>{
-      if ($.this.running){
-        $.this.start()
-      }
-    },
+      def: {
+        onTriggered: $=>{},
 
-    onDestroy: $=>{
-      $.this.stop()
-    },
-
-    on: { this: {
-      __intervalChanged: ($, newInterval)=>{
-        $.this.running = newInterval === undefined ? false : true
-      },
-      runningChanged: ($, newRunning, oldRunning) => {
-        if (newRunning !== oldRunning){
-          if (newRunning && $.this.__interval === undefined) {
-            $.this.start()
-          } else if (!newRunning && $.this.__interval !== undefined) {
-            $.this.stop()
-          }
-        }
-      },
-      intervalChanged: $ =>{
-        if($.this.running) {
+        start: $=>{
+          $.this.__interval = setInterval(()=>$.this.onTriggered(), $.this.interval)
+        },
+        stop: $=>{
+          clearInterval($.this.__interval)
+          $.this.__interval = undefined
+        },
+        completeAndStop: $=>{
           $.this.stop();
-          $.this.start();
+          $.this.onTriggered();
         }
-      }
-    }}
-  }
-}
+      },
 
-/** Directives Demo */
-const $D = {
-  onKeyPressed: (key, $funcToExec)=> ({onkeypress: ($, e)=>{ if (e.key === key) {$funcToExec($, e)} } })
-}
+      afterInit: $=>{
+        if ($.this.running){
+          $.this.start()
+        }
+      },
 
+      onDestroy: $=>{
+        $.this.stop()
+      },
 
-const InputComponent = { 
-	input: {
-		id: "myInput",
-
-		data: { text: "Hello!" },
-
-		signals: {
-			newInputConfirmed: "stream => (text: string)"
-		},
-
-		on: { this: {
-			textChanged: $=>console.log("text changeeeeeeddddd")
-		}},
-
-		attrs: {
-			value: $ => $.this.text
-		},
-		handle: {
-			oninput: ($, e) => { console.log("ipt!!!"); $.this.text = e.target.value },
-      
-			// onkeypress: ($, e) => { if (e.key === "Enter") { console.log("sono child, sto per emettere il segnale!"); $.this.newInputConfirmed.emit($.this.text) } },
-      // DEMO DIRECTIVES
-      ...$D.onKeyPressed("Enter", 
-          ($, e) => { console.log("sono child, sto per emettere il segnale!"); $.this.newInputConfirmed.emit($.this.text) } 
-      )
-		},
-
-
-	}
-}
-
-const CtxEnabledComponent = {
-  div: { 
-    "private:id": "myCtxRoot",
-
-    data: {
-      todo: ["todo1", "todo2", "todo3"]
-    },
-
-    "=>" : [
-
-      { button: { 
-        "private:id": "removeBtn",
-
-        text: "remove final todo",
-
-        def: {
-          removeLastTodo: $ => {
-            if ($.ctx.myCtxRoot.todo.length > 0) {
-              let copy = [...$.ctx.myCtxRoot.todo]
-              copy.pop()
-              $.ctx.myCtxRoot.todo = copy
+      on: { this: {
+        __intervalChanged: ($, newInterval)=>{
+          $.this.running = newInterval === undefined ? false : true
+        },
+        runningChanged: ($, newRunning, oldRunning) => {
+          if (newRunning !== oldRunning){
+            if (newRunning && $.this.__interval === undefined) {
+              $.this.start()
+            } else if (!newRunning && $.this.__interval !== undefined) {
+              $.this.stop()
             }
           }
         },
-
-        handle: { 
-          onclick: $ => $.this.removeLastTodo() 
+        intervalChanged: $ =>{
+          if($.this.running) {
+            $.this.stop();
+            $.this.start();
+          }
         }
+      }}
+    }
+  }
 
+  /** Directives Demo */
+  const $D = {
+    onKeyPressed: (key, $funcToExec)=> ({onkeypress: ($, e)=>{ if (e.key === key) {$funcToExec($, e)} } })
+  }
+
+
+  const InputComponent = { 
+    input: {
+      id: "myInput",
+
+      data: { text: "Hello!" },
+
+      signals: {
+        newInputConfirmed: "stream => (text: string)"
+      },
+
+      on: { this: {
+        textChanged: $=>console.log("text changeeeeeeddddd")
       }},
 
-      { div: { 
-          "private:id": "listPresenter",
+      attrs: {
+        value: $ => $.this.text
+      },
+      handle: {
+        oninput: ($, e) => { console.log("ipt!!!"); $.this.text = e.target.value },
+        
+        // onkeypress: ($, e) => { if (e.key === "Enter") { console.log("sono child, sto per emettere il segnale!"); $.this.newInputConfirmed.emit($.this.text) } },
+        // DEMO DIRECTIVES
+        ...$D.onKeyPressed("Enter", 
+            ($, e) => { console.log("sono child, sto per emettere il segnale!"); $.this.newInputConfirmed.emit($.this.text) } 
+        )
+      },
 
-          text: $ => "--" + $.ctx.myCtxRoot.todo.toString(),
 
-          on: { // demo di _root_ e _ctxroot_
-            ctx: {"_ctxroot_": {
-              todoChanged: $=> console.log(" heeey sto puntanto al _ctxroot_ e ai sui aggiornamenti di todo!!")
-            }},
-            le: {"_root_": {
-              counterChanged: $=> console.log(" heeey sto puntanto al _root_ e ai sui aggiornamenti di counter!! essendo un componente è possibile che vengano lanciati più segnli")
-            }}
-          },
-          
-          onInit: $ => {
-            console.log("heeeeeey sono visibile solo nel contestooooo", $.ctx, $.ctx.myCtxRoot, $.le)
-          }
-      }}
-
-    ]
-
+    }
   }
-}
 
-const app_root = RenderApp(document.body, {
+  const CtxEnabledComponent = {
     div: { 
-        data: { counter: 10 },
+      "private:id": "myCtxRoot",
 
-        def: {
-          incCounter: $ => $.this.counter = $.this.counter+2
-        },
+      data: {
+        todo: ["todo1", "todo2", "todo3"]
+      },
 
-        handle: { 
-          onclick: ($, e)=> $.this.incCounter()
-        },
+      "=>" : [
 
-        on: { this: { 
-          counterChanged: ($, v)=> console.log("il counter è cambiato!! ora è:", v) 
-        } },
+        { button: { 
+          "private:id": "removeBtn",
 
-        on_s: { le: { myInput: {
-          newInputConfirmed: ($, newText) => console.log("sono parent, ho ricevuto un segnale da input!", newText)
-        }}},
+          text: "remove final todo",
 
-        ["=>"]: [ 
-
-            "hello World!", $=>" -> "+$.this.counter, $=>"!!",
-
-            { br: {} }, { br: {} },
-            
-            { div: {} }, // empty div
-            { div: {text: "hello! world!"} }, { div: {text: $ => $.parent.counter+20} }, { div: {text: "!!"} },
-
-            { div: { 
-              id: "future_counter",
-
-              data: {
-                futureCounter: $ => $.parent.counter + 100
-              },
-
-              ["=>"]: { 
-                div: { text: $ => $.parent.futureCounter }
+          def: {
+            removeLastTodo: $ => {
+              if ($.ctx.myCtxRoot.todo.length > 0) {
+                let copy = [...$.ctx.myCtxRoot.todo]
+                copy.pop()
+                $.ctx.myCtxRoot.todo = copy
               }
-            }},
+            }
+          },
 
-            { div: {
+          handle: { 
+            onclick: $ => $.this.removeLastTodo() 
+          }
 
-              data: {
-                bgColor: "red",
-              },
-              handle: { 
-                onclick: ($, e) => { $.this.bgColor = $.this.bgColor === "red" ? "blue" : "red"; e.stopPropagation();}
-              },
-              attrs: {
-                style: $ => ($.parent.counter % 11 !== 0 ? {
-                  width: 100,
-                  height: ( $.parent.counter * 2 )  + "px",
-                  backgroundColor: $.this.bgColor
-                } : undefined)
-              },
-              text: "gooo",
-            }},
+        }},
 
-            Use(
-              InputComponent
-            ),
-            Use(
-              InputComponent, {
-                id: "myInput2",
+        { div: { 
+            "private:id": "listPresenter",
 
-                data: { text: "Hello from ipt2!" },
+            text: $ => "--" + $.ctx.myCtxRoot.todo.toString(),
 
-                on: { this: {
-                  textChanged: $=>{ console.log("text cambiatoooo by ipt2!", $.le); $.le.myInput.newInputConfirmed.emit("oh no! hacked!") }
-                }}
-            }, {strategy: "override"}),
+            on: { // demo di _root_ e _ctxroot_
+              ctx: {"_ctxroot_": {
+                todoChanged: $=> console.log(" heeey sto puntanto al _ctxroot_ e ai sui aggiornamenti di todo!!")
+              }},
+              le: {"_root_": {
+                counterChanged: $=> console.log(" heeey sto puntanto al _root_ e ai sui aggiornamenti di counter!! essendo un componente è possibile che vengano lanciati più segnli")
+              }}
+            },
+            
+            onInit: $ => {
+              console.log("heeeeeey sono visibile solo nel contestooooo", $.ctx, $.ctx.myCtxRoot, $.le)
+            }
+        }}
 
-            Use(
-              InputComponent, {
-                id: "myInput3",
+      ]
 
-                data: { text: "Hello from ipt3!" },
+    }
+  }
 
-                on: { this: {
-                  textChanged: $=>{ console.log("text cambiatoooo by ipt3!", $, $.le); $.le.myInput.newInputConfirmed.emit("oh no! hacked!"); $.this.myFunc1() }
-                }},
-                def: {
-                  myFunc1: $=>console.log("hellooooo sono un func merged")
-                }
-            }, {strategy: "merge"}),
+  const app_root = RenderApp(document.body, {
+      div: { 
+          data: { counter: 10 },
 
-            $ => $.le.myInput3.text,
+          def: {
+            incCounter: $ => $.this.counter = $.this.counter+2
+          },
 
+          handle: { 
+            onclick: ($, e)=> $.this.incCounter()
+          },
 
-            { Model: {
-              data: {prop1: 23},
-              afterInit: $ => console.log($.this.el),
-              ["=>"]: [
+          on: { this: { 
+            counterChanged: ($, v)=> console.log("il counter è cambiato!! ora è:", v) 
+          } },
 
-                { Model: { // sub model/obj
-                  data: {prop2: 25},
-                  afterInit: $ => console.log($.this.el),
-                  text: "oleeeee",
-                }
-              },
-              ]
-            }},
+          on_s: { le: { myInput: {
+            newInputConfirmed: ($, newText) => console.log("sono parent, ho ricevuto un segnale da input!", newText)
+          }}},
 
-            Use(
-              Timer, {
-                id: "myTimer",
+          ["=>"]: [ 
+
+              "hello World!", $=>" -> "+$.this.counter, $=>"!!",
+
+              { br: {} }, { br: {} },
+              
+              { div: {} }, // empty div
+              { div: {text: "hello! world!"} }, { div: {text: $ => $.parent.counter+20} }, { div: {text: "!!"} },
+
+              { div: { 
+                id: "future_counter",
+
                 data: {
-                              
-                  interval: 1000,
-                  running: true,
-
-                  count: 0,
+                  futureCounter: $ => $.parent.counter + 100
                 },
 
-                def: {
-
-                  onTriggered: $=>{
-                    console.log("heeeeey..sono timer!!!")
-                    $.this.count += 1
-                    if ($.this.count === 5){
-                      $.le.future_counter.futureCounter = 0
-                    }
-                    if ($.this.count > 10){
-                      $.this.stop()
-                      $.le.future_counter.futureCounter = $ => $.parent.counter + 100
-                    }
-                  },
+                ["=>"]: { 
+                  div: { text: $ => $.parent.futureCounter }
                 }
-              }
-            ), // default is merge strategy!
+              }},
 
-            Use(
-              CtxEnabledComponent,
-              { id: "nowIsGlobalComponent1" }
-            ),
-            Use(
-              CtxEnabledComponent,
-              { id: "nowIsGlobalComponent2" }
-            ),
-            
-            // demo visible parent chain
-            { div: { "=>": { div: { "=>": { div: { "=>": {div: { afterInit: $ => console.log("ooooooooooooooooo", $.this, $.this.parent.parent.parent.parent.counter, $.this, $.parent.parent.parent.parent.counter)}}}}}}}},
+              { div: {
+
+                data: {
+                  bgColor: "red",
+                },
+                handle: { 
+                  onclick: ($, e) => { $.this.bgColor = $.this.bgColor === "red" ? "blue" : "red"; e.stopPropagation();}
+                },
+                attrs: {
+                  style: $ => ($.parent.counter % 11 !== 0 ? {
+                    width: 100,
+                    height: ( $.parent.counter * 2 )  + "px",
+                    backgroundColor: $.this.bgColor
+                  } : undefined)
+                },
+                text: "gooo",
+              }},
+
+              Use(
+                InputComponent
+              ),
+              Use(
+                InputComponent, {
+                  id: "myInput2",
+
+                  data: { text: "Hello from ipt2!" },
+
+                  on: { this: {
+                    textChanged: $=>{ console.log("text cambiatoooo by ipt2!", $.le); $.le.myInput.newInputConfirmed.emit("oh no! hacked!") }
+                  }}
+              }, {strategy: "override"}),
+
+              Use(
+                InputComponent, {
+                  id: "myInput3",
+
+                  data: { text: "Hello from ipt3!" },
+
+                  on: { this: {
+                    textChanged: $=>{ console.log("text cambiatoooo by ipt3!", $, $.le); $.le.myInput.newInputConfirmed.emit("oh no! hacked!"); $.this.myFunc1() }
+                  }},
+                  def: {
+                    myFunc1: $=>console.log("hellooooo sono un func merged")
+                  }
+              }, {strategy: "merge"}),
+
+              $ => $.le.myInput3.text,
 
 
-            { div: {
-              hattrs: {
-                "style.cssText": $=>toInlineStyle({
-                  color: "blue"
-                }), // this works only because exec order is mantained!
-                "style.backgroundColor": $=> $.parent.counter === 10 ? "red" : "white",
-                // textContent: $ => $.parent.counter // NEVER DO THIS!
-              },
-              text: $ => $.parent.counter
-            }},
+              { Model: {
+                data: {prop1: 23},
+                afterInit: $ => console.log($.this.el),
+                ["=>"]: [
 
-        ] 
-    }
-})
+                  { Model: { // sub model/obj
+                    data: {prop2: 25},
+                    afterInit: $ => console.log($.this.el),
+                    text: "oleeeee",
+                  }
+                },
+                ]
+              }},
 
-console.log(app_root)
+              Use(
+                Timer, {
+                  id: "myTimer",
+                  data: {
+                                
+                    interval: 1000,
+                    running: true,
+
+                    count: 0,
+                  },
+
+                  def: {
+
+                    onTriggered: $=>{
+                      console.log("heeeeey..sono timer!!!")
+                      $.this.count += 1
+                      if ($.this.count === 5){
+                        $.le.future_counter.futureCounter = 0
+                      }
+                      if ($.this.count > 10){
+                        $.this.stop()
+                        $.le.future_counter.futureCounter = $ => $.parent.counter + 100
+                      }
+                    },
+                  }
+                }
+              ), // default is merge strategy!
+
+              Use(
+                CtxEnabledComponent,
+                { id: "nowIsGlobalComponent1" }
+              ),
+              Use(
+                CtxEnabledComponent,
+                { id: "nowIsGlobalComponent2" }
+              ),
+              
+              // demo visible parent chain
+              { div: { "=>": { div: { "=>": { div: { "=>": {div: { afterInit: $ => console.log("ooooooooooooooooo", $.this, $.this.parent.parent.parent.parent.counter, $.this, $.parent.parent.parent.parent.counter)}}}}}}}},
+
+
+              { div: {
+                hattrs: {
+                  "style.cssText": $=>toInlineStyle({
+                    color: "blue"
+                  }), // this works only because exec order is mantained!
+                  "style.backgroundColor": $=> $.parent.counter === 10 ? "red" : "white",
+                  // textContent: $ => $.parent.counter // NEVER DO THIS!
+                },
+                text: $ => $.parent.counter
+              }},
+
+          ] 
+      }
+  })
+
+  console.log(app_root)
 }
 
 
@@ -3128,254 +3132,258 @@ const test2way = ()=>{ console.log(
 // TODO LIST DEMO
 const appTodolist = ()=> {
 
-const TodoListModel = { 
-  Model: {
-    id: "model",
+  const TodoListModel = { 
+    Model: {
+      id: "model",
 
-    data: {
-      todolist: []
-    },
-
-    def: {
-      add: ($, todo) =>{
-        $.this.todolist = [...$.this.todolist, todo]
+      data: {
+        todolist: []
       },
-      remove: ($, todo) =>{
-        $.this.todolist = $.this.todolist.filter(t=>t !== todo)
-      }
-    },
+
+      def: {
+        add: ($, todo) =>{
+          $.this.todolist = [...$.this.todolist, todo]
+        },
+        remove: ($, todo) =>{
+          $.this.todolist = $.this.todolist.filter(t=>t !== todo)
+        }
+      },
+    }
   }
-}
 
-const TodoListController = {
-  Controller: {
-    id: "controller",
+  const TodoListController = {
+    Controller: {
+      id: "controller",
 
-    def: {
-      addTodoFromInput: $ => { 
-        $.le.model.add($.le.input.text);
-        $.le.input.text = ""
-      }
-    },
-    
-    on_s: { le: { input: {
-      newInputConfirmed: $ => $.this.addTodoFromInput()
-    }}}
-  }
-}
-
-const TodoInput = { 
-	input: {
-		id: "input",
-
-		data: { 
-      text: "" 
-    },
-
-		signals: {
-			newInputConfirmed: "stream => (text: string)"
-		},
-
-		hattrs: {
-			value: Bind($ => $.this.text)
-		},
-
-		handle: {
-			onkeypress: ($, e) => { e.key === "Enter" && $.this.newInputConfirmed.emit($.this.text) },
-		},
-
-	}
-}
-
-const AddTodoButton = { 
-  button: {  text: "Add Todo",  handle: { onclick: $ => $.le.controller.addTodoFromInput() }  }
-}
-
-
-const ReGenTodoView = $ => {
-
-    let $$ = $
-
-    $.this.oldRenderized?.destroy()
-    $.this.el.innerText = "" // simple clear all content..[without remove handlers etc..] to be sure all is clear!
-
-    $.this.oldRenderized = RenderApp($$.this.el, {
+      def: {
+        addTodoFromInput: $ => { 
+          $.le.model.add($.le.input.text);
+          $.le.input.text = ""
+        }
+      },
       
-      div: { 
-        ["=>"]: $.le.model.todolist.map( todo => ( {
-          
-          div: { 
-            ["=>"]: [
-
-              { button: {  text: "remove",  handle: { onclick: $ => $$.le.model.remove(todo) }  }},
-
-              { span: {text: todo, attrs: { style: {marginLeft:"15px"}}}}
-
-          ]}
-
-        })) 
-      }
-    })
-}
-const TodoListContainer_v0 = { 
-  div: {
-    id: "todoContainer",
-
-    data: {
-      oldRenderized: undefined
-    },
-
-    on: { le: { model: {
-      todolistChanged: ReGenTodoView
-    }}}
+      on_s: { le: { input: {
+        newInputConfirmed: $ => $.this.addTodoFromInput()
+      }}}
+    }
   }
-}
 
+  const TodoInput = { 
+    input: {
+      id: "input",
 
-const TodoListItems_v1 = { 
-  div: {  // { meta: { forEach: "todo", of: $ => $.le.model.todolist } }
+      data: { 
+        text: "" 
+      },
 
-    "=>": [
-      { button: {  text: "remove",  handle: { onclick: $ => $.le.model.remove($.meta.todo) }  }},
+      signals: {
+        newInputConfirmed: "stream => (text: string)"
+      },
 
-      { span: {text: $ => $.meta.todo, attrs: { style: {marginLeft:"15px"}}}}
-    ]
+      hattrs: {
+        value: Bind($ => $.this.text)
+      },
+
+      handle: {
+        onkeypress: ($, e) => { e.key === "Enter" && $.this.newInputConfirmed.emit($.this.text) },
+      },
+
+    }
   }
-}
 
-const TodoListContainer_v1 = { 
-  div: {
-    id: "todoContainer_with_lefor",
-
-    "=>": Use(TodoListItems_v1,  { meta: { forEach: "todo", of: $ => $.le.model.todolist } } )
+  const AddTodoButton = { 
+    button: {  text: "Add Todo",  handle: { onclick: $ => $.le.controller.addTodoFromInput() }  }
   }
-}
 
 
-const app_root = RenderApp(document.body, {
-  div: {
-    id: "appRoot",
+  const ReGenTodoView = $ => {
 
-    ["=>"]: [
+      let $$ = $
 
-      // Model & Controller
-      Use(TodoListModel),
-      Use(TodoListController),
+      $.this.oldRenderized?.destroy()
+      $.this.el.innerText = "" // simple clear all content..[without remove handlers etc..] to be sure all is clear!
 
-      // Gui
-      Use(TodoInput, { 
-        attrs: { style: {width: "calc(100% - 90px)"} }
-      }),
+      $.this.oldRenderized = RenderApp($$.this.el, {
+        
+        div: { 
+          ["=>"]: $.le.model.todolist.map( todo => ( {
+            
+            div: { 
+              ["=>"]: [
 
-      Use(AddTodoButton, { 
-        attrs: { style: {width: "80px"}} 
-      }),
-      
-      { hr: {} },
+                { button: {  text: "remove",  handle: { onclick: $ => $$.le.model.remove(todo) }  }},
 
-      Use(TodoListContainer_v0),
+                { span: {text: todo, attrs: { style: {marginLeft:"15px"}}}}
 
+            ]}
 
-
-      // Testing le IF
-      { div: {   meta: { if: $ => $.le.model.todolist.length <= 0 },
-
-        text: $ => "Hurraa! Non ci sono todo! (" + $.le.model.todolist.length + ")"
-
-      }},
-
-      { div: {   meta: { if: $ => $.le.model.todolist.length >= 5 },
-
-        "=>": { span: { text: [ 
-          "Oh no! hai molti todo! (",  {b: { text: $ => $.le.model.todolist.length}},  ")"
-        ]}}
-      }},
-
-      $ => "---" // simple text node to dimostrate that le-if works as expected (keeping order)
-
-
-      // Testing le for
-      ,{ div: { meta: {forEach:"todo", of: $ => $.le.model.todolist}, 
-        text: $ => $.meta.todo
-      }},
-      
-      $ => "---", // simple text node to dimostrate that le-for works as expected (keeping order)
-      
-      Use(TodoListContainer_v1),
-
-      $ => "---", // simple text node to dimostrate that le-for works as expected (keeping order)
-
-      // testing nested le-for
-      { Model: { id: "test_lefor", data: { arr:[1,2,3] }}},
-
-      { div: {   meta: {forEach:"arr_val", of: $ => $.le.test_lefor.arr}, 
-        "=>": { div: {   meta: {forEach:"todo", of: $ => $.le.model.todolist}, 
-          text: $ => $.meta.arr_val + ") " + $.meta.todo
-        }}
-      }},
-
-      // here testing component "meta" sapeartion
-      { div: {   meta: {forEach:"arr_val", of: $ => $.le.test_lefor.arr}, 
-
-        "=>": Use({ div: {   meta: {forEach:"todo", of: $ => $.le.model.todolist}, 
-          text: $ => $.meta.arr_val + ") " + $.meta.todo
-        }})
-      }},
-
-    ]
+          })) 
+        }
+      })
   }
-})
+  const TodoListContainer_v0 = { 
+    div: {
+      id: "todoContainer",
 
-console.log(app_root)
+      data: {
+        oldRenderized: undefined
+      },
+
+      on: { le: { model: {
+        todolistChanged: ReGenTodoView
+      }}}
+    }
+  }
+
+
+  const TodoListItems_v1 = { 
+    div: {  // { meta: { forEach: "todo", of: $ => $.le.model.todolist } }
+
+      "=>": [
+        { button: {  text: "remove",  handle: { onclick: $ => $.le.model.remove($.meta.todo) }  }},
+
+        { span: {text: $ => $.meta.todo, attrs: { style: {marginLeft:"15px"}}}}
+      ]
+    }
+  }
+
+  const TodoListContainer_v1 = { 
+    div: {
+      id: "todoContainer_with_lefor",
+
+      "=>": Use(TodoListItems_v1,  { meta: { forEach: "todo", of: $ => $.le.model.todolist } } )
+    }
+  }
+
+
+  const app_root = RenderApp(document.body, {
+    div: {
+      id: "appRoot",
+
+      ["=>"]: [
+
+        // Model & Controller
+        Use(TodoListModel),
+        Use(TodoListController),
+
+        // Gui
+        Use(TodoInput, { 
+          attrs: { style: {width: "calc(100% - 90px)"} }
+        }),
+
+        Use(AddTodoButton, { 
+          attrs: { style: {width: "80px"}} 
+        }),
+        
+        { hr: {} },
+
+        Use(TodoListContainer_v0),
+
+
+
+        // Testing le IF
+        { div: {   meta: { if: $ => $.le.model.todolist.length <= 0 },
+
+          text: $ => "Hurraa! Non ci sono todo! (" + $.le.model.todolist.length + ")"
+
+        }},
+
+        { div: {   meta: { if: $ => $.le.model.todolist.length >= 5 },
+
+          "=>": { span: { text: [ 
+            "Oh no! hai molti todo! (",  {b: { text: $ => $.le.model.todolist.length}},  ")"
+          ]}}
+        }},
+
+        $ => "---" // simple text node to dimostrate that le-if works as expected (keeping order)
+
+
+        // Testing le for
+        ,{ div: { meta: {forEach:"todo", of: $ => $.le.model.todolist}, 
+          text: $ => $.meta.todo
+        }},
+        
+        $ => "---", // simple text node to dimostrate that le-for works as expected (keeping order)
+        
+        Use(TodoListContainer_v1),
+
+        $ => "---", // simple text node to dimostrate that le-for works as expected (keeping order)
+
+        // testing nested le-for
+        { Model: { id: "test_lefor", data: { arr:[1,2,3] }}},
+
+        { div: {   meta: {forEach:"arr_val", of: $ => $.le.test_lefor.arr}, 
+          "=>": { div: {   meta: {forEach:"todo", of: $ => $.le.model.todolist}, 
+            text: $ => $.meta.arr_val + ") " + $.meta.todo
+          }}
+        }},
+
+        // here testing component "meta" sapeartion
+        { div: {   meta: {forEach:"arr_val", of: $ => $.le.test_lefor.arr}, 
+
+          "=>": Use({ div: {   meta: {forEach:"todo", of: $ => $.le.model.todolist}, 
+            text: $ => $.meta.arr_val + ") " + $.meta.todo + " (undefined is normal)"
+          }})
+        }},
+
+      ]
+    }
+  })
+
+  console.log(app_root)
 
 }
 
 
 const appNestedData = ()=>{
 
-const app_root = RenderApp(document.body, {
-  div: {
-    id: "appRoot",
+  const app_root = RenderApp(document.body, {
+    div: {
+      id: "appRoot",
 
-    data: {
-      fruits:[
-        {name: "orange", tags: ["orange", "agrume", "sphere"]},
-        {name: "strawberry", tags: ["red"]},
-        {name: "lemon", tags: ["yellow", "agrume"]}
-      ]
-    },
-
-    ["=>"]: [
-
-      { div: {  meta: { forEach: "fruit", of: $ => $.parent.fruits },
-          "=>": { 
-
-            div: {
-              "=>": [
-
-                "- name:", $ => $.meta.fruit.name, " ",
-                { br:{} },
-
-                "-->[", 
-                  { b: {  meta: { forEach: "tag", of: $ => $.meta.fruit.tags,   define: { last: "isLast", first: "isFirst" } },
-                    text: $ => ($.meta.isFirst ? " (#" : "(#") + $.meta.tag + ( $.meta.isLast ? ") " : "), " ), 
-                  }}, 
-                "]"
-              ]
-            }
-          }
-        }
+      data: {
+        fruits:[
+          {name: "orange", tags: ["orange", "agrume", "sphere"]},
+          {name: "strawberry", tags: ["red"]},
+          {name: "lemon", tags: ["yellow", "agrume"]}
+        ]
       },
 
-      { br:{} },
-      // test key/value
-      { div: {  meta: { forEach: "fruit_entries", of: $ => Object.entries($.parent.fruits[0]) },
-        text: $ => $.meta.fruit_entries.join(":") + "..", 
-      }}
-    ]
+      ["=>"]: [
 
-  }
-})
+        { div: {  meta: { forEach: "fruit", of: $ => $.parent.fruits },
+            "=>": { 
+
+              div: {
+                text: [
+
+                  "- name:", $ => $.meta.fruit.name, " ",
+                  { br:{} },
+
+                  "--> [", 
+                    { b: {  meta: { forEach: "tag", of: $ => $.meta.fruit.tags,   define: { last: "isLast", first: "isFirst" } },
+                    
+                      text: $ => ($.meta.isFirst ? " (#" : "(#") + $.meta.tag + ( $.meta.isLast ? ") " : "), " ), 
+                      handle: {
+                        onclick: $ => console.log("heeey! hai scelto il tag: " + $.meta.tag )
+                      }
+                    }}, 
+                  "]"
+                ]
+              }
+            }
+          }
+        },
+
+        { br:{} },
+        // test key/value
+        { div: {  meta: { forEach: "fruit_entries", of: $ => Object.entries($.parent.fruits[0]) },
+          text: $ => $.meta.fruit_entries.join(":") + "..", 
+        }}
+      ]
+
+    }
+  })
 }
 
 // app0()
