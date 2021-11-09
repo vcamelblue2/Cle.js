@@ -378,7 +378,7 @@ const component = {
       onclick: ($, e) => $.this.count++
     },
 
-    define_css: ".class { bla:bli ... }" // todo..magari qualcosa di più complesso..come hoisting (via replacer, o anche per i subel), or namaed definition (tipo le)..oppure per automatizzare l'hoisting =>  define_css: [ ".class { bla:bli ... }", ".class2 { foo:bar; ...", NoHoisting("sostanzialmente ::ng-dep..")]
+    css: [ ".class { bla:bli ... }", $=>".r0 { .."+$.this.somedeps +"}" ] | {rule1: ".class { bla:bli ... }", rule2: $=>".r0 { .."+$.this.somedeps +"}"} // todo..magari qualcosa di più complesso..come hoisting (via replacer, o anche per i subel), or namaed definition (tipo le)..oppure per automatizzare l'hoisting =>  css: [ ".class { bla:bli ... }", ".class2 { foo:bar; ...", NoHoisting("sostanzialmente ::ng-dep..")]
 
     states: {
       // "default": "this", // implicit, always chang
@@ -459,7 +459,7 @@ first_lvl = ["signals", "dbus_signals", "data", "private:data", "props", "privat
 second_lvl = ["on", "on_s", "on_a"]
 first_or_second_lvl = ["def", "private:def"] // check for function (may exist "first lvl namespace")
 // TODO: actually merge unsupported
-"hattrs", "ha", "private:hattrs", "private:ha", "attrs", "private:attrs", "a", "private:a", define_css, states, state, stateChangeStrategy, onState, contains | childs | text | '>>' | '=>' | _???
+"hattrs", "ha", "private:hattrs", "private:ha", "attrs", "private:attrs", "a", "private:a", css, states, state, stateChangeStrategy, onState, contains | childs | text | '>>' | '=>' | _???
 
 
 
@@ -1241,6 +1241,7 @@ class Component {
   isObjComponent
   html_pointer_element
   html_end_pointer_element // future use, per i componenti dinamici e liste..
+  css_html_pointer_element
 
   // step 1: build
   constructor(parent, definition, $le){
@@ -2030,6 +2031,54 @@ class Component {
     }
 
 
+    // css, TODO: support function etc. occhio 
+    if (this.convertedDefinition.css !== undefined){
+      if (this.css_html_pointer_element === undefined){
+        this.css_html_pointer_element = document.createElement('style');
+        document.getElementsByTagName('head')[0].appendChild(this.css_html_pointer_element);
+      }
+
+      let rules = []
+      
+      const renderize_css = ()=>{
+        this.css_html_pointer_element.innerText = rules.map(r=>r.value.replaceAll("\n", "").replaceAll("\t", " ").replaceAll("   ", "").replaceAll("  ", " ")).join(" ")
+      }
+
+      (Array.isArray(this.convertedDefinition.css) ? 
+        this.convertedDefinition.css 
+        :
+        Object.values(this.convertedDefinition.css)
+      ).forEach(rule=>{
+        rules.push(
+          
+          new Property(rule, none, renderize_css, none, ()=>this.$this, (thisProp, deps)=>{
+            
+            // deps connection logic
+            deps.$this_deps?.forEach(d=>{
+              this.properties[d]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() ) // qui il ? server affinche si ci registri solo alle props (e non alle func etc!)
+            }) // supporting multiple deps, but only of first order..
+
+            deps.$parent_deps?.forEach(d=>{
+              this.parent.properties[d]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+            })
+
+            deps.$le_deps?.forEach(d=>{ // [le_id, property]
+              this.$le[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+            })
+
+            deps.$ctx_deps?.forEach(d=>{ // [le_id, property]
+              this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+            })
+
+          }, true)
+        )
+      })
+
+      renderize_css()
+
+    }
+
+
 
     // constructor (if is a use component)
     if (this.isA$ctxComponent && this.convertedDefinition.constructor !== undefined){
@@ -2083,6 +2132,8 @@ class Component {
   destroy(){
     this.childs.forEach(child=>child.destroy())
     this.html_pointer_element.remove()
+    this.css_html_pointer_element?.remove()
+    this.css_html_pointer_element=undefined
     try { delete this.$ctx[this.id] } catch {}
     try { delete this.$ctx[this._id] } catch {}
     try { if(this.isMyParentHtmlRoot){ delete this.$le["_root_"] } } catch {}
@@ -2120,7 +2171,7 @@ class Component {
       "constructor", 
       "beforeInit", "onInit", "afterInit", "onUpdate", "onDestroy", 
       "signals", "dbus_signals", "on", "on_s", "on_a", 
-      "alias", "handle", "define_css", 
+      "alias", "handle", "css", 
       "states", "stateChangeStrategy", "onState"
     ])
 
@@ -2329,6 +2380,7 @@ class ConditionalComponent extends Component{
   // real "create", wrapped in the conditional system
   _create(){
     console.log("sto per ricreare", this)
+    super.defineAndRegisterId()
     super.buildSkeleton()
     super.buildChildsSkeleton()
     super.create()
@@ -2598,6 +2650,8 @@ class IterableViewComponent{
 // todo: destroy delle dipendenze, properties, signal, attr etc alla destroy!
 
 // todo: define css, state
+
+// todo: i Model/Controller (object) devono poter definire css? sarebbe mooolto utile, in quanto sarebbe il modo naturale (magari via Css) per definirlo, integrando anche l'auto update dei dati..ovvero le classi possono dipendere dai dati e quinid non devo più aggiornare la classe css dell'elemento, ma una property, che in cascata aggiornerà tutto. questo porta alla necessità di avere gli ng-if anche per gli object in modo obbligatorio! [done]
 
 // todo: dipendenze delle def..perchè al momento non posso usare in una Property e avere l'autoaggiornamneto
 
@@ -3337,6 +3391,29 @@ const appTodolist = ()=> {
 
 const appNestedData = ()=>{
 
+  const CssEngine = { 
+    Controller: { meta: {if: $=>$.le.appRoot.counter  <= 0 || $.le.appRoot.counter >= 5},
+
+    id: "css_engine",
+    
+    data: {
+      colors: ["red", "orange"],
+      colors_idx: 0
+    },
+    
+    css: {
+      r0: ".test { background-color: red }",
+      r1: $ => ".test2 { background-color: " + $.this.colors[$.this.colors_idx] + "}",
+      r2_conditional: $ => $.this.colors_idx === 0 ? "" : ".test-font { font-size: 30px }"
+    },
+    
+    // css: [
+    //   ".test { background-color: red }",
+    //   $ => ".test2 { background-color:" +$.this.fruits[0].name + "}"
+    // ],
+
+  }}
+
   const app_root = RenderApp(document.body, {
     div: {
       id: "appRoot",
@@ -3346,10 +3423,18 @@ const appNestedData = ()=>{
           {name: "orange", tags: ["orange", "agrume", "sphere"]},
           {name: "strawberry", tags: ["red"]},
           {name: "lemon", tags: ["yellow", "agrume"]}
-        ]
+        ],
+
+        counter: 0
+      },
+
+      handle: {
+        onclick: $=>$.this.counter += 1
       },
 
       ["=>"]: [
+
+        Use(CssEngine),
 
         { div: {  meta: { forEach: "fruit", of: $ => $.parent.fruits },
             "=>": { 
@@ -3365,7 +3450,15 @@ const appNestedData = ()=>{
                     
                       text: $ => ($.meta.isFirst ? " (#" : "(#") + $.meta.tag + ( $.meta.isLast ? ") " : "), " ), 
                       handle: {
-                        onclick: $ => console.log("heeey! hai scelto il tag: " + $.meta.tag )
+                        onclick: ($,e)=> {
+                          console.log("heeey! hai scelto il tag: " + $.meta.tag );
+
+                          e.stopPropagation()
+                          $.le.css_engine.colors_idx = ($.le.css_engine.colors_idx + 1 )%2 // demo direct change css
+                        }
+                      },
+                      attrs: {
+                        class: "test2 test-font"
                       }
                     }}, 
                   "]"
