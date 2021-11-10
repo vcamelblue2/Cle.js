@@ -2130,8 +2130,8 @@ class Component {
   // }
   // regenerate(){}
   destroy(){
-    this.childs.forEach(child=>child.destroy())
-    this.html_pointer_element.remove()
+    this.childs?.forEach(child=>child.destroy())
+    this.html_pointer_element?.remove()
     this.css_html_pointer_element?.remove()
     this.css_html_pointer_element=undefined
     try { delete this.$ctx[this.id] } catch {}
