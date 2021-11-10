@@ -3481,7 +3481,200 @@ const appNestedData = ()=>{
   })
 }
 
+
+// TODO LIST DEMO STABLE
+const appTodolistv2 = ()=> {
+
+  const TodoListModel = { 
+    Model: {
+      id: "model",
+
+      data: {
+        _todo_id_gen: 0,
+        todolist: [], /* {_id: number, todo: string, done: boolean}*/
+      },
+
+      def: {
+        add: ($, todoText, done=false) =>{
+          $.this.todolist = [...$.this.todolist, { _id: $.this._todo_id_gen++, todo: todoText, done: done } ]
+        },
+        remove: ($, todo) =>{
+          $.this.todolist = $.this.todolist.filter(t=>t._id !== todo._id)
+        },
+        chnageDoneStatus: ($, todo) => {
+          todo.done = !todo.done
+          $.this.todolist = [...$.this.todolist]
+        }
+      },
+    }
+  }
+
+  const TodoListController = {
+    Controller: {
+      id: "controller",
+
+      def: {
+        addTodoFromInput: $ => { 
+          $.le.model.add($.le.input.text);
+          $.le.input.text = ""
+        }
+      },
+      
+      on_s: { le: { input: {
+        newInputConfirmed: $ => $.this.addTodoFromInput()
+      }}}
+    }
+  }
+
+  // View
+  const TodoInput = { 
+    input: {
+      id: "input",
+
+      data: { 
+        text: "" 
+      },
+
+      signals: {
+        newInputConfirmed: "stream => (text: string)"
+      },
+
+      hattrs: {
+        value: Bind($ => $.this.text)
+      },
+
+      handle: {
+        onkeypress: ($, e) => { e.key === "Enter" && $.this.newInputConfirmed.emit($.this.text) },
+      },
+
+    }
+  }
+
+  const AddTodoButton = { 
+    button: {  text: "Add Todo",  handle: { onclick: $ => $.le.controller.addTodoFromInput() }  }
+  }
+
+
+
+  const TodoListItem = { 
+    div: {  // { meta: { forEach: "todo", of: $ => $.le.model.todolist } }
+
+      "=>": [
+        // todo with checkbox
+        { span: {
+          "=>": [
+            { input: { hattrs: { type: "checkbox", checked: $ => $.meta.todo.done, name: $ => $.meta.todo._id}, handle: {onchange: $ => $.le.model.chnageDoneStatus($.meta.todo) } }}, 
+            
+            { label: { 
+              "=>": [  // si poteva fare anche con style..
+                { span: { meta: {if: $ => !$.meta.todo.done}, 
+                  text: $ => $.meta.todo.todo
+                }}, 
+                { s: { meta: {if: $ => $.meta.todo.done}, 
+                  text: $ => $.meta.todo.todo 
+                }},
+              ], 
+              hattrs: {for: $ => $.meta.todo._id} 
+            }}
+          ] 
+        }},
+        // remove button
+        { button: {  
+          text: "remove", 
+          handle: { 
+            onclick: $ => $.le.model.remove($.meta.todo) 
+          }, 
+          attrs: { 
+            style: {position: "absolute", right:"2px"}
+          }  
+        }},
+      ]
+    }
+  }
+
+  const TodoListContainer= { 
+    div: {
+      id: "todoContainer_with_lefor",
+
+      "=>": Use(TodoListItem,  { meta: { forEach: "todo", of: $ => $.le.model.todolist } } )
+    }
+  }
+
+  const TodoRecap = {
+    div: {
+      "=>": [
+
+        { div: {   meta: { if: $ => $.le.model.todolist.length <= 0 },
+          text: $ => "Hurraa! Non ci sono todo!"
+        }},
+
+        { div: {   meta: { if: $ => $.le.model.todolist.length > 0 },
+
+          "=>": { span: { text: [ 
+            "Ci sono ",  {b: { text: $ => $.le.model.todolist.length}}, " To-Do"
+          ]}}
+        }}
+      ]
+    }
+  }
+
+  const app_root = RenderApp(document.body, {
+    div: {
+      id: "appRoot",
+
+      attrs: {
+        style: {
+          width: "75%",
+          minHeight: "50vh",
+          overflowY: "auto",
+          margin: "auto",
+          position: "relative",
+          marginTop: "25vh", //"calc(calc(100% - 50vh) / 5)",
+          border: "1px solid black"
+        }
+      },
+
+      ["=>"]: [
+
+        // Model & Controller
+        Use(TodoListModel),
+        Use(TodoListController),
+
+        // Gui
+        Use(TodoInput, { 
+          attrs: { style: {width: "calc(100% - 90px)"} }
+        }),
+
+        Use(AddTodoButton, { 
+          attrs: { style: {width: "80px"}} 
+        }),
+        
+        { hr: {} },
+
+        Use(TodoListContainer),
+
+        { hr: {} },
+
+        Use(TodoRecap, { attrs: {style: {marginLeft: "5px", textAlgin:"right"}}}),
+
+      ],
+
+      // simulate data
+      afterInit: $ => {
+        $.le.model.add("Some stuff..", true)
+        $.le.model.add("Other things")
+        $.le.model.add("Kind of magic!", true)
+      }
+    }
+  })
+
+  console.log(app_root)
+
+}
+
+
 // app0()
 // test2way()
 // appTodolist()
-appNestedData()
+appTodolistv2()
+// appNestedData()
