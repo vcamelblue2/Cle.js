@@ -1256,7 +1256,7 @@ class Component {
     this.oj_definition = definition
 
     this.htmlElementType = getComponentType(definition)
-    this.isObjComponent = ["Model", "Controller", "Connector"].includes(this.htmlElementType)
+    this.isObjComponent = ["Model", "Controller", "Connector", "Style", "Css"].includes(this.htmlElementType)
     this.convertedDefinition = Component.parseComponentDefinition( (definition instanceof UseComponentDeclaration ? definition.computedTemplate : definition) [this.htmlElementType])
 
     this.defineAndRegisterId()
@@ -2642,6 +2642,9 @@ class IterableViewComponent{
 // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // //
 // TESTING
 
+// todo: "SelfStyle" o altro meccanismo per esplicitare hoisting del css..vedi su..alternativa andare di replace e tutto è "pubblico" (aka ng-deep) di default..in questo caso è compito dello sviluppatore inserire un "replacer" che indica all'engine che quella classe è "locale"
+// todo: tutti gli elementi devono avere un attributo che mappa un identificativo univoco dell'elemento (stabile nel tempo, anche per gli ng-if e ng-for) per poter aiutare l'hoisting..
+
 // todo: al momento la catena dei parent non è contemplata nella risoluzione delle dipendenze..migliorare
 
 // todo: anche se abbiamo fatto una prima versione di le-for, in realtà molto è da fare..al momento distruggo e ricreo, e dunque non posso neanche legarmi agli aggiornamenti delle property in meta..anche perchè non è semplice recuperare il who/what id-metaOfComponent. anche perchè i componenti non sopravvivono mai ad un aggiornamento!
@@ -3388,11 +3391,10 @@ const appTodolist = ()=> {
 
 }
 
-
 const appNestedData = ()=>{
 
   const CssEngine = { 
-    Controller: { meta: {if: $=>$.le.appRoot.counter  <= 0 || $.le.appRoot.counter >= 5},
+    Style: { meta: {if: $=>$.le.appRoot.counter  <= 0 || $.le.appRoot.counter >= 5},
 
     id: "css_engine",
     
