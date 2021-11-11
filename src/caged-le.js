@@ -1256,7 +1256,7 @@ class Component {
     this.oj_definition = definition
 
     this.htmlElementType = getComponentType(definition)
-    this.isObjComponent = ["Model", "Controller", "Connector", "Style", "Css"].includes(this.htmlElementType)
+    this.isObjComponent = ["Model", "Controller", "Connector", "Signals", "Style", "Css"].includes(this.htmlElementType)
     this.convertedDefinition = Component.parseComponentDefinition( (definition instanceof UseComponentDeclaration ? definition.computedTemplate : definition) [this.htmlElementType])
 
     this.defineAndRegisterId()
@@ -2642,12 +2642,19 @@ class IterableViewComponent{
 // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // //
 // TESTING
 
+// todo: "smart component", ovvero la possibilità di scrivere {div: "mio text"} e in automatico venga parsata in modo corretto con l'autoespansione in {div: { text: "mio text" }}
+
+// todo: lanciare eccezioni quando parso dei componenenti (anche Use) con nome di proprietà non conosciuti! magari regole di similarità per hint su cosa si voleva scrivere!
+
+// todo: "re_emit_as" -> combina in automatico la possibilità di gestire un segnale e rialnciarlo con un altro nome..per propagare i sengali! ovviamente devo inserire il nome di un mio segnale e non di altri..
+
 // todo: "SelfStyle" o altro meccanismo per esplicitare hoisting del css..vedi su..alternativa andare di replace e tutto è "pubblico" (aka ng-deep) di default..in questo caso è compito dello sviluppatore inserire un "replacer" che indica all'engine che quella classe è "locale"
 // todo: tutti gli elementi devono avere un attributo che mappa un identificativo univoco dell'elemento (stabile nel tempo, anche per gli ng-if e ng-for) per poter aiutare l'hoisting..
 
 // todo: al momento la catena dei parent non è contemplata nella risoluzione delle dipendenze..migliorare
 
 // todo: anche se abbiamo fatto una prima versione di le-for, in realtà molto è da fare..al momento distruggo e ricreo, e dunque non posso neanche legarmi agli aggiornamenti delle property in meta..anche perchè non è semplice recuperare il who/what id-metaOfComponent. anche perchè i componenti non sopravvivono mai ad un aggiornamento!
+// todo: le-for e le-if: se qualcuno seguiva qualche proprità e distruggo, devo riagganciare al rebuild!
 
 // todo: le dipendenze in cascata devono avere il meccanismo della retry, altrimenti al primo undefined ciaone
 // todo: destroy delle dipendenze, properties, signal, attr etc alla destroy!
@@ -2667,6 +2674,9 @@ class IterableViewComponent{
 // todo: quindi a questo punto gli elementi dovrebbero stare anche anche in una property "child", accessibile sia come array che by name (realizzabile tramite "proxy", tenendo gli elementi come dict [solo se unordered] altrimenti come array)
 
 // todo: iniziare a pensare alla questione che posso definire e usare anche pezzi dei children nel parent (se quello di sopra dovesse realizzarsi), in partiolare gli alias..portano dritto questo problema alla luce
+
+// todo: potrebbe essere più semplice per il discorso "padre deve seguire il figlio senza replace/merge" definire nella "Use" una parte specifica dove posso definire delle "add" in modo da non compromettere il funzionamento di un componente..e quindi poter definire delle "on" etc che si aggiungono e non sovrappongono (basta duplicare on etc per la Use in una nuova property)
+// todo/note: come fare per fare in modo che un padre possa operare su un child senza nome? (neanche di contesto) opz 1: proprietà child come array (ma questo richiede la specifica di un estrapolatore etc, nonchè una nuova logica per gestire tutte le paturnie degli array..es: [x], find.. etc etc..). opzione 2: ogni elemento che ha figli ha al suo interno delle proprità "_child_XXX" con XXX numero/indice del child. essendo proprietà a tutti gli effetti potrei seguirle e bona, e al suo interno ci troverei il suo $this. per poter tenere in piedi il meccanismo di estrapolazione deps dovrei realizzare un $.childs.c_xxx
 
 // todo: iniziare a strutturare come funziona "meta" lato dev, nel senso che il mio meta è in realtà l'insieme di tutti i meta dei miei parent (nello stesso componente? in teoria si, perchè il il compoente è entità "atomica", non dividibile, quindi dentro e fuori non si "conoscono") compreso il mio..a questo punto tutto deve andare con retry incrementale?
 
@@ -3673,8 +3683,111 @@ const appTodolistv2 = ()=> {
 }
 
 
+// test parent to "no name child"
+const appPrantToChildComm = ()=>{
+
+
+  const smart = (component, otherDefs={}) => {
+    return Object.entries(component).map( ([tag, text])=>( {[tag]: {text: text, ...otherDefs }} ) )[0]
+  }
+
+  const Dbus = {
+    Signals: {
+      id: "dbus",
+
+      signals: {
+        changeNestedText: "stream => (string)",
+        changeParentText: "stream => (string)",
+        // reset: "stream => (void)",
+      }
+    }
+  }
+
+  const app_root = RenderApp(document.body, {
+    div: {
+      id: "appRoot",
+
+      "=>": [
+
+        Use(Dbus),
+
+        { div: {
+
+          data: {
+            parentText: "parent!"
+          },
+
+          // recive msg from "unknown" client
+          on_s: { le: { dbus: {
+            changeParentText: ($, newText) => $.this.parentText = newText,
+
+            // reset: $ => $.this.parentText = "parent!"
+          }}},
+
+          // stupid reset
+          handle: {
+            onclick: $ => {
+              $.le.dbus.changeNestedText.emit("- nested!");
+              $.this.parentText = "parent!"
+            }
+          },
+
+          "=>": [
+            
+            smart({ div: "esempio di componente 'smart', e di sistema di comunicazione tra elementi senza nome!" }, {attrs: {style: {fontSize: "25px"}}} ),
+
+            $ => $.this.parentText,
+
+            { div: {
+
+              data: {
+                testo: "- nested!"
+              },
+
+              text: $ => $.this.testo,
+
+              // recive msg from "unknown" client
+              on_s: { le: { dbus: {
+                changeNestedText: ($, newText) => $.this.testo = newText,
+
+                // reset: $ => $.this.testo = "- nested!"
+              }}},
+
+              // send message to "unknown" parent
+              handle: {
+                onclick: ($, e) => { $.parent.parentText = "parent edited by nested!"; e.stopPropagation()}
+              },
+
+              // or send message to "unknown" reciver on text change!
+              on: { this: { testoChanged: ($, newText) =>  $.le.dbus.changeParentText.emit("parent edited by nested by external changes!")}},
+              // on: { this: { testoChanged: ($, newText) => newText !== "- nested!" && $.le.dbus.changeParentText.emit("parent edited by nested by external changes!")}},
+
+            }}
+          ]
+          
+        }},
+
+        { div: {
+          text: "on click i will change the nested el text",
+
+          handle: {
+            onclick: $ => $.le.dbus.changeNestedText.emit("- changed!")
+          }
+          
+        }},
+
+        // smart({ button: "reset" }, { handle: { onclick: $ => $.le.dbus.reset.emit() }} )
+
+      ]
+    }
+  })
+
+  console.log(app_root)
+}
+
 // app0()
 // test2way()
 // appTodolist()
-appTodolistv2()
+// appTodolistv2()
 // appNestedData()
+appPrantToChildComm()
