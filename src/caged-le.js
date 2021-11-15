@@ -2309,10 +2309,11 @@ class TextNodeComponent {
     this.analizeDeps()
     debug.log("createeed")
 
-    this.staticAnDeps.$this_deps?.forEach(d=>this.parent.properties[d].addOnChangedHandler(this, ()=>this._renderizeText())) // take it easy for now..one deps
-    this.staticAnDeps.$parent_deps?.forEach(d=>this.parent.parent.properties[d].addOnChangedHandler(this, ()=>this._renderizeText())) // take it easy for now..one deps
-    this.staticAnDeps.$le_deps?.forEach(d=>this.parent.$le[d[0]].properties[d[1]].addOnChangedHandler(this, ()=>this._renderizeText())) // take it easy for now..one deps
-    this.staticAnDeps.$ctx_deps?.forEach(d=>this.parent.$ctx[d[0]].properties[d[1]].addOnChangedHandler(this, ()=>this._renderizeText())) // take it easy for now..one deps
+    // todo: questo bugfix va anche da altre parti
+    this.staticAnDeps.$this_deps?.forEach(d=>"addOnChangedHandler" in this.parent.properties[Array.isArray(d) ? d[0] : d] && this.parent.properties[Array.isArray(d) ? d[0] : d].addOnChangedHandler(this, ()=>this._renderizeText())) // take it easy for now..one deps
+    this.staticAnDeps.$parent_deps?.forEach(d=>"addOnChangedHandler" in this.parent.parent.properties[Array.isArray(d) ? d[0] : d] && this.parent.parent.properties[Array.isArray(d) ? d[0] : d].addOnChangedHandler(this, ()=>this._renderizeText())) // take it easy for now..one deps
+    this.staticAnDeps.$le_deps?.forEach(d=>"addOnChangedHandler" in this.parent.$le[d[0]].properties[d[1]] && this.parent.$le[d[0]].properties[d[1]].addOnChangedHandler(this, ()=>this._renderizeText())) // take it easy for now..one deps
+    this.staticAnDeps.$ctx_deps?.forEach(d=>"addOnChangedHandler" in this.parent.$ctx[d[0]].properties[d[1]] && this.parent.$ctx[d[0]].properties[d[1]].addOnChangedHandler(this, ()=>this._renderizeText())) // take it easy for now..one deps
 
     this._renderizeText()
     
@@ -2645,6 +2646,11 @@ class IterableViewComponent{
 
 // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // //
 // TESTING
+
+// todo: analisi dipendenze funzioni (in cascata..ovvero se uso func le "importo")..qui il senso è NON rielaborare la funzione ad ogni changes delle deps, ma segnalare le deps, in modo che le property che veramente la usano e devono autoupdatarsi possono agganciarsi alle deps..in modo da "far funzionare l'auto aggiornamento" in quanto il signal delle deps delle func farà si che si uppi la prop/text etc che la segue e tutto funge. in cascata perchè se uso altre func devo agganciarmi a tutto. 
+// todo: una cosa molto figa che viene fuori da questa cosa è che posso anche "sandboxare" altre dipendenze , ovvero: se scrivo in una def tipo "myVarDeps": $ => ($.this.dep1, $.this.dep2..., "") posso usarla in un text o una property o qualsiasi altra cosa e stabilire le deps a piacimento (non so se veramnete utile..)
+
+// todo: il bugfix dei text node va anche da altre parti..ovvero di avere $.this.miavar.something.. il parser restituisce [miavra, something] e non miavar..qui devo fozare di prendere [0]..alternativa farlo bene perchè in effetti potrei bindarmi a tutto..e poi mi serve per la catena dei parent
 
 // todo: "smart component", ovvero la possibilità di scrivere {div: "mio text"} e in automatico venga parsata in modo corretto con l'autoespansione in {div: { text: "mio text" }}
 
