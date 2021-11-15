@@ -3792,9 +3792,112 @@ const appPrantToChildComm = ()=>{
   console.log(app_root)
 }
 
+
+const appTestCssAndPassThis = ()=>{
+
+  const app_root = RenderApp(document.body, {
+    div: {
+      id: "appRoot",
+
+      css: [
+        // "[leName=hfkw4td] button{ color: green }",
+        "button[leName=hfkw4td]{ color: green }", // todo: nota bene: affinchè funzioni alla angular maniera devi andare a definire un attr custom s tutti gli elementi dello stesso componente..qui però si evince una differenza tra angular e il mio..è a livello di componente (ctx) o di elemento? a rigor di logica il primo..ergo vado a usarlo per inserire nel css (via un replacer) il fatto che la regola è solo del component..farlo manualmente non è semplice..dovrei studiare bene i selettori, ma a occhio e croce dovrebbe essere solo alla fine (prima della graffa) e per gli el con virgola prima di ognuna (per ogni el insomma..)
+        ".toEdit button{ color: red }",  // es di replacer "button @ctx { color: green }" (devo fare il replace di " @ctx ")
+      ], 
+
+      data: {
+        selected: undefined
+      },
+
+      "=>": [
+        { div: {
+          attrs: { name: "hfkw4td" },
+          "=>": [
+            { div: {
+              "=>": [
+                { div: {
+                  "=>": [
+                    { button: {
+                      attrs: { leName: "hfkw4td" },
+                      text: "btn1"
+
+                      ,data: {message: "btn1"}, def: {getMsg: $ => "!!" + $.this.message + "!!"}, handle: { onclick: $ => $.le.appRoot.selected = $.this }
+                    }},
+
+                    { div: {
+                      attrs: { leName: "wwwjj3d" },
+                      "=>": [
+                        { div: {
+                          "=>": [
+                            { div: {
+                              "=>": [
+                                { button: {
+                                  text: "btn1.1"
+
+                                  ,data: {message: "btn1.1"}, def: {getMsg: $ => "!!" + $.this.message + "!!"}, handle: { onclick: $ => $.le.appRoot.selected = $.this }
+                                }}
+                              ]
+                            }}
+                          ]
+                        }}
+                      ]
+                    }}
+
+                  ]
+                }}
+              ]
+            }}
+          ]
+        }},
+        
+        { div: {
+          attrs: { class: "toEdit" },
+          "=>": [
+            { div: {
+              "=>": [
+                { div: {
+                  "=>": [
+                    { button: {
+                      text: "btn2"
+
+                      ,data: {message: "btn2"}, def: {getMsg: $ => "!!" + $.this.message + "!!"}, handle: { onclick: $ => $.le.appRoot.selected = $.this }
+                    }}
+                  ]
+                }}
+              ]
+            }}
+          ]
+        }},
+
+        { div: {
+          // attrs: { class: "notToEdit" },
+          "=>": [
+            { div: {
+              "=>": [
+                { div: {
+                  "=>": [
+                    { button: {
+                      text: "btn3"
+
+                      ,data: {message: "btn3"}, def: {getMsg: $ => "!!" + $.this.message + "!!"}, handle: { onclick: $ => $.le.appRoot.selected = $.this }
+                    }}
+                  ]
+                }}
+              ]
+            }}
+          ]
+        }},
+
+        smart({ div: $ => ($.le.appRoot.selected?.message || "") + " " + ($.le.appRoot.selected?.getMsg() || "") })
+      ]
+    }
+  })
+}
+
 // app0()
 // test2way()
 // appTodolist()
 // appTodolistv2()
 // appNestedData()
-appPrantToChildComm()
+// appPrantToChildComm()
+// appTestCssAndPassThis()
