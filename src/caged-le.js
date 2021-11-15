@@ -3894,6 +3894,1034 @@ const appTestCssAndPassThis = ()=>{
   })
 }
 
+
+const appDemoStockApi = ()=>{
+
+  const app_root = RenderApp(document.body, {
+    div: {
+      id: "appRoot",
+
+      data: {
+        fullInitialStockData: [],
+
+        stockData: {price: 0, date: 0, volume: 0, bid:0, ask:0 },
+        oldStockData: {price: 0, date: 0, volume: 0, bid:0, ask:0 },
+
+        maxPercObserved: 0,
+        minPercObserved: 0,
+        avgPercObserved: 0,
+        totalPercObserved: 0,
+
+        slidingWindowMaxPercObserved: 0,
+        slidingWindowMinPercObserved: 0,
+        slidingWindowAvgPercObserved: 0,
+        slidingWindowTotalPercObserved: 0,
+
+        refreshRateMs: 1000
+      },
+
+      "=>": [
+
+        { Controller: {
+          id:"controller",
+
+          def: {
+            loadStockData: async $ => {
+              try {
+                let res = await axios.get('http://localhost:4512/api/stock-data')
+
+                $.parent.oldStockData = $.parent.stockData
+                $.parent.stockData = { price: res.data.price, date: res.data.date, volume: res.data.volume, bid: res.data.bid, ask: res.data.ask  } 
+                // console.log(res)
+              } catch (e) { console.log(e)}
+            },
+
+            loadFullStockData: async $ => {
+              try {
+                let res = await axios.get('http://localhost:4512/api/full-stock-data')
+
+                $.parent.fullInitialStockData = res.data
+
+                console.log("full", res)
+              } catch (e) { console.log(e)}
+            },
+
+            getStockPriceChanges: $ => {
+              let actual = $.le.appRoot.stockData
+              let old = $.le.appRoot.oldStockData
+
+              let diff = actual.price - old.price
+              let neg_diff = old.price - actual.price
+              let abs_diff = Math.abs(diff)
+
+              let is_neg = diff < 0
+
+              let perc = is_neg ? (neg_diff / actual.price) * 100 : (diff / actual.price) * 100
+
+              return {diff: diff, perc: perc}
+            }
+
+          },
+
+        }},
+
+        { button: {
+          text: "run",
+
+          data: {
+            intervall: undefined
+          },
+          
+          handle: { 
+            onclick: async $ => {
+              if ($.this.intervall === undefined) {
+                console.log("running full call..")
+                await $.le.controller.loadFullStockData()
+                console.log("runnong intervall call")
+                $.le.controller.loadStockData()
+                $.this.intervall = setInterval(()=>$.le.controller.loadStockData(), $.parent.refreshRateMs)
+              } else {
+                clearInterval( $.this.intervall )
+                $.this.intervall = undefined
+              }
+            } 
+          }
+        }},
+
+        { div: {
+          text: [
+            $ => "Refrsh Rate (sec): " + $.parent.refreshRateMs/1000,
+            {br:{}},
+
+            $ => "Price: " + $.parent.stockData?.price.toFixed(2), " - ",
+            $ => " Volumes: " + $.parent.stockData?.volume.toFixed(5), " - ",
+            { span: { 
+              def: { getFormattedStockPriceChanges: $ =>{
+                let {diff, perc} = $.le.controller.getStockPriceChanges()
+                return "Diff: " + diff.toFixed(4) + "; Perc: " + perc.toFixed(4) +"%"
+              }},
+              text: $ => $.le.appRoot.stockData === undefined ? "" : $.this.getFormattedStockPriceChanges() 
+            }},
+
+            {hr: {}},
+            {br: {}},
+            $ => "avg obs: " + $.parent.avgPercObserved.toFixed(5)+"%", " - ",
+            $ => "avg obs: " + $.parent.avgPercObserved.toFixed(5)+"%", " - ",
+            // $ => "min obs: " + $.parent.minPercObserved.toFixed(5)+"%", " - ",
+            $ => "max obs: " + $.parent.maxPercObserved.toFixed(5)+"%", " - ",
+            $ => "total obs: " + $.parent.totalPercObserved.toFixed(5)+"%",
+
+            {br: {}},
+            $ => "avg obs (sl wiw): " + $.parent.slidingWindowAvgPercObserved.toFixed(5)+"%", " - ",
+            // $ => "min obs (sl wiw): " + $.parent.slidingWindowMinPercObserved.toFixed(5)+"%", " - ",
+            $ => "max obs (sl wiw): " + $.parent.slidingWindowMaxPercObserved.toFixed(5)+"%", " - ",
+            $ => "sum obs (sl wiw): " + $.parent.slidingWindowTotalPercObserved.toFixed(5)+"%", 
+
+
+            {hr: {}},
+            {br: {}},
+            $ => "avg obs (5x leverage): " + ($.parent.avgPercObserved*5).toFixed(5)+"%", " - ",
+            // $ => "min obs (5x leverage): " + ($.parent.minPercObserved*5).toFixed(5)+"%", " - ",
+            $ => "max obs (5x leverage): " + ($.parent.maxPercObserved*5).toFixed(5)+"%", " - ",
+            $ => "total obs (5x leverage): " + ($.parent.totalPercObserved*5).toFixed(5)+"%",
+
+            {br: {}},
+            $ => "avg obs (sl wiw - 5x leverage): " + ($.parent.slidingWindowAvgPercObserved*5).toFixed(5)+"%", " - ",
+            // $ => "min obs (sl wiw - 5x leverage): " + ($.parent.slidingWindowMinPercObserved*5).toFixed(5)+"%", " - ",
+            $ => "max obs (sl wiw - 5x leverage): " + ($.parent.slidingWindowMaxPercObserved*5).toFixed(5)+"%", " - ",
+            $ => "total obs (sl wiw - 5x leverage): " + ($.parent.slidingWindowTotalPercObserved*5).toFixed(5)+"%",
+            
+          ]
+        }},
+
+        
+        { canvas: { 
+          id: "chartjs",
+
+
+          data: {
+            chart: undefined,
+
+            numPoints: 60*30, // minuti
+            slidingWindowsPoints: 60 // sec [if refresh rate is 1 sec]
+          },
+
+          def: {
+            computeAvgPercObserved: ($, limitToSlidingWindow=false) => {
+              // console.log("datasetsss", $.this.chart.data.datasets[0].data)
+
+              let data = $.this.chart.data.datasets[0].data
+              if (limitToSlidingWindow){
+                data = data.length > $.this.slidingWindowsPoints ? data.slice((data.length-$.this.slidingWindowsPoints), data.length) : data
+              }
+              let count = data.length
+
+              let sum = 0
+              let min = Number.MAX_SAFE_INTEGER
+              let max = Number.MIN_SAFE_INTEGER
+              for (let i=0; i<count-1; i++){
+                let _old = data[i]
+                let _new = data[i+1]
+
+                let abs_diff = Math.abs(_new - _old)
+
+                let perc = (abs_diff / _new) * 100
+                // console.log()
+                perc < min && min > 0 && (min = perc)
+                perc > max && (max = perc)
+                sum = sum + perc
+              }
+              return {total: sum, avg: sum/count, min: min, max: max}
+
+              //   let perc = (abs_diff / _new) * 100
+
+              //   sum += abs_diff
+              // }
+              // return ((sum/count) / _new) * 100
+
+            }
+          },
+          
+          on: { le: { appRoot: {
+
+            fullInitialStockDataChanged: ($, newFullData, oldFullData) => {
+              // console.log("full chaaart", newFullData, $.this.chart)
+              if ($.this.chart !== undefined){
+                
+                let i = 0;
+                let skip_num = ($.le.appRoot.refreshRateMs / 500)
+                newFullData.forEach(newData=>{
+                  if (i++%skip_num === 0){ // get only half data, because of 0.5 sec scraping and 1 sec retriving here
+                    $.this.chart.data.labels.push(newData.date);
+                    $.this.chart.data.datasets.forEach((dataset) => {
+                      dataset.data.push(newData.price);
+                    });
+                    
+                    // remove last..to keep num items in sync	
+                    if ($.this.chart.data.labels.length > $.this.numPoints ){
+                      $.this.chart.data.labels.shift();
+                      $.this.chart.data.datasets.forEach((dataset) => {
+                        dataset.data.shift();
+                      });
+                    }
+                  }
+
+                })
+                
+                $.this.chart.update('none'); // with none no animation is done
+              }
+
+            },
+
+            stockDataChanged: ($, newData, oldData) => {
+              // console.log("chaaart", $.this.chart)
+              if ($.this.chart !== undefined){
+                        
+                $.this.chart.data.labels.push(newData.date);
+                $.this.chart.data.datasets.forEach((dataset) => {
+                  dataset.data.push(newData.price);
+                });
+                
+                // remove last..to keep num items in sync	
+                if ($.this.chart.data.labels.length > $.this.numPoints ){
+                  $.this.chart.data.labels.shift();
+                  $.this.chart.data.datasets.forEach((dataset) => {
+                    dataset.data.shift();
+                  });
+                }
+                
+                let observedPerc = $.this.computeAvgPercObserved()
+
+                $.le.appRoot.totalPercObserved = observedPerc.total
+                $.le.appRoot.avgPercObserved = observedPerc.avg
+                $.le.appRoot.minPercObserved = observedPerc.min
+                $.le.appRoot.maxPercObserved = observedPerc.max
+
+                let slidingWindowObservedPerc = $.this.computeAvgPercObserved(true)
+
+                $.le.appRoot.slidingWindowTotalPercObserved = slidingWindowObservedPerc.total
+                $.le.appRoot.slidingWindowAvgPercObserved = slidingWindowObservedPerc.avg
+                $.le.appRoot.slidingWindowMinPercObserved = slidingWindowObservedPerc.min
+                $.le.appRoot.slidingWindowMaxPercObserved = slidingWindowObservedPerc.max
+
+                // console.log("avg", $.le.appRoot.avgPercObserved)
+
+                
+                $.this.chart.update('none'); // with none no animation is done
+                // $.this.chart.update(); // with none no animation is done
+              }
+
+            }
+
+          }}},
+
+
+          attrs: { id: "chartJSContainer",  width: "1024", height: "600" }, 
+
+          afterInit: $ => {
+
+            if ($.this.chart === undefined ){
+              let full_data = [] //[{date: 0, price: 0}]
+              
+              const getLabels = (_data)=>_data.map(d=>d.date)
+              const getValues = (_data)=>_data.map(d=>d.price)
+              
+              
+              const data = {
+                labels: getLabels(full_data),
+                datasets: [
+                {
+                  label: 'Dataset 1',
+                  data: getValues(full_data),
+                  borderColor: 'rgb(255, 99, 132)',
+                  //backgroundColor: Utils.transparentize(chartColors.red, 0.5),
+                  //backgroundColor: '#ff000099', //'rgb(255, 99, 132, 0.5)',
+                  yAxisID: 'y',
+                  pointRadius:0,
+                  borderWidth: 1,
+                },
+                ]
+              };
+          
+              const config = {
+                type: 'line',
+                data: data,
+                options: {
+                  responsive: false, //true,
+                  interaction: {
+                    mode: 'index',
+                    intersect: false,
+                  },
+                  // animation: { // new animation!
+                  //     duration: 800,
+                  //     easing: 'linear',
+                  //     // from: 1,
+                  //     // to: 0,
+                  //     loop: false
+                  // },
+
+                  stacked: false,
+                  plugins: {
+                    title: {
+                    display: true,
+                    text: '30 Min Chart'
+                    },
+
+                    tooltip: {
+                      callbacks: {
+                        footer: (tooltipItems) => {
+                        
+                          let long = (100 - ((tooltipItems[0].parsed.y / $.le.appRoot.stockData.price) * 100))
+                          let short = ((100 - (($.le.appRoot.stockData.price / tooltipItems[0].parsed.y ) * 100)))
+
+                          return  '[from here]\n' + 'Long: ' + long.toFixed(3) + "%" + "\nShort: " + short.toFixed(3) + "%\n" +        '\n' + 'Long (5x): ' + (long*5).toFixed(3) + "%" + "\nShort(x5): " + (short*5).toFixed(3) + "%\n"
+                        }
+                      }
+                    },
+                  },
+                  scales: {
+                    y: {
+                      type: 'linear',
+                      display: true,
+                      position: 'right',
+                      ticks: {
+                        color: 'rgb(255, 99, 132)',
+                      },
+                      
+                          
+                      title: {
+                        color: 'rgb(255, 99, 132)',
+                        display: true,
+                        text: 'Dataset 1'
+                      }
+                    }
+                  }
+                },
+              };
+          
+              // let chartCtx = $.this.el.getContext('2d');
+
+              let chartCtx = document.getElementById('chartJSContainer').getContext('2d');
+
+              $.this.chart = new Chart(chartCtx, config);
+            }
+          }
+
+        }},
+
+
+        { canvas: { 
+          id: "chartjsVolumes",
+
+
+          data: {
+            chart: undefined,
+
+            numPoints: 60*30, // minuti
+            slidingWindowsPoints: 60 // sec [if refresh rate is 1 sec]
+          },
+
+          
+          on: { le: { appRoot: {
+
+            fullInitialStockDataChanged: ($, newFullData, oldFullData) => {
+              // console.log("full chaaart", newFullData, $.this.chart)
+              if ($.this.chart !== undefined){
+                
+                let i = 0;
+                let skip_num = ($.le.appRoot.refreshRateMs / 500)
+                newFullData.forEach(newData=>{
+                  if (i++%skip_num === 0){ // get only half data, because of 0.5 sec scraping and 1 sec retriving here
+                    $.this.chart.data.labels.push(newData.date);
+                    $.this.chart.data.datasets.forEach((dataset) => {
+                      dataset.data.push(newData.volume);
+                    });
+                    
+                    // remove last..to keep num items in sync	
+                    if ($.this.chart.data.labels.length > $.this.numPoints ){
+                      $.this.chart.data.labels.shift();
+                      $.this.chart.data.datasets.forEach((dataset) => {
+                        dataset.data.shift();
+                      });
+                    }
+                  }
+
+                })
+                
+                $.this.chart.update('none'); // with none no animation is done
+              }
+
+            },
+
+            stockDataChanged: ($, newData, oldData) => {
+              // console.log("chaaart", $.this.chart)
+              if ($.this.chart !== undefined){
+                        
+                $.this.chart.data.labels.push(newData.date);
+                $.this.chart.data.datasets.forEach((dataset) => {
+                  dataset.data.push(newData.volume);
+                });
+                
+                // remove last..to keep num items in sync	
+                if ($.this.chart.data.labels.length > $.this.numPoints ){
+                  $.this.chart.data.labels.shift();
+                  $.this.chart.data.datasets.forEach((dataset) => {
+                    dataset.data.shift();
+                  });
+                }
+                
+                $.this.chart.update('none'); // with none no animation is done
+                // $.this.chart.update(); // with none no animation is done
+              }
+
+            }
+
+          }}},
+
+
+          attrs: { id: "chartJSVolumesContainer",  width: "1024", height: "350" }, 
+
+          afterInit: $ => {
+
+            if ($.this.chart === undefined ){
+              let full_data = [] //[{date: 0, price: 0}]
+              
+              const getLabels = (_data)=>_data.map(d=>d.date)
+              const getValues = (_data)=>_data.map(d=>d.volume)
+              
+              
+              const data = {
+                labels: getLabels(full_data),
+                datasets: [
+                {
+                  label: 'Dataset 1',
+                  data: getValues(full_data),
+                  borderColor: 'rgb(255, 99, 132)',
+                  //backgroundColor: Utils.transparentize(chartColors.red, 0.5),
+                  //backgroundColor: '#ff000099', //'rgb(255, 99, 132, 0.5)',
+                  yAxisID: 'y',
+                  pointRadius:0,
+                  borderWidth: 1,
+                },
+                ]
+              };
+          
+              const config = {
+                type: 'line',
+                data: data,
+                options: {
+                responsive: false, //true,
+                interaction: {
+                  mode: 'index',
+                  intersect: false,
+                },
+                // animation: { // new animation!
+                //     duration: 800,
+                //     easing: 'linear',
+                //     // from: 1,
+                //     // to: 0,
+                //     loop: false
+                // },
+                stacked: false,
+                plugins: {
+                  title: {
+                  display: true,
+                  text: 'Volumes'
+                  }
+                },
+                scales: {
+                  y: {
+                  type: 'linear',
+                  display: true,
+                  position: 'right',
+                  ticks: {
+                    color: 'rgb(255, 99, 132)',
+                  },
+                  x: {
+                    display: false
+                  },
+                  
+                      
+                  title: {
+                    color: 'rgb(255, 99, 132)',
+                    display: true,
+                    text: 'Dataset 2'
+                  }
+                  }
+                }
+                },
+              };
+          
+              // let chartCtx = $.this.el.getContext('2d');
+
+              let chartCtx = document.getElementById('chartJSVolumesContainer').getContext('2d');
+
+              $.this.chart = new Chart(chartCtx, config);
+            }
+          }
+
+        }},
+
+
+        // { canvas: { 
+        //   id: "chartjsBidAsk",
+
+
+        //   data: {
+        //     chart: undefined,
+
+        //     numPoints: 60*30, // minuti
+        //     slidingWindowsPoints: 60 // sec [if refresh rate is 1 sec]
+        //   },
+
+          
+        //   on: { le: { appRoot: {
+
+        //     fullInitialStockDataChanged: ($, newFullData, oldFullData) => {
+        //       // console.log("full chaaart", newFullData, $.this.chart)
+        //       if ($.this.chart !== undefined){
+                
+        //         let i = 0;
+        //         let skip_num = ($.le.appRoot.refreshRateMs / 500)
+        //         newFullData.forEach(newData=>{
+        //           if (i++%skip_num === 0){ // get only half data, because of 0.5 sec scraping and 1 sec retriving here
+        //             $.this.chart.data.labels.push(newData.date);
+        //             $.this.chart.data.datasets[0].data.push(newData.bid);
+        //             $.this.chart.data.datasets[1].data.push(newData.ask);
+                    
+        //             // remove last..to keep num items in sync	
+        //             if ($.this.chart.data.labels.length > $.this.numPoints ){
+        //               $.this.chart.data.labels.shift();
+        //               $.this.chart.data.datasets[0].data.shift();
+        //               $.this.chart.data.datasets[1].data.shift();
+        //             }
+        //           }
+
+        //         })
+                
+        //         $.this.chart.update('none'); // with none no animation is done
+        //       }
+
+        //     },
+
+        //     stockDataChanged: ($, newData, oldData) => {
+        //       // console.log("chaaart", $.this.chart)
+        //       if ($.this.chart !== undefined){
+                        
+        //         $.this.chart.data.labels.push(newData.date);
+        //         $.this.chart.data.datasets[0].data.push(newData.bid);
+        //         $.this.chart.data.datasets[1].data.push(newData.ask);
+                
+        //         // remove last..to keep num items in sync	
+        //         if ($.this.chart.data.labels.length > $.this.numPoints ){
+        //           $.this.chart.data.labels.shift();
+        //           $.this.chart.data.datasets[0].data.shift();
+        //           $.this.chart.data.datasets[1].data.shift();
+        //         }
+                
+        //         $.this.chart.update('none'); // with none no animation is done
+        //         // $.this.chart.update(); // with none no animation is done
+        //       }
+
+        //     }
+
+        //   }}},
+
+
+        //   attrs: { id: "chartJSBidAskContainer",  width: "1024", height: "600" }, 
+
+        //   afterInit: $ => {
+
+        //     if ($.this.chart === undefined ){
+        //       let full_data = [] //[{date: 0, price: 0}]
+              
+        //       const getLabels = (_data)=>_data.map(d=>d.date)
+        //       const getValues = (_data)=>_data.map(d=>d.bid)
+        //       const getValues2 = (_data)=>_data.map(d=>d.ask)
+              
+              
+        //       const data = {
+        //         labels: getLabels(full_data),
+        //         datasets: [
+        //           {
+        //             label: 'Dataset 1',
+        //             data: getValues(full_data),
+        //             borderColor: 'rgb(255, 99, 132)',
+        //             //backgroundColor: Utils.transparentize(chartColors.red, 0.5),
+        //             //backgroundColor: '#ff000099', //'rgb(255, 99, 132, 0.5)',
+        //             yAxisID: 'y',
+        //             pointRadius:0,
+        //             borderWidth: 1,
+        //           },
+        //           {
+        //             label: 'Dataset 2',
+        //             data: getValues2(full_data),
+        //             borderColor: 'rgb(99, 255, 132)',
+        //             //backgroundColor: Utils.transparentize(chartColors.red, 0.5),
+        //             //backgroundColor: '#ff000099', //'rgb(255, 99, 132, 0.5)',
+        //             yAxisID: 'y',
+        //             pointRadius:0,
+        //             borderWidth: 1,
+        //           },
+        //         ]
+        //       };
+          
+        //       const config = {
+        //         type: 'line',
+        //         data: data,
+        //         options: {
+        //         responsive: false, //true,
+        //         interaction: {
+        //           mode: 'index',
+        //           intersect: false,
+        //         },
+        //         // animation: { // new animation!
+        //         //     duration: 800,
+        //         //     easing: 'linear',
+        //         //     // from: 1,
+        //         //     // to: 0,
+        //         //     loop: false
+        //         // },
+        //         stacked: false,
+        //         plugins: {
+        //           title: {
+        //           display: true,
+        //           text: 'Bid Ask'
+        //           }
+        //         },
+        //         scales: {
+        //           y: {
+        //           type: 'linear',
+        //           display: true,
+        //           position: 'right',
+        //           ticks: {
+        //             color: 'rgb(255, 99, 132)',
+        //           },
+        //           x: {
+        //             display: false
+        //           },
+                  
+                      
+        //           title: {
+        //             color: 'rgb(255, 99, 132)',
+        //             display: true,
+        //             text: 'Bid Ask'
+        //           }
+        //           }
+        //         }
+        //         },
+        //       };
+          
+        //       // let chartCtx = $.this.el.getContext('2d');
+
+        //       let chartCtx = document.getElementById('chartJSBidAskContainer').getContext('2d');
+
+        //       $.this.chart = new Chart(chartCtx, config);
+        //     }
+        //   }
+
+        // }},
+
+
+
+        
+        { canvas: { 
+          id: "chartjs5Min",
+
+
+          data: {
+            chart: undefined,
+
+            numPoints: 60*5, // minuti
+            slidingWindowsPoints: 60 // sec [if refresh rate is 1 sec]
+          },
+
+          def: {
+            computeAvgPercObserved: ($, limitToSlidingWindow=false) => {
+              // console.log("datasetsss", $.this.chart.data.datasets[0].data)
+
+              let data = $.this.chart.data.datasets[0].data
+              if (limitToSlidingWindow){
+                data = data.length > $.this.slidingWindowsPoints ? data.slice((data.length-$.this.slidingWindowsPoints), data.length) : data
+              }
+              let count = data.length
+
+              let sum = 0
+              let min = Number.MAX_SAFE_INTEGER
+              let max = Number.MIN_SAFE_INTEGER
+              for (let i=0; i<count-1; i++){
+                let _old = data[i]
+                let _new = data[i+1]
+
+                let abs_diff = Math.abs(_new - _old)
+
+                let perc = (abs_diff / _new) * 100
+                // console.log()
+                perc < min && min > 0 && (min = perc)
+                perc > max && (max = perc)
+                sum = sum + perc
+              }
+              return {total: sum, avg: sum/count, min: min, max: max}
+
+              //   let perc = (abs_diff / _new) * 100
+
+              //   sum += abs_diff
+              // }
+              // return ((sum/count) / _new) * 100
+
+            }
+          },
+          
+          on: { le: { appRoot: {
+
+            fullInitialStockDataChanged: ($, newFullData, oldFullData) => {
+              // console.log("full chaaart", newFullData, $.this.chart)
+              if ($.this.chart !== undefined){
+                
+                let i = 0;
+                let skip_num = ($.le.appRoot.refreshRateMs / 500)
+                newFullData.forEach(newData=>{
+                  if (i++%skip_num === 0){ // get only half data, because of 0.5 sec scraping and 1 sec retriving here
+                    $.this.chart.data.labels.push(newData.date);
+                    $.this.chart.data.datasets.forEach((dataset) => {
+                      dataset.data.push(newData.price);
+                    });
+                    
+                    // remove last..to keep num items in sync	
+                    if ($.this.chart.data.labels.length > $.this.numPoints ){
+                      $.this.chart.data.labels.shift();
+                      $.this.chart.data.datasets.forEach((dataset) => {
+                        dataset.data.shift();
+                      });
+                    }
+                  }
+
+                })
+                
+                $.this.chart.update('none'); // with none no animation is done
+              }
+
+            },
+
+            stockDataChanged: ($, newData, oldData) => {
+              // console.log("chaaart", $.this.chart)
+              if ($.this.chart !== undefined){
+                        
+                $.this.chart.data.labels.push(newData.date);
+                $.this.chart.data.datasets.forEach((dataset) => {
+                  dataset.data.push(newData.price);
+                });
+                
+                // remove last..to keep num items in sync	
+                if ($.this.chart.data.labels.length > $.this.numPoints ){
+                  $.this.chart.data.labels.shift();
+                  $.this.chart.data.datasets.forEach((dataset) => {
+                    dataset.data.shift();
+                  });
+                }
+                
+                $.this.chart.update('none'); // with none no animation is done
+                // $.this.chart.update(); // with none no animation is done
+              }
+
+            }
+
+          }}},
+
+
+          attrs: { id: "chartJSContainer5min",  width: "1024", height: "600" }, 
+
+          afterInit: $ => {
+
+            if ($.this.chart === undefined ){
+              let full_data = [] //[{date: 0, price: 0}]
+              
+              const getLabels = (_data)=>_data.map(d=>d.date)
+              const getValues = (_data)=>_data.map(d=>d.price)
+              
+              
+              const data = {
+                labels: getLabels(full_data),
+                datasets: [
+                {
+                  label: 'Dataset 1',
+                  data: getValues(full_data),
+                  borderColor: 'rgb(255, 99, 132)',
+                  //backgroundColor: Utils.transparentize(chartColors.red, 0.5),
+                  //backgroundColor: '#ff000099', //'rgb(255, 99, 132, 0.5)',
+                  yAxisID: 'y',
+                  pointRadius:0,
+                  borderWidth: 1,
+                },
+                ]
+              };
+          
+              const config = {
+                type: 'line',
+                data: data,
+                options: {
+                  responsive: false, //true,
+                  interaction: {
+                    mode: 'index',
+                    intersect: false,
+                  },
+                  // animation: { // new animation!
+                  //     duration: 800,
+                  //     easing: 'linear',
+                  //     // from: 1,
+                  //     // to: 0,
+                  //     loop: false
+                  // },
+
+                  stacked: false,
+                  plugins: {
+                    title: {
+                    display: true,
+                    text: '5 Min Chart'
+                    },
+
+                    tooltip: {
+                      callbacks: {
+                        footer: (tooltipItems) => {
+                        
+                          let long = (100 - ((tooltipItems[0].parsed.y / $.le.appRoot.stockData.price) * 100))
+                          let short = ((100 - (($.le.appRoot.stockData.price / tooltipItems[0].parsed.y ) * 100)))
+
+                          return  '[from here]\n' + 'Long: ' + long.toFixed(3) + "%" + "\nShort: " + short.toFixed(3) + "%\n" +        '\n' + 'Long (5x): ' + (long*5).toFixed(3) + "%" + "\nShort(x5): " + (short*5).toFixed(3) + "%\n"
+                        }
+                      }
+                    },
+                  },
+                  scales: {
+                    y: {
+                      type: 'linear',
+                      display: true,
+                      position: 'right',
+                      ticks: {
+                        color: 'rgb(255, 99, 132)',
+                      },
+                      
+                          
+                      title: {
+                        color: 'rgb(255, 99, 132)',
+                        display: true,
+                        text: 'Dataset 1'
+                      }
+                    }
+                  }
+                },
+              };
+          
+              // let chartCtx = $.this.el.getContext('2d');
+
+              let chartCtx = document.getElementById('chartJSContainer5min').getContext('2d');
+
+              $.this.chart = new Chart(chartCtx, config);
+            }
+          }
+
+        }},
+
+
+        { canvas: { 
+          id: "chartjsVolumes5min",
+
+
+          data: {
+            chart: undefined,
+
+            numPoints: 60*5, // minuti
+            slidingWindowsPoints: 50 // sec [if refresh rate is 1 sec]
+          },
+
+          
+          on: { le: { appRoot: {
+
+            fullInitialStockDataChanged: ($, newFullData, oldFullData) => {
+              // console.log("full chaaart", newFullData, $.this.chart)
+              if ($.this.chart !== undefined){
+                
+                let i = 0;
+                let skip_num = ($.le.appRoot.refreshRateMs / 500)
+                newFullData.forEach(newData=>{
+                  if (i++%skip_num === 0){ // get only half data, because of 0.5 sec scraping and 1 sec retriving here
+                    $.this.chart.data.labels.push(newData.date);
+                    $.this.chart.data.datasets.forEach((dataset) => {
+                      dataset.data.push(newData.volume);
+                    });
+                    
+                    // remove last..to keep num items in sync	
+                    if ($.this.chart.data.labels.length > $.this.numPoints ){
+                      $.this.chart.data.labels.shift();
+                      $.this.chart.data.datasets.forEach((dataset) => {
+                        dataset.data.shift();
+                      });
+                    }
+                  }
+
+                })
+                
+                $.this.chart.update('none'); // with none no animation is done
+              }
+
+            },
+
+            stockDataChanged: ($, newData, oldData) => {
+              // console.log("chaaart", $.this.chart)
+              if ($.this.chart !== undefined){
+                        
+                $.this.chart.data.labels.push(newData.date);
+                $.this.chart.data.datasets.forEach((dataset) => {
+                  dataset.data.push(newData.volume);
+                });
+                
+                // remove last..to keep num items in sync	
+                if ($.this.chart.data.labels.length > $.this.numPoints ){
+                  $.this.chart.data.labels.shift();
+                  $.this.chart.data.datasets.forEach((dataset) => {
+                    dataset.data.shift();
+                  });
+                }
+                
+                $.this.chart.update('none'); // with none no animation is done
+                // $.this.chart.update(); // with none no animation is done
+              }
+
+            }
+
+          }}},
+
+
+          attrs: { id: "chartJSVolumesContainer5min",  width: "1024", height: "350" }, 
+
+          afterInit: $ => {
+
+            if ($.this.chart === undefined ){
+              let full_data = [] //[{date: 0, price: 0}]
+              
+              const getLabels = (_data)=>_data.map(d=>d.date)
+              const getValues = (_data)=>_data.map(d=>d.volume)
+              
+              
+              const data = {
+                labels: getLabels(full_data),
+                datasets: [
+                {
+                  label: 'Dataset 1',
+                  data: getValues(full_data),
+                  borderColor: 'rgb(255, 99, 132)',
+                  //backgroundColor: Utils.transparentize(chartColors.red, 0.5),
+                  //backgroundColor: '#ff000099', //'rgb(255, 99, 132, 0.5)',
+                  yAxisID: 'y',
+                  pointRadius:0,
+                  borderWidth: 1,
+                },
+                ]
+              };
+          
+              const config = {
+                type: 'line',
+                data: data,
+                options: {
+                responsive: false, //true,
+                interaction: {
+                  mode: 'index',
+                  intersect: false,
+                },
+                // animation: { // new animation!
+                //     duration: 800,
+                //     easing: 'linear',
+                //     // from: 1,
+                //     // to: 0,
+                //     loop: false
+                // },
+                stacked: false,
+                plugins: {
+                  title: {
+                  display: true,
+                  text: 'Volumes'
+                  }
+                },
+                scales: {
+                  y: {
+                  type: 'linear',
+                  display: true,
+                  position: 'right',
+                  ticks: {
+                    color: 'rgb(255, 99, 132)',
+                  },
+                  x: {
+                    display: false
+                  },
+                  
+                      
+                  title: {
+                    color: 'rgb(255, 99, 132)',
+                    display: true,
+                    text: 'Dataset 2'
+                  }
+                  }
+                }
+                },
+              };
+          
+              // let chartCtx = $.this.el.getContext('2d');
+
+              let chartCtx = document.getElementById('chartJSVolumesContainer5min').getContext('2d');
+
+              $.this.chart = new Chart(chartCtx, config);
+            }
+          }
+
+        }},
+
+      ],
+
+    }
+  })
+}
+
+
 // app0()
 // test2way()
 // appTodolist()
@@ -3901,3 +4929,5 @@ const appTestCssAndPassThis = ()=>{
 // appNestedData()
 // appPrantToChildComm()
 // appTestCssAndPassThis()
+
+appDemoStockApi()
