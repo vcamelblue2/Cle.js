@@ -624,8 +624,8 @@ const DEBUG_ENABLED = false
 const debug = { log: (...args)=> DEBUG_ENABLED && console.log(...args) }
 
 // syntatic sentinel..maybe use symbol in future..
-const pass = undefined
-const none = ()=>undefined
+/*export*/ const pass = undefined
+/*export*/ const none = ()=>undefined
 
 
 // utils
@@ -637,7 +637,7 @@ const copyObjPropsInplace = (copy_from, copy_into, props) => {
   })
 }
 
-const toInlineStyle = /** @param {CSSStyleDeclaration | ()=>CSSStyleDeclaration} styles - use "::" on single style name to specify no name translation! */(styles)=>{ 
+/*export*/ const toInlineStyle = /** @param {CSSStyleDeclaration | ()=>CSSStyleDeclaration} styles - use "::" on single style name to specify no name translation! */(styles)=>{ 
   if((typeof styles) === "function"){styles=styles()}; 
 
   let style = ""
@@ -848,9 +848,13 @@ class SignalSubSystem {
 
 }
 
+// smart component: convert {div: "hello"} as {div: {text: "hello"}}
+/*export*/ const smart = (component, otherDefs={}) => {
+  return Object.entries(component).map( ([tag, text])=>( {[tag]: {text: text, ...otherDefs }} ) )[0]
+}
 
 //const Use = (component, redefinition, initialization_args=$=>({p1:1, p2:"bla"}), passed_props= $=>({prop1: $.this.prop1...}) )=>{ 
-const Use = (component, redefinitions=undefined, { strategy="merge", init=undefined, passed_props=undefined }={})=>{ return new UseComponentDeclaration(component, redefinitions, { strategy:strategy, init:init, passed_props:passed_props } ) } // passed_props per puntare a una var autostored as passed_props e seguirne i changes, mentre init args per passare principalmente valori (magari anche props) ma che devi elaborare nel construct
+/*export*/ const Use = (component, redefinitions=undefined, { strategy="merge", init=undefined, passed_props=undefined }={})=>{ return new UseComponentDeclaration(component, redefinitions, { strategy:strategy, init:init, passed_props:passed_props } ) } // passed_props per puntare a una var autostored as passed_props e seguirne i changes, mentre init args per passare principalmente valori (magari anche props) ma che devi elaborare nel construct
 // todo: qui potrebbe starci una connect del signal con autopropagate, ovvero poter indicare che propago un certo segnale nel mio parent! subito dopo la redefinitions, in modo da avere una roba molto simile a quello che ha angular (Output) e chiudere il cerchio della mancanza di id..
 // di fatto creiamo un nuovo segnale e lo connettiamo in modo semplice..nel parent chiamo "definePropagatedSignal"
 // perdo solo un po di descrittività, in favore di un meccanismo comodo e facile..
@@ -1125,11 +1129,11 @@ class Binding {
     this.event = event
   }
 }
-const Bind = (bindFunc, {remap=undefined, event=undefined}={}) => new Binding(bindFunc, remap, event)
+/*export*/ const Bind = (bindFunc, {remap=undefined, event=undefined}={}) => new Binding(bindFunc, remap, event)
 
 
 
-const RenderApp = (html_root, definition)=>{
+/*export*/ const RenderApp = (html_root, definition)=>{
 
   let component_tree_root = new ComponentsTreeRoot(html_root, definition)
   component_tree_root.initAndRenderize()
@@ -1138,7 +1142,7 @@ const RenderApp = (html_root, definition)=>{
 
 }
 
-// todo: routing (also partial!)
+// todo: routing (also partial!) con history api
 // class VDoom {
 //   constructor(renderRoot, route){
 //     this.renderRoot = renderRoot
