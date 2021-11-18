@@ -271,6 +271,10 @@ const component = {
       console.log()
     },
 
+    afterChildsInit: $ => { // dopo la onInit dei childs
+
+    }
+
     afterInit: $ => { // dopo html init (auto lazy)
       console.log()
     },
@@ -454,7 +458,7 @@ const component = {
 // COMPONENT REDEFINITION SEPARATION
 
 impossible_to_redefine = ["private:id"]
-direct_lvl = ["id", "constructor", "beforeInit", "onInit", "afterInit", "onUpdate", "onDestroy"]
+direct_lvl = ["id", "constructor", "beforeInit", "onInit", "afterChildsInit", "afterInit", "onUpdate", "onDestroy"]
 first_lvl = ["signals", "dbus_signals", "data", "private:data", "props", "private:props", "alias", "handle"]
 second_lvl = ["on", "on_s", "on_a"]
 first_or_second_lvl = ["def", "private:def"] // check for function (may exist "first lvl namespace")
@@ -886,7 +890,7 @@ class UseComponentDeclaration{
 
         // throw new Error("Not Implemented Yet!")
         const impossible_to_redefine = ["private:id"]
-        const direct_lvl = ["id", "constructor", "beforeInit", "onInit", "afterInit", "onUpdate", "onDestroy"] // direct copy
+        const direct_lvl = ["id", "constructor", "beforeInit", "onInit", "afterChildsInit", "afterInit", "onUpdate", "onDestroy"] // direct copy
         const first_lvl = ["signals", "dbus_signals", "data", "private:data", "props", "private:props", "alias", "handle"] // on first lvl direct
         const second_lvl = ["on", "on_s", "on_a"]
         const first_or_second_lvl = ["def", "private:def"] // check for function (may exist "first lvl namespace")
@@ -1131,6 +1135,15 @@ class Binding {
 }
 /*export*/ const Bind = (bindFunc, {remap=undefined, event=undefined}={}) => new Binding(bindFunc, remap, event)
 
+
+
+class ComponentRUUIDGen{
+  static __counter = 0;
+  static __modifier_on_max = ""
+  static generate(){ if(this.__counter >= Number.MAX_SAFE_INTEGER){this.__counter = 0; this.__modifier_on_max+="-"}; return "t-le-id-" + (this.__counter++) + this.__modifier_on_max }
+  static reset(){ this.__counter = 0 }
+};
+// const CRUUID =  () => ComponentRUUIDGen.generate()
 
 
 /*export*/ const RenderApp = (html_root, definition)=>{
@@ -2125,6 +2138,11 @@ class Component {
     // create childs
     this.childs.forEach(child=>child.create())
 
+    // afterChildsInit (non lazy!)
+    if (this.convertedDefinition.afterChildsInit !== undefined){
+      this.hooks.afterChildsInit = this.convertedDefinition.afterChildsInit.bind(undefined, this.$this)
+    }
+
     // trigger afterInit (lazy..)
     this.hooks.afterInit !== undefined && setTimeout(()=>this.hooks.afterInit(), 1)
 
@@ -2173,7 +2191,7 @@ class Component {
 
     copyObjPropsInplace(definition, unifiedDef, [
       "constructor", 
-      "beforeInit", "onInit", "afterInit", "onUpdate", "onDestroy", 
+      "beforeInit", "onInit", "afterInit", "afterChildsInit", "onUpdate", "onDestroy", 
       "signals", "dbus_signals", "on", "on_s", "on_a", 
       "alias", "handle", "css", 
       "states", "stateChangeStrategy", "onState"
@@ -2192,8 +2210,8 @@ class Component {
       ha, "private:ha": _ha, 
     } = definition
 
-    unifiedDef.id = id || "TODO: RANDOM ID"
-    unifiedDef._id = _id || id || "TODO: RANDOM ID"
+    unifiedDef.id = id || ComponentRUUIDGen.generate()
+    unifiedDef._id = _id || unifiedDef.id
 
     def && (unifiedDef.def = def)
     _def && (unifiedDef._def = _def)
