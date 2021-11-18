@@ -413,10 +413,10 @@ const component = {
     contains | childs | text | '>>' | '=>' | _ : [
 
       { 
-        h1: { "private:id": "counter_name", text: $ => $.parent.name }
+        h1: { ctx_id: "counter_name", text: $ => $.parent.name }
       },
       { 
-        span: { "private:id": "counter_value", text: $ => "count:" + $.parent.counter }
+        span: { ctx_id: "counter_value", text: $ => "count:" + $.parent.counter }
       },
       "simple text",
       $ => "lazy text:" + $.this.state,
@@ -460,7 +460,7 @@ const component = {
 
 // COMPONENT REDEFINITION SEPARATION
 
-impossible_to_redefine = ["private:id"]
+impossible_to_redefine = ["ctx_id"]
 direct_lvl = ["id", "constructor", "beforeInit", "onInit", "afterChildsInit", "afterInit", "onUpdate", "onDestroy"]
 first_lvl = ["signals", "dbus_signals", "data", "private:data", "props", "private:props", "alias", "handle"]
 second_lvl = ["on", "on_s", "on_a"]
@@ -892,7 +892,7 @@ class UseComponentDeclaration{
       else if (this.strategy === "merge") {
 
         // throw new Error("Not Implemented Yet!")
-        const impossible_to_redefine = ["private:id"]
+        const impossible_to_redefine = ["ctx_id"]
         const direct_lvl = ["id", "constructor", "beforeInit", "onInit", "afterChildsInit", "afterInit", "onUpdate", "onDestroy"] // direct copy
         const first_lvl = ["signals", "dbus_signals", "data", "private:data", "props", "private:props", "alias", "handle"] // on first lvl direct
         const second_lvl = ["on", "on_s", "on_a"]
@@ -2212,7 +2212,7 @@ class Component {
     // maybe private def
 
     let { 
-      id, "private:id": _id, 
+      id, ctx_id: _id, 
       def, "private:def": _def, 
       attrs, "private:attrs":_attrs, 
       a, "private:a": _a, 
@@ -2860,7 +2860,7 @@ const app0 = ()=>{
 
   const CtxEnabledComponent = {
     div: { 
-      "private:id": "myCtxRoot",
+      ctx_id: "myCtxRoot",
 
       data: {
         todo: ["todo1", "todo2", "todo3"]
@@ -2869,7 +2869,7 @@ const app0 = ()=>{
       "=>" : [
 
         { button: { 
-          "private:id": "removeBtn",
+          ctx_id: "removeBtn",
 
           text: "remove final todo",
 
@@ -2890,7 +2890,7 @@ const app0 = ()=>{
         }},
 
         { div: { 
-            "private:id": "listPresenter",
+            ctx_id: "listPresenter",
 
             text: $ => "--" + $.ctx.myCtxRoot.todo.toString(),
 
@@ -5000,10 +5000,10 @@ const appDemoStockApi = ()=>{
 }
 
 
-// app0()
+app0()
 // test2way()
 // appTodolist()
-appTodolistv2()
+// appTodolistv2()
 // appNestedData()
 // appPrantToChildComm()
 // appTestCssAndPassThis()
