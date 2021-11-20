@@ -685,7 +685,7 @@ const cloneDefinitionWithoutMeta = (definition)=>{
 class Property{
   constructor(valueFunc, onGet, onSet, onDestroy, executionContext, registerToDepsHelper, init=true){
     // execution context per fare la bind poco prima di chiamare (o per non bindare e chiamare direttamente..)
-    // "registerToDepsHelper..un qualcosa che mi fornisce il parent per registrarmi alle mie dpes..in modo da poter settare anche altro e fare in modo da non dover conoscere il mio padre, per evitare ref circolari"
+    // "registerToDepsHelper..un qualcosa che mi fornisce il parent per registrarmi alle mie dpes..in modo da poter settare anche altro e fare in modo da non dover conoscere il mio padre, per evitare ref circolari" restituisce i "remover"
     this.executionContext = (Array.isArray(executionContext) ? executionContext : [executionContext]).map(ec=>isFunction(ec) ? ec : ()=>ec) // interface for "dynamic execution context"..wrap in lambda aslo if not passed..
     this.registerToDepsHelper = registerToDepsHelper
     this.onChangedHandlers = []
@@ -720,7 +720,7 @@ class Property{
     if (this.isFunc){
       this.dependency = analizeDepsStatically(this._valueFunc)
       console.log("dependency!!!!", this, this.dependency)
-      this.registerToDepsHelper(this, this.dependency) // it's my parent competence to actually coonect deps!
+      this.registeredDependency = this.registerToDepsHelper(this, this.dependency) // it's my parent competence to actually coonect deps!
     }
   }
 
@@ -1436,25 +1436,33 @@ class Component {
 
           // deps connection logic
 
+          let depsRemover = []
+
           deps.$this_deps?.forEach(d=>{
             debug.log("pushooooo")
-            this.properties[d]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() ) // qui il ? server affinche si ci registri solo alle props (e non alle func etc!)
+            let depRemover = this.properties[d]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() ) // qui il ? server affinche si ci registri solo alle props (e non alle func etc!)
+            depRemover && depsRemover.push(depRemover)
           }) // supporting multiple deps, but only of first order..
 
           deps.$parent_deps?.forEach(d=>{
             debug.log("pushooooo")
-            this.parent.properties[d]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+            let depRemover = this.parent.properties[d]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+            depRemover && depsRemover.push(depRemover)
           })
 
           deps.$le_deps?.forEach(d=>{ // [le_id, property]
             debug.log("pushooooo")
-            this.$le[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+            let depRemover = this.$le[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+            depRemover && depsRemover.push(depRemover)
           })
 
           deps.$ctx_deps?.forEach(d=>{ // [le_id, property]
             debug.log("pushooooo")
-            this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+            let depRemover = this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+            depRemover && depsRemover.push(depRemover)
           })
+          
+          return depsRemover
 
         }, false)
 
@@ -2079,24 +2087,30 @@ class Component {
         rules.push(
           
           new Property(rule, none, renderize_css, none, ()=>this.$this, (thisProp, deps)=>{
-            
+                  
+            let depsRemover = []
+
             // deps connection logic
             deps.$this_deps?.forEach(d=>{
-              this.properties[d]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() ) // qui il ? server affinche si ci registri solo alle props (e non alle func etc!)
+              let depRemover = this.properties[d]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() ) // qui il ? server affinche si ci registri solo alle props (e non alle func etc!)
+              depRemover && depsRemover.push(depRemover)
             }) // supporting multiple deps, but only of first order..
 
             deps.$parent_deps?.forEach(d=>{
-              this.parent.properties[d]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+              let depRemover = this.parent.properties[d]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+              depRemover && depsRemover.push(depRemover)
             })
 
             deps.$le_deps?.forEach(d=>{ // [le_id, property]
-              this.$le[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+              let depRemover = this.$le[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+              depRemover && depsRemover.push(depRemover)
             })
 
             deps.$ctx_deps?.forEach(d=>{ // [le_id, property]
-              this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+              let depRemover = this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+              depRemover && depsRemover.push(depRemover)
             })
-
+            return depsRemover
           }, true)
         )
       })
@@ -2425,22 +2439,28 @@ class ConditionalComponent extends Component{
     // step 1: geenrate If property, and configure to create (that build) or destry component!
     this.visible = new Property(this.convertedDefinition.meta.if, none, (v, _, prop)=>{ console.log("seeeetttinnggggggg", v, _, prop); if (v !== prop._latestResolvedValue) { v ? this._create() : this._destroy() } }, pass, ()=>this.$this, (thisProp, deps)=>{
 
+      let depsRemover = []
+      
       console.log("calculating deeeeeepsssssss!!!!!")
       // deps connection logic
       deps.$parent_deps?.forEach(d=>{
         debug.log("pushooooo")
-        this.parent.properties[d]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+        let depRemover = this.parent.properties[d]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+        depRemover && depsRemover.push(depRemover)
       })
 
       deps.$le_deps?.forEach(d=>{ // [le_id, property]
         debug.log("pushooooo")
-        this.$le[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+        let depRemover = this.$le[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+        depRemover && depsRemover.push(depRemover)
       })
 
       deps.$ctx_deps?.forEach(d=>{ // [le_id, property]
         debug.log("pushooooo")
-        this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+        let depRemover = this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+        depRemover && depsRemover.push(depRemover)
       })
+      return depsRemover
     }, true)
 
     console.log("ultimooooooooooo", this, this.convertedDefinition.meta.if)
@@ -2626,23 +2646,27 @@ class IterableViewComponent{
       pass, 
       // aggancio gli autoaggiornamenti della property per far in modo che la set vada a buon fine senza una "set" reale e diretta
       ()=>this.$this, (thisProp, deps)=>{
-
+        let depsRemover = []
         console.log("calculating deeeeeepsssssss!!!!!")
         // deps connection logic
         deps.$parent_deps?.forEach(d=>{
           debug.log("pushooooo")
-          this.parent.properties[d]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+          let depRemover = this.parent.properties[d]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+          depRemover && depsRemover.push(depRemover)
         })
 
         deps.$le_deps?.forEach(d=>{ // [le_id, property]
           debug.log("pushooooo")
-          this.$le[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+          let depRemover = this.$le[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+          depRemover && depsRemover.push(depRemover)
         })
 
         deps.$ctx_deps?.forEach(d=>{ // [le_id, property]
           debug.log("pushooooo")
-          this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+          let depRemover = this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+          depRemover && depsRemover.push(depRemover)
         })
+        return depsRemover
       }, 
       true
     )
@@ -5000,11 +5024,11 @@ const appDemoStockApi = ()=>{
 }
 
 
-app0()
+// app0()
 // test2way()
 // appTodolist()
 // appTodolistv2()
-// appNestedData()
+appNestedData()
 // appPrantToChildComm()
 // appTestCssAndPassThis()
 
