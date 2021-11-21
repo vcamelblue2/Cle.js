@@ -2694,18 +2694,19 @@ class IterableViewComponent{
 
 
 
-// // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // 
 
+// // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // 
 // DYNAMIC JS/CSS LOADING -- TESTING --
 // TODO: TEST!!!! assolutamente temporaneo..importato da LE originale
+const _init_LE_Loaded_Sentinel_ = ()=>{ if (window._Caged_LE_Loaded === undefined){ window._Caged_LE_Loaded = {} } }
 /** 
  * Dynamic JS Loading
  * - When resolved the loaded script HTMLEL is returned, so you can remove the js from the page at any time with ".LE_removeScript()"
  * - alternatively you can remove using document.querySelector('[src="..CSS_URL.."]').LE_removeStyle()
  * NOTE: remotion does not have any effect without a "destructor" tht clean all vars etc in window and so on, because once a script is loaded it's keept in ram forever (also if .removed)
 */
-const _init_LE_Loaded_Sentinel_ = ()=>{ if (window._Caged_LE_Loaded === undefined){ window._Caged_LE_Loaded = {} } }
-/*export*/ const LE_LoadScript = (url, {do_microwait=undefined, attr={}, scriptDestructor=()=>{}, debug=false}={})=>{
+/*export*/ 
+const LE_LoadScript = (url, {do_microwait=undefined, attr={}, scriptDestructor=()=>{}, debug=false}={})=>{
     _init_LE_Loaded_Sentinel_()
 
     return new Promise(function(resolve, reject) {
@@ -2739,7 +2740,8 @@ const _init_LE_Loaded_Sentinel_ = ()=>{ if (window._Caged_LE_Loaded === undefine
  * - When resolved the loaded css HTMLEL is returned, so you can remove the style from the page at any time with ".LE_removeStyle()"
  * - alternatively you can remove using document.querySelector('[href="..CSS_URL.."]').LE_removeStyle()
 */
-/*export*/ const LE_LoadCss = (url, {do_microwait=undefined, attr={}, debug=false}={})=>{
+/*export*/ 
+const LE_LoadCss = (url, {do_microwait=undefined, attr={}, debug=false}={})=>{
     _init_LE_Loaded_Sentinel_()
 
     return new Promise(function(resolve, reject) { 
@@ -2769,8 +2771,8 @@ const _init_LE_Loaded_Sentinel_ = ()=>{ if (window._Caged_LE_Loaded === undefine
         document.head.appendChild(s);
     })
 }
-
-/*export*/  const LE_InitWebApp = (appDef)=>{ document.addEventListener("DOMContentLoaded", appDef ) }
+/*export*/
+const LE_InitWebApp = (appDef)=>{ document.addEventListener("DOMContentLoaded", appDef ) }
 // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // 
 
 
