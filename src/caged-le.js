@@ -1250,7 +1250,7 @@ class Component {
   // typeOfPropertiesRegistry = { // todo: registry to identify the type of an exposed properties, for now only def will be here
   //   // key: "def", "defContainer" | "property", "manualPropertyMarker"| "signal"
   // }
-  // defs = {} // to keep track of def dependencies
+  defDeps = {} // to keep track of def dependencies
 
 
   // Frontend for Dev
@@ -1494,13 +1494,18 @@ class Component {
           Object.entries(v).forEach(([kk,vv])=>{
             this.properties[k][kk] = (...args)=>vv.bind(undefined, this.$this, ...args)()
 
-            // let staticDeps = analizeDepsStatically(vv) // TODO: static deps analysis
+            let staticDeps = analizeDepsStatically(vv) // TODO: static deps analysis
+            this.defDeps[k+"."+kk] = staticDeps
 
           })
           this.properties[k] = ComponentProxy(this.properties[k]) // maby is a normal obj?? -> to avoid to create a point where user can write without permission
         }
         else{
           this.properties[k] = (...args)=>v.bind(undefined, this.$this, ...args)()
+
+          let staticDeps = analizeDepsStatically(v) // TODO: static deps analysis
+          this.defDeps[k] = staticDeps
+          
         }
       })
     }
@@ -2336,7 +2341,8 @@ class TextNodeComponent {
   _renderizeText(){
     this.html_pointer_element.textContent = isFunction(this.definition) ? this.definition.bind(undefined, this.parent.$this)() : this.definition
   }
-
+  
+  depsRemover = []
   staticAnDeps = {} // TEST, DEMO
   analizeDeps(){
     if (typeof this.definition === "function"){
@@ -2351,11 +2357,200 @@ class TextNodeComponent {
     this.analizeDeps()
     debug.log("createeed")
 
-    // todo: questo bugfix va anche da altre parti
-    this.staticAnDeps.$this_deps?.forEach(d=>"addOnChangedHandler" in this.parent.properties[Array.isArray(d) ? d[0] : d] && this.parent.properties[Array.isArray(d) ? d[0] : d].addOnChangedHandler(this, ()=>this._renderizeText())) // take it easy for now..one deps
-    this.staticAnDeps.$parent_deps?.forEach(d=>"addOnChangedHandler" in this.parent.parent.properties[Array.isArray(d) ? d[0] : d] && this.parent.parent.properties[Array.isArray(d) ? d[0] : d].addOnChangedHandler(this, ()=>this._renderizeText())) // take it easy for now..one deps
-    this.staticAnDeps.$le_deps?.forEach(d=>"addOnChangedHandler" in this.parent.$le[d[0]].properties[d[1]] && this.parent.$le[d[0]].properties[d[1]].addOnChangedHandler(this, ()=>this._renderizeText())) // take it easy for now..one deps
-    this.staticAnDeps.$ctx_deps?.forEach(d=>"addOnChangedHandler" in this.parent.$ctx[d[0]].properties[d[1]] && this.parent.$ctx[d[0]].properties[d[1]].addOnChangedHandler(this, ()=>this._renderizeText())) // take it easy for now..one deps
+    // todo: fattorizzare perchè così non ha senso..
+
+    // todo: questo bugfix va anche da altre parti // aka il d[0] : d..questo mappa il problema della parent chian lato dev!
+    this.staticAnDeps.$this_deps?.forEach(d=>{
+      let propName = Array.isArray(d) ? d[0] : d
+      let pointedProp = this.parent.properties[propName]
+      if ("addOnChangedHandler" in pointedProp){
+        this.depsRemover.push(pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+      }
+      else if (propName in this.parent.defDeps){ // is a function!
+        let staticDeps = this.parent.defDeps[propName]
+        let pointedComponentEl = this.parent
+        
+        staticDeps.$this_deps?.forEach(_d=>{
+          let _propName = Array.isArray(_d) ? _d[0] : _d
+          let _pointedProp = pointedComponentEl.properties[_propName]
+          if ("addOnChangedHandler" in _pointedProp){
+            this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+          }
+          // todo: recoursive def deps!
+        })
+
+        staticDeps.$parent_deps?.forEach(_d=>{
+          let _propName = Array.isArray(_d) ? _d[0] : _d
+          let _pointedProp = pointedComponentEl.parent.properties[_propName]
+          if ("addOnChangedHandler" in _pointedProp){
+            this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+          }
+          // todo: recoursive def deps!
+        })
+
+        staticDeps.$le_deps?.forEach(_d=>{
+          let _propName = _d[1]
+          let _pointedProp = pointedComponentEl.$le[_d[0]].properties[_propName]
+          if ("addOnChangedHandler" in _pointedProp){
+            this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+          }
+          // todo: recoursive def deps!
+        })
+
+        staticDeps.$ctx_deps?.forEach(_d=>{
+          let _propName = _d[1]
+          let _pointedProp = pointedComponentEl.$ctx[_d[0]].properties[_propName]
+          if ("addOnChangedHandler" in _pointedProp){
+            this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+          }
+          // todo: recoursive def deps!
+        })
+      }
+    })
+
+    this.staticAnDeps.$parent_deps?.forEach(d=>{
+      let propName = Array.isArray(d) ? d[0] : d
+      let pointedProp = this.parent.parent.properties[propName]
+      if ("addOnChangedHandler" in pointedProp){
+        this.depsRemover.push(pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+      }
+      else if (propName in this.parent.parent.defDeps){ // is a function!
+        let staticDeps = this.parent.parent.defDeps[propName]
+        let pointedComponentEl = this.parent.parent
+        
+        staticDeps.$this_deps?.forEach(_d=>{
+          let _propName = Array.isArray(_d) ? _d[0] : _d
+          let _pointedProp = pointedComponentEl.properties[_propName]
+          if ("addOnChangedHandler" in _pointedProp){
+            this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+          }
+          // todo: recoursive def deps!
+        })
+
+        staticDeps.$parent_deps?.forEach(_d=>{
+          let _propName = Array.isArray(_d) ? _d[0] : _d
+          let _pointedProp = pointedComponentEl.parent.properties[_propName]
+          if ("addOnChangedHandler" in _pointedProp){
+            this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+          }
+          // todo: recoursive def deps!
+        })
+
+        staticDeps.$le_deps?.forEach(_d=>{
+          let _propName = _d[1]
+          let _pointedProp = pointedComponentEl.$le[_d[0]].properties[_propName]
+          if ("addOnChangedHandler" in _pointedProp){
+            this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+          }
+          // todo: recoursive def deps!
+        })
+
+        staticDeps.$ctx_deps?.forEach(_d=>{
+          let _propName = _d[1]
+          let _pointedProp = pointedComponentEl.$ctx[_d[0]].properties[_propName]
+          if ("addOnChangedHandler" in _pointedProp){
+            this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+          }
+          // todo: recoursive def deps!
+        })
+      }
+    })
+
+    this.staticAnDeps.$le_deps?.forEach(d=>{
+      let propName = d[1]
+      let pointedProp = this.parent.$le[d[0]].properties[propName]
+      if ("addOnChangedHandler" in pointedProp){
+        this.depsRemover.push(pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+      }
+      else if (propName in this.parent.$le[d[0]].defDeps){ // is a function!
+        let staticDeps = this.parent.$le[d[0]].defDeps[propName]
+        let pointedComponentEl = this.parent.$le[d[0]]
+        
+        staticDeps.$this_deps?.forEach(_d=>{
+          let _propName = Array.isArray(_d) ? _d[0] : _d
+          let _pointedProp = pointedComponentEl.properties[_propName]
+          if ("addOnChangedHandler" in _pointedProp){
+            this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+          }
+          // todo: recoursive def deps!
+        })
+
+        staticDeps.$parent_deps?.forEach(_d=>{
+          let _propName = Array.isArray(_d) ? _d[0] : _d
+          let _pointedProp = pointedComponentEl.parent.properties[_propName]
+          if ("addOnChangedHandler" in _pointedProp){
+            this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+          }
+          // todo: recoursive def deps!
+        })
+
+        staticDeps.$le_deps?.forEach(_d=>{
+          let _propName = _d[1]
+          let _pointedProp = pointedComponentEl.$le[_d[0]].properties[_propName]
+          if ("addOnChangedHandler" in _pointedProp){
+            this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+          }
+          // todo: recoursive def deps!
+        })
+
+        staticDeps.$ctx_deps?.forEach(_d=>{
+          let _propName = _d[1]
+          let _pointedProp = pointedComponentEl.$ctx[_d[0]].properties[_propName]
+          if ("addOnChangedHandler" in _pointedProp){
+            this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+          }
+          // todo: recoursive def deps!
+        })
+      }
+    })
+
+    this.staticAnDeps.$ctx_deps?.forEach(d=>{
+      let propName = d[1]
+      let pointedProp = this.parent.$ctx[d[0]].properties[propName]
+      if ("addOnChangedHandler" in pointedProp){
+        this.depsRemover.push(pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+      }
+      else if (propName in this.parent.$ctx[d[0]].defDeps){ // is a function!
+        let staticDeps = this.parent.$ctx[d[0]].defDeps[propName]
+        let pointedComponentEl = this.parent.$ctx[d[0]]
+        
+        staticDeps.$this_deps?.forEach(_d=>{
+          let _propName = Array.isArray(_d) ? _d[0] : _d
+          let _pointedProp = pointedComponentEl.properties[_propName]
+          if ("addOnChangedHandler" in _pointedProp){
+            this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+          }
+          // todo: recoursive def deps!
+        })
+
+        staticDeps.$parent_deps?.forEach(_d=>{
+          let _propName = Array.isArray(_d) ? _d[0] : _d
+          let _pointedProp = pointedComponentEl.parent.properties[_propName]
+          if ("addOnChangedHandler" in _pointedProp){
+            this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+          }
+          // todo: recoursive def deps!
+        })
+
+        staticDeps.$le_deps?.forEach(_d=>{
+          let _propName = _d[1]
+          let _pointedProp = pointedComponentEl.$le[_d[0]].properties[_propName]
+          if ("addOnChangedHandler" in _pointedProp){
+            this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+          }
+          // todo: recoursive def deps!
+        })
+
+        staticDeps.$ctx_deps?.forEach(_d=>{
+          let _propName = _d[1]
+          let _pointedProp = pointedComponentEl.$ctx[_d[0]].properties[_propName]
+          if ("addOnChangedHandler" in _pointedProp){
+            this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+          }
+          // todo: recoursive def deps!
+        })
+      }
+    })
 
     this._renderizeText()
     
@@ -2368,6 +2563,7 @@ class TextNodeComponent {
   // regenerate(){}
   destroy(){
     this.html_pointer_element.remove()
+    this.depsRemover?.forEach(dr=>dr())
     // todo: optimization: on destroy i must unsubscribe from deps!
   }
 
@@ -2784,15 +2980,18 @@ const LE_InitWebApp = (appDef)=>{ document.addEventListener("DOMContentLoaded", 
 
 // BUGFIX:
 
-  // todo: dipendenze delle def..perchè al momento non posso usare in una Property e avere l'autoaggiornamneto
+  // done: support def deps on TextNode..only for ordinary def (not namespaces)
+  // todo: dipendenze delle def..perchè al momento non posso usare in una Property e avere l'autoaggiornamneto..anche se a dirla tutta, avrebbe poco senso! nel caso pensare ai "trasformer" ovvero delle "pure_def" che sono appunto funzioni pure senza side effects e quinid utilizzabili in modo safe da noi --> quetsa nota deriva dal questo commento // noooo...potenzialmente buggato! specialmente in ricorsione..perchè se uso una funzione che assegna invece di usare aggiungo una dipendenza inutile.. dovrei accertarmi che non sto a sinistra di un uguale..ma non solo! forse va specificata questa cosa e usato un paradigma appisito, "pure_def", ovvero funzioni pure senza side effects! poi sta al dev capire che fare..
   // todo: analisi dipendenze funzioni (in cascata..ovvero se uso func le "importo")..qui il senso è NON rielaborare la funzione ad ogni changes delle deps, ma segnalare le deps, in modo che le property che veramente la usano e devono autoupdatarsi possono agganciarsi alle deps..in modo da "far funzionare l'auto aggiornamento" in quanto il signal delle deps delle func farà si che si uppi la prop/text etc che la segue e tutto funge. in cascata perchè se uso altre func devo agganciarmi a tutto. 
-  // todo: una cosa molto figa che viene fuori da questa cosa è che posso anche "sandboxare" altre dipendenze , ovvero: se scrivo in una def tipo "myVarDeps": $ => ($.this.dep1, $.this.dep2..., "") posso usarla in un text o una property o qualsiasi altra cosa e stabilire le deps a piacimento (non so se veramnete utile..)
+  // todo/nota: una cosa molto figa che viene fuori da questa cosa è che posso anche "dichiarare" le dipendenze , ovvero: se scrivo in una def tipo "myVarDeps": $ => ($.this.dep1, $.this.dep2..., "") posso usarla in un text o una property o qualsiasi altra cosa e stabilire le deps a piacimento (non so se veramnete utile..)
+
+  // todo: l'analisi delle dipendenze al momento avviene via testo..questo significa che legge anche i commenti! qui ho un mezzo bug/feature: da un lato posso inserire le dipendenze in un commento, es /* deps: $.this.counter */, dall'altro se commento un pezzo di codice ne continuo a seguire le deps..
 
 
   // todo: il bugfix dei text node va anche da altre parti..ovvero di avere $.this.miavar.something.. il parser restituisce [miavra, something] e non miavar..qui devo fozare di prendere [0]..alternativa farlo bene perchè in effetti potrei bindarmi a tutto..e poi mi serve per la catena dei parent
   // todo: al momento la catena dei parent non è contemplata nella risoluzione delle dipendenze..migliorare. per farlo: durante l'analisi delle deps ho bisogno di un nuovo items che si chiama "$parentChain": qui ci devono far finire il numero di ".parent" a partire da "$.this" e "$.parent". in questo modo risolvo anche per bene il bug che ho segnalato sopra, ovvero quello dei TextNode
 
-  // todo: visto che il punto di vista nella redefine dei componenent è sempre se stessi..quando faccio una use component non posso in alcun modo usare $.ctx per riferirmi al mio contesto visibile al momento della definizione..quindi forse ho due "problemi", il primo è che i context dovrebbero essere inclusivi (ovvero il mio as subchild è l'insieme del mio e di tutti quelli sopra di me. in alternativa devo avere il concetto di "supctx" ovvero ctx di mio padre (che deve rimanere tale anche per i miei child interni al componente). in effetti è semplice da fare, sostanzialmente è: this.getMyCtx().parent.getMyCtx()). in alternativa devo poter andare in cascata come per parent..
+  // todo: visto che il punto di vista nella redefine dei componenent è sempre se stessi..quando faccio una use component non posso in alcun modo usare $.ctx per riferirmi al mio contesto visibile al momento della definizione..quindi forse ho due "problemi", il primo è che i context dovrebbero essere inclusivi (ovvero il mio as subchild è l'insieme del mio e di tutti quelli sopra di me. in alternativa devo avere il concetto di "supctx" ovvero ctx di mio padre (che deve rimanere tale anche per i miei child interni al componente). in effetti è semplice da fare, sostanzialmente è: this.getMyCtx().parent.getMyCtx()). in alternativa devo poter andare in cascata come per parent.. oppure: definisco "elemento speciale" in ogni context "super_ctx" e modifico il codice affinche si possa fare: $.ctx.super_ctx.myElId.Prop..però così mi perdeo la possibilità di definire in on on_s etc l'aggancio a un super ctx element..per cui la migliore sarebbe un $.super_ctx.. oppure la ricorsione
 
 
 // NEW FEATURES:
@@ -2843,6 +3042,10 @@ const LE_InitWebApp = (appDef)=>{ document.addEventListener("DOMContentLoaded", 
   // todo: 2wayBinding anche property to property..utile per trattare come "mia" una property di un altro..e isolare da "$.parent.." 
 
   // todo: full name di un elemento..come insieme del suo nome e dei suoi parent separati da punto: "parentParentId.parentId.thisId"
+
+
+  // todo: deduplicare le deps prima della subscribe..anche e soprattutto per via delle deps dell func, ma probabilemnte lo abbiamo già adesso questo problema! a meno della "buona gestione" in Property per cui non riaggiungiamo se siamo già subscribed (visto che passo this come who), ancdrebbe però comunque migliorato, per evitre aggiornamenti multipli! qui si capisce l'importanza di angular e del change detector..ovvero un loop per "ridurre" i repaint "accorpandoli". come? al posto di iposta al change l'azione diretta, basta segnalarla in un array con "esecuzione a scadenza" ovvero timeout ad es 2 ms dell'esecuzione delle azioni, con autodelete delle azioni "replicate" all'esecuzione, e auto reset del timeout con l'avanzare del codice. questo garantisce la separazione tra rendering e prop, ma potrebbe incasinare il codice che faceva affidamento su di essa.
+
 
 
 
@@ -3023,7 +3226,8 @@ const app0 = ()=>{
           data: { counter: 10 },
 
           def: {
-            incCounter: $ => $.this.counter = $.this.counter+2
+            incCounter: $ => $.this.counter = $.this.counter+2,
+            beautifyCounterStatus: $ => "the counter is: " + $.this.counter + " (testing def deps)"
           },
 
           handle: { 
@@ -3044,6 +3248,9 @@ const app0 = ()=>{
 
               { br: {} }, { br: {} },
               
+              $ => $.this.beautifyCounterStatus(),
+              { br: {} }, { br: {} },
+
               { div: {} }, // empty div
               { div: {text: "hello! world!"} }, { div: {text: $ => $.parent.counter+20} }, { div: {text: "!!"} },
 
@@ -4077,6 +4284,37 @@ const appTestCssAndPassThis = ()=>{
   })
 }
 
+const appTestSuperCtxProblem = ()=>{
+
+  const app_root = RenderApp(document.body, {
+    div: {
+      id: "ctx0",
+
+      "=>": [
+        Use({ div: {
+          ctx_id: "ctx1",
+
+          data: { counter: 0 },
+
+          handle: {
+            onclick: $ => { $.this.counter += 1 }
+          },
+              
+          "=>": [
+              
+            $ => "counter: " + $.ctx.ctx1.counter,
+
+            Use({ div: {
+              ctx_id: "ctx2",
+
+              text: $ => "counter: " + $.parent.counter // non posso usare $.ctx.ctx1.counter...
+            }})
+          ]
+        }})
+      ]
+    }
+  })
+}
 
 const appDemoStockApi = ()=>{
 
@@ -4183,7 +4421,7 @@ const appDemoStockApi = ()=>{
                 let {diff, perc} = $.le.controller.getStockPriceChanges()
                 return "Diff: " + diff.toFixed(4) + "; Perc: " + perc.toFixed(4) +"%"
               }},
-              text: $ => $.le.appRoot.stockData === undefined ? "" : $.this.getFormattedStockPriceChanges() 
+              text: $ => $.le.appRoot.stockData === undefined ? "" : $.this.getFormattedStockPriceChanges()  // l'autoupdate qui funziona solo perchè al momento sto puntanto alle vere deps!
             }},
 
             {hr: {}},
@@ -5109,8 +5347,9 @@ const appDemoStockApi = ()=>{
 // test2way()
 // appTodolist()
 // appTodolistv2()
-appNestedData()
+// appNestedData()
 // appPrantToChildComm()
 // appTestCssAndPassThis()
+appTestSuperCtxProblem()
 
 // appDemoStockApi()
