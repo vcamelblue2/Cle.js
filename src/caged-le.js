@@ -2694,6 +2694,85 @@ class IterableViewComponent{
 
 
 
+// // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // 
+
+// DYNAMIC JS/CSS LOADING -- TESTING --
+// TODO: TEST!!!! assolutamente temporaneo..importato da LE originale
+/** 
+ * Dynamic JS Loading
+ * - When resolved the loaded script HTMLEL is returned, so you can remove the js from the page at any time with ".LE_removeScript()"
+ * - alternatively you can remove using document.querySelector('[src="..CSS_URL.."]').LE_removeStyle()
+ * NOTE: remotion does not have any effect without a "destructor" tht clean all vars etc in window and so on, because once a script is loaded it's keept in ram forever (also if .removed)
+*/
+const _init_LE_Loaded_Sentinel_ = ()=>{ if (window._Caged_LE_Loaded === undefined){ window._Caged_LE_Loaded = {} } }
+/*export*/ const LE_LoadScript = (url, {do_microwait=undefined, attr={}, scriptDestructor=()=>{}, debug=false}={})=>{
+    _init_LE_Loaded_Sentinel_()
+
+    return new Promise(function(resolve, reject) {
+        
+        if (window._Caged_LE_Loaded[url] !== undefined){
+            debug && console.log("js already loaded!")
+            if (do_microwait !== undefined){ setTimeout(() => { resolve(window._Caged_LE_Loaded[url]) }, do_microwait); }
+            else{ resolve(window._Caged_LE_Loaded[url]) }
+            return;
+        }
+
+        let script = document.createElement("script");
+        
+        script.onload = (e)=>{
+            window._Caged_LE_Loaded[url] = script; 
+            script.LE_removeScript = ()=>{window._Caged_LE_Loaded[url].remove(); scriptDestructor(); delete window._Caged_LE_Loaded[url] } 
+            debug && console.log("resolved!", e)
+            if (do_microwait !== undefined){ setTimeout(() => { resolve(window._Caged_LE_Loaded[url]) }, do_microwait); }
+            else{ resolve(window._Caged_LE_Loaded[url]) }
+        };
+        script.onerror = reject;
+        
+        script.setAttribute('src', url);
+        Object.keys(attr).map(k=>script.setAttribute(k, attr));
+
+        document.head.appendChild(script);
+    });
+}
+/** 
+ * Dynamic Css Loading
+ * - When resolved the loaded css HTMLEL is returned, so you can remove the style from the page at any time with ".LE_removeStyle()"
+ * - alternatively you can remove using document.querySelector('[href="..CSS_URL.."]').LE_removeStyle()
+*/
+/*export*/ const LE_LoadCss = (url, {do_microwait=undefined, attr={}, debug=false}={})=>{
+    _init_LE_Loaded_Sentinel_()
+
+    return new Promise(function(resolve, reject) { 
+        
+        if (window._Caged_LE_Loaded[url] !== undefined){
+            console.log("css already loaded!")
+            if (do_microwait !== undefined){ setTimeout(() => { resolve(window._Caged_LE_Loaded[url]) }, do_microwait); }
+            else{ resolve(window._Caged_LE_Loaded[url]) }
+            return;
+        }
+
+        let s = document.createElement('link');
+        
+        s.setAttribute('rel', 'stylesheet');
+        s.setAttribute('href', url);
+        Object.keys(attr).map(k=>s.setAttribute(k, attr));
+
+        s.onload = (e)=>{
+            window._Caged_LE_Loaded[url] = s;
+            debug && console.log("resolved!", e)
+            s.LE_removeStyle = ()=>{window._Caged_LE_Loaded[url].remove(); delete window._Caged_LE_Loaded[url] } 
+            if (do_microwait !== undefined){ setTimeout(() => { resolve(window._Caged_LE_Loaded[url]) }, do_microwait); }
+            else{ resolve(window._Caged_LE_Loaded[url]) }
+        };
+        s.onerror = reject;
+            
+        document.head.appendChild(s);
+    })
+}
+
+/*export*/  const LE_InitWebApp = (appDef)=>{ document.addEventListener("DOMContentLoaded", appDef ) }
+// // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // 
+
 
 
 
