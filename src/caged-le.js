@@ -3046,6 +3046,8 @@ const LE_InitWebApp = (appDef)=>{ document.addEventListener("DOMContentLoaded", 
 
   // todo: deduplicare le deps prima della subscribe..anche e soprattutto per via delle deps dell func, ma probabilemnte lo abbiamo già adesso questo problema! a meno della "buona gestione" in Property per cui non riaggiungiamo se siamo già subscribed (visto che passo this come who), ancdrebbe però comunque migliorato, per evitre aggiornamenti multipli! qui si capisce l'importanza di angular e del change detector..ovvero un loop per "ridurre" i repaint "accorpandoli". come? al posto di iposta al change l'azione diretta, basta segnalarla in un array con "esecuzione a scadenza" ovvero timeout ad es 2 ms dell'esecuzione delle azioni, con autodelete delle azioni "replicate" all'esecuzione, e auto reset del timeout con l'avanzare del codice. questo garantisce la separazione tra rendering e prop, ma potrebbe incasinare il codice che faceva affidamento su di essa.
 
+  // todo: injector palceholders: meccanismo per permettere di inserire sottocomponenti in punti specifici di un componente Use: sostanzialmente in una Use possiamo definire dei Placeholder (classe UsePlaceholder), che hanno dei "nomi", e dunque possiamo passare alla Use un dict con i nome i componenti che vogliamo ignettare. la semplicità del meccanismo è tutta nella definizione della Use, che si occupa di matchare i placeholder (tra i subel) e di rimuovere quelli inutilizzati. trasparente per la factory!
+
 
 
 
@@ -4304,6 +4306,8 @@ const appTestSuperCtxProblem = ()=>{
               
             $ => "counter: " + $.ctx.ctx1.counter,
 
+            // pass, // todo: pass/undefined/null must be skipped..
+
             Use({ div: {
               ctx_id: "ctx2",
 
@@ -4316,6 +4320,112 @@ const appTestSuperCtxProblem = ()=>{
   })
 }
 
+
+const appTestAnchors = ()=>{
+
+  const app_root = RenderApp(document.body, {
+    div: {
+      id: "root",
+
+      props: {
+        width: 0, height: 0, x:0, y:0
+      },
+      attrs: {style: "width:100%; height:100%; padding: 0px; margin: 0px; position: relative"},
+      onInit: $ => {
+                
+        function resetRootWindowSize() {
+          $.this.width = window.innerWidth;
+          $.this.height = window.innerHeight;
+        }
+
+        window.onresize = resetRootWindowSize;
+        document.body.style.padding = "0px"
+        document.body.style.margin = "0px"
+        resetRootWindowSize()
+      },
+
+      "=>": [
+
+        { div: {
+          id: "navbar",
+
+          props: { width: $ => $.parent.width, height: 64, fontSize: 24 },
+
+          attrs: { style: $ => ({ width: $.this.width+"px", height: $.this.height+"px", backgroundColor: "black", color: "white", fontSize: $.this.fontSize+"px", position: "absolute" })},
+
+          // text: "Bar"
+
+          "=>": [
+            { div: {
+              id: "nav_left_text",
+
+              props: { width: $ => $.parent.width / 3, left: 15, top: $ => ($.parent.height / 2) - ($.parent.fontSize / 2) - ($.parent.fontSize / 10)},
+
+              attrs: { style: $ => ({ width: $.this.width+"px", top: $.this.top+"px", left: $.this.left+"px",  position: "absolute" })},
+
+              text: "Hello Anchors!"
+
+            }},
+
+            { div: {
+              id: "nav_second_text",
+
+              props: { width: $ => $.parent.width / 3, left: $ => $.le.nav_left_text.width + $.le.nav_left_text.left + 15, top: $ => ($.parent.height / 2) - ($.parent.fontSize / 2) - ($.parent.fontSize / 10)},
+
+              attrs: { style: $ => ({ width: $.this.width+"px", top: $.this.top+"px", left: $.this.left+"px",  position: "absolute", textAlign:"center"})},
+
+              text: "un testo secondario!"
+
+            }},
+
+            { div: {
+              id: "nav_right_text",
+
+              props: { width: $ => $.parent.width / 3, right: 15, top: $ => ($.parent.height / 2) - ($.parent.fontSize / 2) - ($.parent.fontSize / 10)},
+
+              attrs: { style: $ => ({ width: $.this.width+"px", top: $.this.top+"px", right: $.this.right+"px",  position: "absolute", textAlign:"right" })},
+
+              text: "A right Text"
+
+            }},
+
+          ]
+
+        }},
+
+
+        // demo follow by content!
+        { div: {
+          id: "content_text_left",
+
+          props: { width: undefined, height: 200, left: 150, top: $ => $.le.navbar.height + 15},
+
+          afterInit: $ => {
+            $.this.width = $.this.el.getBoundingClientRect().width
+          },
+
+          attrs: { style: $ => ({height: $.this.height+"px",  width: $.this.width? $.this.width+"px" : undefined, top: $.this.top+"px", left: $.this.left+"px",  position: "absolute" })},
+
+          text: "Hello Contents!!"
+
+        }},
+
+        { div: {
+          id: "content_text_left_after",
+
+          props: { width: 200, height: 200, left: $=>$.le.content_text_left.width + $.le.content_text_left.left + 15, top: $ => $.le.navbar.height + 15},
+
+
+          attrs: { style: $ => ({height: $.this.height+"px",  width: $.this.width+"px", top: $.this.top+"px", left: $.this.left+"px",  position: "absolute" })},
+
+          text: "i always follow content!"
+
+        }},
+
+      ]
+    }
+  })
+}
 const appDemoStockApi = ()=>{
 
   const app_root = RenderApp(document.body, {
@@ -5350,6 +5460,7 @@ const appDemoStockApi = ()=>{
 // appNestedData()
 // appPrantToChildComm()
 // appTestCssAndPassThis()
-appTestSuperCtxProblem()
+// appTestSuperCtxProblem()
+// appTestAnchors()
 
 // appDemoStockApi()
