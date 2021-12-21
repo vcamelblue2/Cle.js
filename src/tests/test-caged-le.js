@@ -1360,6 +1360,12 @@ const appTestAnchors = ()=>{
 }
 const appDemoStockApi = ()=>{
 
+  const SERVER_SCRAPE_TIME = 500
+
+  const DEFAULT_REFRESH_RATE = [500, 1000][0]
+  const DEFAULT_INITIAL_BALANCE = 500
+
+
   const app_root = RenderApp(document.body, {
     div: {
       id: "appRoot",
@@ -1380,7 +1386,9 @@ const appDemoStockApi = ()=>{
         slidingWindowAvgPercObserved: 0,
         slidingWindowTotalPercObserved: 0,
 
-        refreshRateMs: 1000
+        refreshRateMs: DEFAULT_REFRESH_RATE,
+
+        running: false,
       },
 
       "=>": [
@@ -1428,6 +1436,170 @@ const appDemoStockApi = ()=>{
 
         }},
 
+        { Model: {
+          id: "wallet",
+
+          data: {
+            balance: DEFAULT_INITIAL_BALANCE,
+            open_order: undefined,
+
+            unreal_balance: $ => {
+              if($.this.open_order === undefined) {
+                return "No Open Orders"
+              }
+              else {
+                if ($.this.open_order.type === "long"){
+                  let new_balance = ($.this.open_order.qty * (1-$.this.sell_commission)) * $.le.appRoot.stockData.ask
+                  return new_balance.toFixed(4) + "€ | " + ((new_balance >= $.this.open_order.invested ? (new_balance / $.this.open_order.invested)-1  : (new_balance / $.this.open_order.invested)-1 ) * 100).toFixed(5) + "%"
+                }
+                else if ($.this.open_order.type === "short"){
+                  let new_balance =  $.this.open_order.invested + (($.this.open_order.qty * $.this.open_order.open_price ) -  (($.this.open_order.qty * (1-$.this.buy_commission)) * $.le.appRoot.stockData.bid))
+                  return new_balance.toFixed(4) + "€ | " + ((new_balance >= $.this.open_order.invested ? (new_balance / $.this.open_order.invested)-1  : (new_balance / $.this.open_order.invested)-1 ) * 100).toFixed(5) + "%"
+                }
+              }
+              return ""
+            },
+
+            history: [],
+
+            buy_commission: 0.075/100,
+            sell_commission: 0.075/100,
+
+            leverage: 1 // todo, leverage
+
+          },
+          
+          on: {
+            this: {
+              balanceChanged: $ => {
+                localStorage.setItem("demo-le-stock:balance", JSON.stringify({balance: $.this.balance}))
+              }
+            }
+          },
+
+          onInit: $ => {
+            let retrivedBalance = localStorage.getItem("demo-le-stock:balance")
+            if (retrivedBalance !== undefined && retrivedBalance !== null){
+              let balance = JSON.parse(retrivedBalance).balance 
+              if(balance > 0){
+                $.this.balance = balance
+              }
+            }
+          },
+
+          def: {
+            can_open_position: $ => {
+              return $.this.open_order === undefined
+            },
+            go_long: $ => {
+              if ($.this.balance > 0 && $.this.can_open_position()){
+                $.this.open_order = {qty: ($.this.balance * (1-$.this.buy_commission)) / $.le.appRoot.stockData.bid, invested: $.this.balance, open_commission: $.this.balance * $.this.buy_commission,  open_price: $.le.appRoot.stockData.bid, open_time: new Date(), type: "long"}
+                $.this.balance = 0
+              }
+            },
+            go_short: $ => {
+              if ($.this.balance > 0 && $.this.can_open_position()){
+                $.this.open_order = {qty: ($.this.balance * (1-$.this.sell_commission))/ $.le.appRoot.stockData.ask, invested: $.this.balance, open_commission: $.this.balance * $.this.sell_commission, open_price: $.le.appRoot.stockData.ask, open_time: new Date(), type: "short"}
+                $.this.balance = 0
+              }
+            },
+            close: $ => {
+              if ($.this.open_order !== undefined){
+                if ($.this.open_order.type === "long"){
+                  let sell_price = $.le.appRoot.stockData.ask
+                  let new_balance = ($.this.open_order.qty * (1-$.this.sell_commission)) * sell_price
+                  let order = {...$.this.open_order,  close_commission: new_balance * $.this.sell_commission, final_balance: new_balance, close_price: sell_price, close_time: new Date(), difference: new_balance - $.this.open_order.invested, difference_perc: (new_balance >= $.this.open_order.invested ? (new_balance / $.this.open_order.invested)-1 : (new_balance / $.this.open_order.invested)-1 )*100}
+                  $.this.balance = new_balance
+                  $.this.open_order = undefined
+                  $.this.history = [order, ...$.this.history]
+                }
+                else if ($.this.open_order.type === "short"){
+                  let buy_price = $.le.appRoot.stockData.bid
+                  let new_balance = $.this.open_order.invested + (($.this.open_order.qty * $.this.open_order.open_price ) -  (($.this.open_order.qty * (1-$.this.buy_commission)) * buy_price))
+                  let order = {...$.this.open_order,  close_commission: new_balance * $.this.buy_commission, final_balance: new_balance, close_price: buy_price, close_time: new Date(), difference: new_balance - $.this.open_order.invested, difference_perc: (new_balance >= $.this.open_order.invested ? (new_balance / $.this.open_order.invested)-1 : (new_balance / $.this.open_order.invested)-1 )*100}
+                  $.this.balance = new_balance
+                  $.this.open_order = undefined
+                  $.this.history = [order, ...$.this.history]
+                }
+              }
+            },
+            resetBalance: $ => {
+              if( !$.this.can_open_position){
+                $.this.close()
+              }
+              $.this.balance = DEFAULT_INITIAL_BALANCE
+            }
+          }
+        }},
+
+        { div: { meta: { if: $=>$.le.appRoot.running },
+
+          id: "order_controls",
+
+          attrs: { style: $=>({position:"fixed", width:"400px", height:"300px", right:"0px", bottom:"0px", border: "1px solid black", backgroundColor:"white", zIndex:"1000", overflowY:"auto"}) },
+
+          "=>":[
+            { button: {
+              text: "Buy",
+              hattrs: {style: "width: 50%; color: green"},
+              handle: {  onclick: $ => $.le.wallet.go_long()  }
+            }},
+
+            { button: {
+              text: "Sell",
+              hattrs: {style: "width: 50%; color: red"},
+              handle: {  onclick: $ => $.le.wallet.go_short()  }
+            }},
+            
+            {br:{}},
+
+            { button: {
+              text: "Close Position",
+              hattrs: {style: "width: 100%"},
+              handle: {  onclick: $ => $.le.wallet.close()  }
+            }},
+
+            {br:{}},
+
+            { div: {
+              text: [ "Balance: ", $ => $.le.wallet.balance, "€" ]
+            }},
+
+            { div: {
+              text: [ "Unreal Balance: ", $ => $.le.wallet.unreal_balance ]
+            }},
+
+            { div: {
+              text: [ "Price: ", $ => $.le.appRoot.stockData.price, " -  Ask: ", $ => $.le.appRoot.stockData.ask, " - Bid: ", $ => $.le.appRoot.stockData.bid]
+            }},
+
+            { div: {
+              text: [ "Spread: ", $ => $.le.appRoot.stockData ? ((($.le.appRoot.stockData.ask / $.le.appRoot.stockData.bid)-1) * 100).toFixed(4) : " - ", "%"]
+            }},
+
+            { div: {
+              text: [ "Open Price: ", $ => $.le.wallet.open_order? $.le.wallet.open_order.open_price : "-"]
+            }},
+
+            "Position: ",
+            { div: {
+              text: $ => JSON.stringify( $.le.wallet.open_order )
+            }},
+
+            "Histroy: ",
+            { div: {
+              text: $ => JSON.stringify( $.le.wallet.history )
+            }},
+
+            { button: {
+              text: "Reset",
+              hattrs: {style: "width: 100%"},
+              handle: {  onclick: $ => $.le.wallet.resetBalance()  }
+            }},
+          ]
+
+        }},
+
         { button: {
           text: "run",
 
@@ -1443,6 +1615,7 @@ const appDemoStockApi = ()=>{
                 console.log("runnong intervall call")
                 $.le.controller.loadStockData()
                 $.this.intervall = setInterval(()=>$.le.controller.loadStockData(), $.parent.refreshRateMs)
+                setTimeout(() => {$.parent.running = true}, $.parent.refreshRateMs * 2);
               } else {
                 clearInterval( $.this.intervall )
                 $.this.intervall = undefined
@@ -1453,7 +1626,7 @@ const appDemoStockApi = ()=>{
 
         { div: {
           text: [
-            $ => "Refrsh Rate (sec): " + $.parent.refreshRateMs/1000,
+            $ => "Refrsh Rate (sec): " + $.parent.refreshRateMs/DEFAULT_REFRESH_RATE,
             {br:{}},
 
             $ => "Price: " + $.parent.stockData?.price.toFixed(2), " - ",
@@ -1505,8 +1678,8 @@ const appDemoStockApi = ()=>{
           data: {
             chart: undefined,
 
-            numPoints: 60*30, // minuti
-            slidingWindowsPoints: 60 // sec [if refresh rate is 1 sec]
+            numPoints: DEFAULT_REFRESH_RATE === 1000 ? 60*30 : 60*30*3, // minuti
+            slidingWindowsPoints: DEFAULT_REFRESH_RATE === 1000 ? 60 : 180 // sec [if refresh rate is 1 sec]
           },
 
           def: {
@@ -1552,7 +1725,7 @@ const appDemoStockApi = ()=>{
               if ($.this.chart !== undefined){
                 
                 let i = 0;
-                let skip_num = ($.le.appRoot.refreshRateMs / 500)
+                let skip_num = ($.le.appRoot.refreshRateMs / SERVER_SCRAPE_TIME)
                 newFullData.forEach(newData=>{
                   if (i++%skip_num === 0){ // get only half data, because of 0.5 sec scraping and 1 sec retriving here
                     $.this.chart.data.labels.push(newData.date);
@@ -1720,8 +1893,8 @@ const appDemoStockApi = ()=>{
           data: {
             chart: undefined,
 
-            numPoints: 60*30, // minuti
-            slidingWindowsPoints: 60 // sec [if refresh rate is 1 sec]
+            numPoints: DEFAULT_REFRESH_RATE === 1000 ? 60*30 : 60*30*3, // minuti
+            slidingWindowsPoints: DEFAULT_REFRESH_RATE === 1000 ? 60 : 180 // sec [if refresh rate is 1 sec]
           },
 
           
@@ -1732,7 +1905,7 @@ const appDemoStockApi = ()=>{
               if ($.this.chart !== undefined){
                 
                 let i = 0;
-                let skip_num = ($.le.appRoot.refreshRateMs / 500)
+                let skip_num = ($.le.appRoot.refreshRateMs / SERVER_SCRAPE_TIME)
                 newFullData.forEach(newData=>{
                   if (i++%skip_num === 0){ // get only half data, because of 0.5 sec scraping and 1 sec retriving here
                     $.this.chart.data.labels.push(newData.date);
@@ -1866,166 +2039,6 @@ const appDemoStockApi = ()=>{
         }},
 
 
-        // { canvas: { 
-        //   id: "chartjsBidAsk",
-
-
-        //   data: {
-        //     chart: undefined,
-
-        //     numPoints: 60*30, // minuti
-        //     slidingWindowsPoints: 60 // sec [if refresh rate is 1 sec]
-        //   },
-
-          
-        //   on: { le: { appRoot: {
-
-        //     fullInitialStockDataChanged: ($, newFullData, oldFullData) => {
-        //       // console.log("full chaaart", newFullData, $.this.chart)
-        //       if ($.this.chart !== undefined){
-                
-        //         let i = 0;
-        //         let skip_num = ($.le.appRoot.refreshRateMs / 500)
-        //         newFullData.forEach(newData=>{
-        //           if (i++%skip_num === 0){ // get only half data, because of 0.5 sec scraping and 1 sec retriving here
-        //             $.this.chart.data.labels.push(newData.date);
-        //             $.this.chart.data.datasets[0].data.push(newData.bid);
-        //             $.this.chart.data.datasets[1].data.push(newData.ask);
-                    
-        //             // remove last..to keep num items in sync	
-        //             if ($.this.chart.data.labels.length > $.this.numPoints ){
-        //               $.this.chart.data.labels.shift();
-        //               $.this.chart.data.datasets[0].data.shift();
-        //               $.this.chart.data.datasets[1].data.shift();
-        //             }
-        //           }
-
-        //         })
-                
-        //         $.this.chart.update('none'); // with none no animation is done
-        //       }
-
-        //     },
-
-        //     stockDataChanged: ($, newData, oldData) => {
-        //       // console.log("chaaart", $.this.chart)
-        //       if ($.this.chart !== undefined){
-                        
-        //         $.this.chart.data.labels.push(newData.date);
-        //         $.this.chart.data.datasets[0].data.push(newData.bid);
-        //         $.this.chart.data.datasets[1].data.push(newData.ask);
-                
-        //         // remove last..to keep num items in sync	
-        //         if ($.this.chart.data.labels.length > $.this.numPoints ){
-        //           $.this.chart.data.labels.shift();
-        //           $.this.chart.data.datasets[0].data.shift();
-        //           $.this.chart.data.datasets[1].data.shift();
-        //         }
-                
-        //         $.this.chart.update('none'); // with none no animation is done
-        //         // $.this.chart.update(); // with none no animation is done
-        //       }
-
-        //     }
-
-        //   }}},
-
-
-        //   attrs: { id: "chartJSBidAskContainer",  width: "1024", height: "600" }, 
-
-        //   afterInit: $ => {
-
-        //     if ($.this.chart === undefined ){
-        //       let full_data = [] //[{date: 0, price: 0}]
-              
-        //       const getLabels = (_data)=>_data.map(d=>d.date)
-        //       const getValues = (_data)=>_data.map(d=>d.bid)
-        //       const getValues2 = (_data)=>_data.map(d=>d.ask)
-              
-              
-        //       const data = {
-        //         labels: getLabels(full_data),
-        //         datasets: [
-        //           {
-        //             label: 'Dataset 1',
-        //             data: getValues(full_data),
-        //             borderColor: 'rgb(255, 99, 132)',
-        //             //backgroundColor: Utils.transparentize(chartColors.red, 0.5),
-        //             //backgroundColor: '#ff000099', //'rgb(255, 99, 132, 0.5)',
-        //             yAxisID: 'y',
-        //             pointRadius:0,
-        //             borderWidth: 1,
-        //           },
-        //           {
-        //             label: 'Dataset 2',
-        //             data: getValues2(full_data),
-        //             borderColor: 'rgb(99, 255, 132)',
-        //             //backgroundColor: Utils.transparentize(chartColors.red, 0.5),
-        //             //backgroundColor: '#ff000099', //'rgb(255, 99, 132, 0.5)',
-        //             yAxisID: 'y',
-        //             pointRadius:0,
-        //             borderWidth: 1,
-        //           },
-        //         ]
-        //       };
-          
-        //       const config = {
-        //         type: 'line',
-        //         data: data,
-        //         options: {
-        //         responsive: false, //true,
-        //         interaction: {
-        //           mode: 'index',
-        //           intersect: false,
-        //         },
-        //         // animation: { // new animation!
-        //         //     duration: 800,
-        //         //     easing: 'linear',
-        //         //     // from: 1,
-        //         //     // to: 0,
-        //         //     loop: false
-        //         // },
-        //         stacked: false,
-        //         plugins: {
-        //           title: {
-        //           display: true,
-        //           text: 'Bid Ask'
-        //           }
-        //         },
-        //         scales: {
-        //           y: {
-        //           type: 'linear',
-        //           display: true,
-        //           position: 'right',
-        //           ticks: {
-        //             color: 'rgb(255, 99, 132)',
-        //           },
-        //           x: {
-        //             display: false
-        //           },
-                  
-                      
-        //           title: {
-        //             color: 'rgb(255, 99, 132)',
-        //             display: true,
-        //             text: 'Bid Ask'
-        //           }
-        //           }
-        //         }
-        //         },
-        //       };
-          
-        //       // let chartCtx = $.this.el.getContext('2d');
-
-        //       let chartCtx = document.getElementById('chartJSBidAskContainer').getContext('2d');
-
-        //       $.this.chart = new Chart(chartCtx, config);
-        //     }
-        //   }
-
-        // }},
-
-
 
         
         { canvas: { 
@@ -2035,8 +2048,8 @@ const appDemoStockApi = ()=>{
           data: {
             chart: undefined,
 
-            numPoints: 60*5, // minuti
-            slidingWindowsPoints: 60 // sec [if refresh rate is 1 sec]
+            numPoints: DEFAULT_REFRESH_RATE === 1000 ? 60*5 : 60*5*3, // minuti
+            slidingWindowsPoints: DEFAULT_REFRESH_RATE === 1000 ? 60 : 180 // sec [if refresh rate is 1 sec]
           },
 
           def: {
@@ -2082,7 +2095,7 @@ const appDemoStockApi = ()=>{
               if ($.this.chart !== undefined){
                 
                 let i = 0;
-                let skip_num = ($.le.appRoot.refreshRateMs / 500)
+                let skip_num = ($.le.appRoot.refreshRateMs / SERVER_SCRAPE_TIME)
                 newFullData.forEach(newData=>{
                   if (i++%skip_num === 0){ // get only half data, because of 0.5 sec scraping and 1 sec retriving here
                     $.this.chart.data.labels.push(newData.date);
@@ -2233,8 +2246,8 @@ const appDemoStockApi = ()=>{
           data: {
             chart: undefined,
 
-            numPoints: 60*5, // minuti
-            slidingWindowsPoints: 50 // sec [if refresh rate is 1 sec]
+            numPoints: DEFAULT_REFRESH_RATE === 1000 ? 60*5 : 60*5*3, // minuti
+            slidingWindowsPoints: DEFAULT_REFRESH_RATE === 1000 ? 60 : 180 // sec [if refresh rate is 1 sec]
           },
 
           
@@ -2245,7 +2258,7 @@ const appDemoStockApi = ()=>{
               if ($.this.chart !== undefined){
                 
                 let i = 0;
-                let skip_num = ($.le.appRoot.refreshRateMs / 500)
+                let skip_num = ($.le.appRoot.refreshRateMs / SERVER_SCRAPE_TIME)
                 newFullData.forEach(newData=>{
                   if (i++%skip_num === 0){ // get only half data, because of 0.5 sec scraping and 1 sec retriving here
                     $.this.chart.data.labels.push(newData.date);
@@ -2392,7 +2405,7 @@ const appDemoStockApi = ()=>{
 // appNestedData()
 // appPrantToChildComm()
 // appTestCssAndPassThis()
-appTestSuperCtxProblem()
+// appTestSuperCtxProblem()
 // appTestAnchors()
 
-// appDemoStockApi()
+appDemoStockApi()
