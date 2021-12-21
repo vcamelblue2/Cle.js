@@ -2786,6 +2786,8 @@ export { pass, none, smart, Use, Bind, RenderApp, LE_LoadScript, LE_LoadCss, LE_
   
   // todo: routing (also partial!) con history api
 
+  // todo: per supportare al meglio il passaggio di un componente come data ad un altro componente, e poterne seguire le sue proprietà: è possibile autoanalizzare (ad ogni set) se la prop passata è un component. in caso positivo potrei sottoscrivermi al meglio nelle prop che la usano, visto che un'eventuale chiamata a una sottoproperty implica in realtà "l'hook" originale alle su property, (e non una sottoproperty che non saprei gestire di un altro tipo di dato), ergo posso fare $.this.selectedEl.property..basta solo modificare i subscruber di conseguenza. e ovviamente devono essere notificati del cambio di tipo, per eventuale risottoscrizione
+
 
 // IMPROVEMENTS:
 
