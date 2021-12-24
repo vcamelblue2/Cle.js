@@ -1916,6 +1916,11 @@ class Component {
       this.hooks.onInit = this.convertedDefinition.onInit.bind(undefined, this.$this)
     }
 
+    // afterChildsInit (non lazy!)
+    if (this.convertedDefinition.afterChildsInit !== undefined){
+      this.hooks.afterChildsInit = this.convertedDefinition.afterChildsInit.bind(undefined, this.$this)
+    }
+
     // afterInit
     if (this.convertedDefinition.afterInit !== undefined){
       this.hooks.afterInit = this.convertedDefinition.afterInit.bind(undefined, this.$this)
@@ -1942,9 +1947,7 @@ class Component {
     this.childs.forEach(child=>child.create())
 
     // afterChildsInit (non lazy!)
-    if (this.convertedDefinition.afterChildsInit !== undefined){
-      this.hooks.afterChildsInit = this.convertedDefinition.afterChildsInit.bind(undefined, this.$this)
-    }
+    this.hooks.afterChildsInit !== undefined && this.hooks.afterChildsInit()
 
     // trigger afterInit (lazy..)
     this.hooks.afterInit !== undefined && setTimeout(()=>this.hooks.afterInit(), 1)
