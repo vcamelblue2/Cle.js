@@ -2782,6 +2782,7 @@ export { pass, none, smart, Use, Bind, RenderApp, LE_LoadScript, LE_LoadCss, LE_
   // todo: tutti gli elementi devono avere un attributo che mappa un identificativo univoco dell'elemento (stabile nel tempo, anche per gli ng-if e ng-for) per poter aiutare l'hoisting..
 
   // todo: state
+  // todo: behavioural property: utilty per creare animazioni, clone di quelle QML. in pratica l'idea è quella di definire una serie di azioni (in modo dichiarativo e non imperativo) all'acadere di un'azione, es all'on change di una property (ma anche eventi, tipo onclick), seguendo una linea temporale e/o quantizzando il valore della property che sta cambiando. l'idea è quella di definire che ad es: quando una property assume valore "vero" o ad un "click" vengono eseguiti una serie di step in sequenza (ovvero una serie di set timeout). tipo subito cambio il colore in blue e dopo 0.5 sec lo cambio nell'originale. ma anche 
 
   // todo: private..come realizzo il meccanismo dei private? name mangling in python style? (più semplice ma "inutile") o reale (e quindi tentare di capire come filtrare le properties visibili..)
 
