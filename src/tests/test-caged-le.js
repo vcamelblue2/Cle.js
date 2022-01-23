@@ -1360,10 +1360,15 @@ const appTestAnchors = ()=>{
 }
 const appDemoStockApi = ()=>{
 
-  const SERVER_SCRAPE_TIME = 500
+  const SERVER_SCRAPE_TIME = 250 //500
 
-  const DEFAULT_REFRESH_RATE = [500, 1000][0]
-  const DEFAULT_INITIAL_BALANCE = 500
+  const DEFAULT_REFRESH_RATE = [250, 500, 1000][0]
+  const DEFAULT_INITIAL_BALANCE = 2000
+
+  const COMMISSIONS_ENABLED = false
+
+  const GRAPH_BIG_MIN = 60
+  const GRAPH_SMALL_MIN = 10
 
 
   const app_root = RenderApp(document.body, {
@@ -1449,12 +1454,16 @@ const appDemoStockApi = ()=>{
               }
               else {
                 if ($.this.open_order.type === "long"){
-                  let new_balance = ($.this.open_order.qty * (1-$.this.sell_commission)) * $.le.appRoot.stockData.ask
-                  return new_balance.toFixed(4) + "€ | " + ((new_balance >= $.this.open_order.invested ? (new_balance / $.this.open_order.invested)-1  : (new_balance / $.this.open_order.invested)-1 ) * 100).toFixed(5) + "%"
+                  let new_balance = ($.this.open_order.qty * (1-$.this.sell_commission)) * $.le.appRoot.stockData.bid // venderò a bid
+                  let profit = new_balance - $.this.open_order.invested
+                  let perc = (new_balance >= $.this.open_order.invested ? (new_balance / $.this.open_order.invested)-1  : (new_balance / $.this.open_order.invested)-1 ) * 100
+                  return profit.toFixed(2) + "€ | " + perc.toFixed(5) + "% | " + new_balance.toFixed(4) + "€"
                 }
                 else if ($.this.open_order.type === "short"){
-                  let new_balance =  $.this.open_order.invested + (($.this.open_order.qty * $.this.open_order.open_price ) -  (($.this.open_order.qty * (1-$.this.buy_commission)) * $.le.appRoot.stockData.bid))
-                  return new_balance.toFixed(4) + "€ | " + ((new_balance >= $.this.open_order.invested ? (new_balance / $.this.open_order.invested)-1  : (new_balance / $.this.open_order.invested)-1 ) * 100).toFixed(5) + "%"
+                  let new_balance =  $.this.open_order.invested + (($.this.open_order.qty * $.this.open_order.open_price ) -  (($.this.open_order.qty * (1-$.this.buy_commission)) * $.le.appRoot.stockData.ask)) // comprerò ad ask
+                  let profit = new_balance - $.this.open_order.invested
+                  let perc = (new_balance >= $.this.open_order.invested ? (new_balance / $.this.open_order.invested)-1  : (new_balance / $.this.open_order.invested)-1 ) * 100
+                  return profit.toFixed(2) + "€ | " + perc.toFixed(5) + "% | " + new_balance.toFixed(4) + "€"
                 }
               }
               return ""
@@ -1462,8 +1471,8 @@ const appDemoStockApi = ()=>{
 
             history: [],
 
-            buy_commission: 0.075/100,
-            sell_commission: 0.075/100,
+            buy_commission: COMMISSIONS_ENABLED ? 0.075/100 : 0,
+            sell_commission: COMMISSIONS_ENABLED ? 0.075/100 : 0,
 
             leverage: 1 // todo, leverage
 
@@ -1492,21 +1501,21 @@ const appDemoStockApi = ()=>{
               return $.this.open_order === undefined
             },
             go_long: $ => {
-              if ($.this.balance > 0 && $.this.can_open_position()){
-                $.this.open_order = {qty: ($.this.balance * (1-$.this.buy_commission)) / $.le.appRoot.stockData.bid, invested: $.this.balance, open_commission: $.this.balance * $.this.buy_commission,  open_price: $.le.appRoot.stockData.bid, open_time: new Date(), type: "long"}
+              if ($.this.balance > 0 && $.this.can_open_position()){ //compro ad ask
+                $.this.open_order = {qty: ($.this.balance * (1-$.this.buy_commission)) / $.le.appRoot.stockData.ask, invested: $.this.balance, open_commission: $.this.balance * $.this.buy_commission,  open_price: $.le.appRoot.stockData.bid, open_time: new Date(), type: "long"}
                 $.this.balance = 0
               }
             },
             go_short: $ => {
-              if ($.this.balance > 0 && $.this.can_open_position()){
-                $.this.open_order = {qty: ($.this.balance * (1-$.this.sell_commission))/ $.le.appRoot.stockData.ask, invested: $.this.balance, open_commission: $.this.balance * $.this.sell_commission, open_price: $.le.appRoot.stockData.ask, open_time: new Date(), type: "short"}
+              if ($.this.balance > 0 && $.this.can_open_position()){ // vendo a bid
+                $.this.open_order = {qty: ($.this.balance * (1-$.this.sell_commission))/ $.le.appRoot.stockData.bid, invested: $.this.balance, open_commission: $.this.balance * $.this.sell_commission, open_price: $.le.appRoot.stockData.ask, open_time: new Date(), type: "short"}
                 $.this.balance = 0
               }
             },
             close: $ => {
               if ($.this.open_order !== undefined){
                 if ($.this.open_order.type === "long"){
-                  let sell_price = $.le.appRoot.stockData.ask
+                  let sell_price = $.le.appRoot.stockData.bid
                   let new_balance = ($.this.open_order.qty * (1-$.this.sell_commission)) * sell_price
                   let order = {...$.this.open_order,  close_commission: new_balance * $.this.sell_commission, final_balance: new_balance, close_price: sell_price, close_time: new Date(), difference: new_balance - $.this.open_order.invested, difference_perc: (new_balance >= $.this.open_order.invested ? (new_balance / $.this.open_order.invested)-1 : (new_balance / $.this.open_order.invested)-1 )*100}
                   $.this.balance = new_balance
@@ -1514,7 +1523,7 @@ const appDemoStockApi = ()=>{
                   $.this.history = [order, ...$.this.history]
                 }
                 else if ($.this.open_order.type === "short"){
-                  let buy_price = $.le.appRoot.stockData.bid
+                  let buy_price = $.le.appRoot.stockData.ask
                   let new_balance = $.this.open_order.invested + (($.this.open_order.qty * $.this.open_order.open_price ) -  (($.this.open_order.qty * (1-$.this.buy_commission)) * buy_price))
                   let order = {...$.this.open_order,  close_commission: new_balance * $.this.buy_commission, final_balance: new_balance, close_price: buy_price, close_time: new Date(), difference: new_balance - $.this.open_order.invested, difference_perc: (new_balance >= $.this.open_order.invested ? (new_balance / $.this.open_order.invested)-1 : (new_balance / $.this.open_order.invested)-1 )*100}
                   $.this.balance = new_balance
@@ -1678,8 +1687,8 @@ const appDemoStockApi = ()=>{
           data: {
             chart: undefined,
 
-            numPoints: DEFAULT_REFRESH_RATE === 1000 ? 60*30 : 60*30*3, // minuti
-            slidingWindowsPoints: DEFAULT_REFRESH_RATE === 1000 ? 60 : 180 // sec [if refresh rate is 1 sec]
+            numPoints: DEFAULT_REFRESH_RATE === 1000 ? 60*GRAPH_BIG_MIN : (1000/DEFAULT_REFRESH_RATE)*60*GRAPH_BIG_MIN, // minuti
+            slidingWindowsPoints: DEFAULT_REFRESH_RATE === 1000 ? 60 : (1000/DEFAULT_REFRESH_RATE)*60 // sec [if refresh rate is 1 sec]
           },
 
           def: {
@@ -1781,7 +1790,25 @@ const appDemoStockApi = ()=>{
                 $.le.appRoot.slidingWindowMaxPercObserved = slidingWindowObservedPerc.max
 
                 // console.log("avg", $.le.appRoot.avgPercObserved)
-
+                
+                $.this.chart.config.options.plugins.annotation = {
+                  annotations: {
+                    bid: {
+                      type: 'line',
+                      yMin: newData.bid,
+                      yMax: newData.bid,
+                      borderColor: 'rgb(255, 99, 132)',
+                      borderWidth: 2 
+                    },
+                    ask:{
+                      type: 'line',
+                      yMin: newData.ask,
+                      yMax: newData.ask,
+                      borderColor: 'rgb(255, 99, 132)',
+                      borderWidth: 2 
+                    }
+                  }
+                }
                 
                 $.this.chart.update('none'); // with none no animation is done
                 // $.this.chart.update(); // with none no animation is done
@@ -1840,7 +1867,7 @@ const appDemoStockApi = ()=>{
                   plugins: {
                     title: {
                     display: true,
-                    text: '30 Min Chart'
+                    text:  GRAPH_BIG_MIN + ' Min Chart'
                     },
 
                     tooltip: {
@@ -1854,6 +1881,26 @@ const appDemoStockApi = ()=>{
                         }
                       }
                     },
+
+                    annotation: {
+                      annotations: {
+                        // bid: {
+                        //   type: 'line',
+                        //   yMin: 0,
+                        //   yMax: 0,
+                        //   borderColor: 'rgb(255, 99, 132)',
+                        //   borderWidth: 2 
+                        // },
+                        // ask:{
+                        //   type: 'line',
+                        //   yMin: 0,
+                        //   yMax: 0,
+                        //   borderColor: 'rgb(255, 99, 132)',
+                        //   borderWidth: 2 
+                        // }
+                      }
+                    }
+
                   },
                   scales: {
                     y: {
@@ -1893,8 +1940,8 @@ const appDemoStockApi = ()=>{
           data: {
             chart: undefined,
 
-            numPoints: DEFAULT_REFRESH_RATE === 1000 ? 60*30 : 60*30*3, // minuti
-            slidingWindowsPoints: DEFAULT_REFRESH_RATE === 1000 ? 60 : 180 // sec [if refresh rate is 1 sec]
+            numPoints: DEFAULT_REFRESH_RATE === 1000 ? 60*GRAPH_BIG_MIN : (1000/DEFAULT_REFRESH_RATE)*60*GRAPH_BIG_MIN, // minuti
+            slidingWindowsPoints: DEFAULT_REFRESH_RATE === 1000 ? 60 : (1000/DEFAULT_REFRESH_RATE)*60 // sec [if refresh rate is 1 sec]
           },
 
           
@@ -2048,8 +2095,8 @@ const appDemoStockApi = ()=>{
           data: {
             chart: undefined,
 
-            numPoints: DEFAULT_REFRESH_RATE === 1000 ? 60*5 : 60*5*3, // minuti
-            slidingWindowsPoints: DEFAULT_REFRESH_RATE === 1000 ? 60 : 180 // sec [if refresh rate is 1 sec]
+            numPoints: DEFAULT_REFRESH_RATE === 1000 ? 60*GRAPH_SMALL_MIN : (1000/DEFAULT_REFRESH_RATE)*60*GRAPH_SMALL_MIN, // minuti
+            slidingWindowsPoints: DEFAULT_REFRESH_RATE === 1000 ? 60 : (1000/DEFAULT_REFRESH_RATE)*60 // sec [if refresh rate is 1 sec]
           },
 
           def: {
@@ -2136,6 +2183,25 @@ const appDemoStockApi = ()=>{
                   });
                 }
                 
+                $.this.chart.config.options.plugins.annotation = {
+                  annotations: {
+                    bid: {
+                      type: 'line',
+                      yMin: newData.bid,
+                      yMax: newData.bid,
+                      borderColor: 'rgb(255, 99, 132)',
+                      borderWidth: 2 
+                    },
+                    ask:{
+                      type: 'line',
+                      yMin: newData.ask,
+                      yMax: newData.ask,
+                      borderColor: 'rgb(255, 99, 132)',
+                      borderWidth: 2 
+                    }
+                  }
+                }
+
                 $.this.chart.update('none'); // with none no animation is done
                 // $.this.chart.update(); // with none no animation is done
               }
@@ -2193,7 +2259,7 @@ const appDemoStockApi = ()=>{
                   plugins: {
                     title: {
                     display: true,
-                    text: '5 Min Chart'
+                    text: GRAPH_SMALL_MIN + 'Min Chart'
                     },
 
                     tooltip: {
@@ -2207,6 +2273,25 @@ const appDemoStockApi = ()=>{
                         }
                       }
                     },
+
+                    annotation: {
+                      annotations: {
+                        // bid: {
+                        //   type: 'line',
+                        //   yMin: 0,
+                        //   yMax: 0,
+                        //   borderColor: 'rgb(255, 99, 132)',
+                        //   borderWidth: 2 
+                        // },
+                        // ask:{
+                        //   type: 'line',
+                        //   yMin: 0,
+                        //   yMax: 0,
+                        //   borderColor: 'rgb(255, 99, 132)',
+                        //   borderWidth: 2 
+                        // }
+                      }
+                    }
                   },
                   scales: {
                     y: {
@@ -2246,8 +2331,8 @@ const appDemoStockApi = ()=>{
           data: {
             chart: undefined,
 
-            numPoints: DEFAULT_REFRESH_RATE === 1000 ? 60*5 : 60*5*3, // minuti
-            slidingWindowsPoints: DEFAULT_REFRESH_RATE === 1000 ? 60 : 180 // sec [if refresh rate is 1 sec]
+            numPoints: DEFAULT_REFRESH_RATE === 1000 ? 60*GRAPH_SMALL_MIN : (1000/DEFAULT_REFRESH_RATE)*60*GRAPH_SMALL_MIN, // minuti
+            slidingWindowsPoints: DEFAULT_REFRESH_RATE === 1000 ? 60 : (1000/DEFAULT_REFRESH_RATE)*60 // sec [if refresh rate is 1 sec]
           },
 
           
