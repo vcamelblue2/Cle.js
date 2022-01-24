@@ -1,5 +1,5 @@
 
-import {pass, none, smart, Use, Bind, RenderApp, LE_LoadScript, LE_LoadCss, LE_InitWebApp} from "../lib/caged-le.js"
+import {pass, none, smart, Use, Placeholder, Bind, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp} from "../lib/caged-le.js"
 
 const app0 = ()=>{
 
@@ -152,6 +152,19 @@ const app0 = ()=>{
 
       ]
 
+    }
+  }
+
+  const EditableComponent = {
+    div: {
+      attrs: { style: "margin-top: 25px; width: 100%; height: 50px; background-color:black; color: white" },
+      "=>": [
+        "Hello ",
+        Placeholder("name", {default_component: "World!"}),
+        { button: { text: "click me", attrs: {style: "margin-left: 15px; margin-right: 15px"},  handle: {onclick: $=>$.parent.el.style.backgroundColor = "black"}}},
+        Placeholder("button_2"),
+        Placeholder("any_component"),
+      ]
     }
   }
 
@@ -314,6 +327,12 @@ const app0 = ()=>{
                 },
                 text: $ => $.parent.counter
               }},
+
+              Use( EditableComponent, pass, { inject: {
+                  "button_2": { button: { text: "injected button!", attrs: {style: " color: red; margin-right: 15px"}, handle: {onclick: $=>$.parent.el.style.backgroundColor = "gray"}}},
+                  "any_component": { input: { attrs: {value: "any stuff injected!", style: "margin-left: 5px;" }}},
+                }
+              } )
 
           ] 
       }
@@ -2483,7 +2502,7 @@ const appDemoStockApi = ()=>{
 }
 
 
-// app0()
+app0()
 // test2way()
 // appTodolist()
 // appTodolistv2()
@@ -2493,4 +2512,4 @@ const appDemoStockApi = ()=>{
 // appTestSuperCtxProblem()
 // appTestAnchors()
 
-appDemoStockApi()
+// appDemoStockApi()

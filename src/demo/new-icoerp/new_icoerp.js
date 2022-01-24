@@ -1,4 +1,4 @@
-import {pass, none, smart, Use, Bind, RenderApp, LE_LoadScript, LE_LoadCss, LE_InitWebApp} from "../../lib/caged-le.js"
+import {pass, none, smart, Use, Placeholder, Bind, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp} from "../../lib/caged-le.js"
 
 const GlobalCss = {
     Style: {

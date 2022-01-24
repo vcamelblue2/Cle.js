@@ -633,7 +633,7 @@ const smart = (component, otherDefs={}) => {
 
 //const Use = (component, redefinition, initialization_args=$=>({p1:1, p2:"bla"}), passed_props= $=>({prop1: $.this.prop1...}) )=>{ 
 // export 
-const Use = (component, redefinitions=undefined, { strategy="merge", init=undefined, passed_props=undefined }={})=>{ return new UseComponentDeclaration(component, redefinitions, { strategy:strategy, init:init, passed_props:passed_props } ) } // passed_props per puntare a una var autostored as passed_props e seguirne i changes, mentre init args per passare principalmente valori (magari anche props) ma che devi elaborare nel construct
+const Use = (component, redefinitions=undefined, { strategy="merge", init=undefined, passed_props=undefined, inject=undefined}={})=>{ return new UseComponentDeclaration(component, redefinitions, { strategy:strategy, init:init, passed_props:passed_props, inject: inject } ) } // passed_props per puntare a una var autostored as passed_props e seguirne i changes, mentre init args per passare principalmente valori (magari anche props) ma che devi elaborare nel construct
 // todo: qui potrebbe starci una connect del signal con autopropagate, ovvero poter indicare che propago un certo segnale nel mio parent! subito dopo la redefinitions, in modo da avere una roba molto simile a quello che ha angular (Output) e chiudere il cerchio della mancanza di id..
 // di fatto creiamo un nuovo segnale e lo connettiamo in modo semplice..nel parent chiamo "definePropagatedSignal"
 // perdo solo un po di descrittività, in favore di un meccanismo comodo e facile..
@@ -641,13 +641,15 @@ const Use = (component, redefinitions=undefined, { strategy="merge", init=undefi
 // nella init il punto di vista del this E' SEMPRE IL MIO
 
 class UseComponentDeclaration{
-  constructor(component, redefinitions=undefined, { strategy="merge", init=undefined, passed_props=undefined }={}){
+  constructor(component, redefinitions=undefined, { strategy="merge", init=undefined, passed_props=undefined, inject=undefined }={}){
     this.component = component // Todo: e se voglio ridefinire un componente già Use??
     this.init = init
     this.passed_props = passed_props
     this.redefinitions = redefinitions
     // assert strategy in "merge" | "override"
     this.strategy = strategy
+
+    this.inject = inject
 
     this.computedTemplate = this._resolveComponentRedefinition()
   }
@@ -759,6 +761,22 @@ class UseComponentDeclaration{
       }
     }
     
+    // now check for injections!
+    let injections = this.inject || {}
+    let childs_def_typology = ["childs", "contains", "text", ">>", "=>", "_"]
+    childs_def_typology.forEach( childs_def_key => {
+      let childs_def = resolved[childs_def_key] 
+      if (childs_def !== undefined ){
+        if (Array.isArray(childs_def)){ // multi child
+          resolved[childs_def_key] = childs_def.map(child=> child instanceof _Placeholder ? child.getCheckedComponent(injections[child.name]) : child).filter(c=>c!==undefined)
+        }
+        else{
+          let child = resolved[childs_def_key] // monochild
+          resolved[childs_def_key] = child.getCheckedComponent(injections[child.name])
+        }
+      }
+    })
+    
     return { [componentType]: resolved }
   }
 
@@ -771,12 +789,66 @@ class UseComponentDeclaration{
     }
 
     return new UseComponentDeclaration(
-      cloneDefinitionWithoutMeta(this.component), redefinitions_no_meta, { strategy:this.strategy, init:this.init, passed_props:this.passed_props }
+      cloneDefinitionWithoutMeta(this.component), redefinitions_no_meta, { strategy:this.strategy, init:this.init, passed_props:this.passed_props, inject:this.inject }
     )
   }
 
 }
 
+// export // todo: valutare se qui ci vuole la copia!
+const Placeholder = (name, {default_component=undefined, must_be_redefined=false, forced_id=undefined, forced_ctx_id=undefined, replace_if_different=true}={}) => {
+  return new _Placeholder(name, {default_component:default_component, must_be_redefined:must_be_redefined, forced_id:forced_id, forced_ctx_id:forced_ctx_id, replace_if_different:replace_if_different})
+}
+class _Placeholder{
+  constructor(name, {default_component=undefined, must_be_redefined=false, forced_id=undefined, forced_ctx_id=undefined, replace_if_different=true}={}){
+    this.name = name
+    this.default_component = default_component
+    this.must_be_redefined = must_be_redefined
+    this.forced_id = forced_id
+    this.forced_ctx_id = forced_ctx_id
+    this.replace_if_different = replace_if_different
+  }
+  getCheckedComponent(component){
+    if (component === undefined){
+      if (this.must_be_redefined){
+        throw new Error("Injected Component (Placeholder repl) must be redefined by contract!")
+      }
+      return this.default_component
+    }
+
+    if (typeof component === "function" || typeof component === "string" ){
+      return component
+    }
+
+    let [componentType, component_def] = Object.entries(component)[0]
+    if (this.replace_if_different === false){
+      
+      if( (this.forced_id !== undefined && component_def.id !== this.forced_private_id) ||
+          (this.forced_ctx_id !== undefined && component_def.ctx_id !== this.forced_ctx_id) ){
+        throw new Error("Injected Component (Placeholder repl) must have specific ID by contract")
+      } else {
+        return component
+      }
+    }
+    else {
+      return {
+        [componentType]: { 
+          ...component_def, 
+          id: this.forced_id || component_def.id,
+          ctx_id: this.forced_ctx_id || component_def.ctx_id,
+        }
+      }
+    }
+  }
+}
+
+const extractChildsDef = (definition)=>{
+  let extracted_childs = undefined
+  let { childs, contains: childs_contains, text: childs_text, ">>":childs_ff, "=>": childs_arrow, _: childs_underscore } = definition
+  extracted_childs = childs || childs_contains || childs_text || childs_ff || childs_arrow || childs_underscore
+  if (extracted_childs !== undefined && !Array.isArray(unifiedDef.childs)) {extracted_childs = [extracted_childs]}
+  return extracted_childs
+}
 
 const getComponentType = (template)=>{
   // let componentDef;
@@ -2749,7 +2821,7 @@ const LE_InitWebApp = (appDef)=>{ document.addEventListener("DOMContentLoaded", 
 // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // 
 
 
-export { pass, none, smart, Use, Bind, RenderApp, LE_LoadScript, LE_LoadCss, LE_InitWebApp }
+export { pass, none, smart, Use, Placeholder, Bind, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp }
 // full import: {pass, none, smart, Use, Bind, RenderApp, LE_LoadScript, LE_LoadCss, LE_InitWebApp}
 
 
@@ -2775,6 +2847,10 @@ export { pass, none, smart, Use, Bind, RenderApp, LE_LoadScript, LE_LoadCss, LE_
 
 
 // NEW FEATURES:
+
+  // todo: injector palceholders: meccanismo per permettere di inserire sottocomponenti in punti specifici di un componente Use: sostanzialmente in una Use possiamo definire dei Placeholder (classe Placeholder), che hanno dei "nomi", e dunque possiamo passare alla Use un dict con i nome i componenti che vogliamo ignettare (via passaggio params). la semplicità del meccanismo è tutta nella definizione della Use, che si occupa di matchare i placeholder (tra i subel) e di rimuovere quelli inutilizzati. trasparente per la factory! ovviamente possibilità di default if not set, e opzione per forzare il match con un id specifico (private) o un rename forzato di un id privato (per far si che si possano definire "interfacce" e usarle)
+  // todo: ricorsione nei sottochild? (solo se stesso ctx, aka non per i nested Use)
+  // todo: valutare se fare copia del default placeholders e/o dell injected
 
   // todo: concetto di "re_emit_as" -> combina in automatico la possibilità di gestire un segnale e rialnciarlo con un altro nome..per propagare i sengali! ovviamente devo inserire il nome di un mio segnale e non di altri.. potrebbe avere senso avere una sentinel del tipo "NewSignal("xxx") per indicare un nuovo segnale ? eìsenza stare a dichiaraare 2 volte..per easy propagation.. vedere bene su..di fatto questa cosa è da realizzare nella on_s lato dev
 
@@ -2835,8 +2911,6 @@ export { pass, none, smart, Use, Bind, RenderApp, LE_LoadScript, LE_LoadCss, LE_
   // todo: deduplicare le deps prima della subscribe..anche e soprattutto per via delle deps dell func, ma probabilemnte lo abbiamo già adesso questo problema! a meno della "buona gestione" in Property per cui non riaggiungiamo se siamo già subscribed (visto che passo this come who), ancdrebbe però comunque migliorato, per evitre aggiornamenti multipli! qui si capisce l'importanza di angular e del change detector..ovvero un loop per "ridurre" i repaint "accorpandoli". come? al posto di iposta al change l'azione diretta, basta segnalarla in un array con "esecuzione a scadenza" ovvero timeout ad es 2 ms dell'esecuzione delle azioni, con autodelete delle azioni "replicate" all'esecuzione, e auto reset del timeout con l'avanzare del codice. questo garantisce la separazione tra rendering e prop, ma potrebbe incasinare il codice che faceva affidamento su di essa.
 
   // todo??: nuova idea su come bindare il this con qualunque funzione (anche => ) (che però annulla la possibilità di avere cose extra framework..): basta fare il toString della func, e poi ricostruirla con new Function assegnando il this..però si perdono tutti gli extra ref!
-
-  // todo: injector palceholders: meccanismo per permettere di inserire sottocomponenti in punti specifici di un componente Use: sostanzialmente in una Use possiamo definire dei Placeholder (classe UsePlaceholder), che hanno dei "nomi", e dunque possiamo passare alla Use un dict con i nome i componenti che vogliamo ignettare. la semplicità del meccanismo è tutta nella definizione della Use, che si occupa di matchare i placeholder (tra i subel) e di rimuovere quelli inutilizzati. trasparente per la factory!
 
 
 
