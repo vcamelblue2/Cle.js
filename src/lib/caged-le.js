@@ -764,18 +764,42 @@ class UseComponentDeclaration{
     // now check for injections!
     let injections = this.inject || {}
     let childs_def_typology = ["childs", "contains", "text", ">>", "=>", "_"]
-    childs_def_typology.forEach( childs_def_key => {
-      let childs_def = resolved[childs_def_key] 
-      if (childs_def !== undefined ){
-        if (Array.isArray(childs_def)){ // multi child
-          resolved[childs_def_key] = childs_def.map(child=> child instanceof _Placeholder ? child.getCheckedComponent(injections[child.name]) : child).filter(c=>c!==undefined)
-        }
-        else{
-          let child = resolved[childs_def_key] // monochild
-          resolved[childs_def_key] = child.getCheckedComponent(injections[child.name])
-        }
+    const recursive_check_injection = (resolved_component, lvl=0) =>{
+
+      // console.log("livello: ", lvl, resolved_component)
+
+      if (typeof resolved_component === "function" || typeof resolved_component === "string" || (resolved_component instanceof UseComponentDeclaration) ){
+        return resolved_component
       }
-    })
+
+      // salvo il rif al componente
+      let oj_resolved_component = resolved_component
+
+      if (lvl > 0){ // per i lvl successivi allo 0 devo estrarre la def dal componente
+        resolved_component = resolved_component[getComponentType(resolved_component)]
+      }
+  
+      // console.log("non bloccato, livello: ", lvl, resolved_component)
+
+      childs_def_typology.forEach( childs_def_key => {
+        let childs_def = resolved_component[childs_def_key] 
+        
+        if (childs_def !== undefined ){
+          if (Array.isArray(childs_def)){ // multi child
+            resolved_component[childs_def_key] = childs_def.map(child=> child instanceof PlaceholderDeclaration ? child.getCheckedComponent(injections[child.name]) : recursive_check_injection(child, lvl++)).filter(c=>c!==undefined)
+          }
+          else{
+            let child = childs_def // monochild, not null
+            resolved_component[childs_def_key] = child instanceof PlaceholderDeclaration ? child.getCheckedComponent(injections[child.name]) : recursive_check_injection(child, lvl++)
+          }
+        }
+      })
+
+      return oj_resolved_component
+    
+    }
+
+    recursive_check_injection(resolved)
     
     return { [componentType]: resolved }
   }
@@ -797,9 +821,9 @@ class UseComponentDeclaration{
 
 // export // todo: valutare se qui ci vuole la copia!
 const Placeholder = (name, {default_component=undefined, must_be_redefined=false, forced_id=undefined, forced_ctx_id=undefined, replace_if_different=true}={}) => {
-  return new _Placeholder(name, {default_component:default_component, must_be_redefined:must_be_redefined, forced_id:forced_id, forced_ctx_id:forced_ctx_id, replace_if_different:replace_if_different})
+  return new PlaceholderDeclaration(name, {default_component:default_component, must_be_redefined:must_be_redefined, forced_id:forced_id, forced_ctx_id:forced_ctx_id, replace_if_different:replace_if_different})
 }
-class _Placeholder{
+class PlaceholderDeclaration{
   constructor(name, {default_component=undefined, must_be_redefined=false, forced_id=undefined, forced_ctx_id=undefined, replace_if_different=true}={}){
     this.name = name
     this.default_component = default_component
@@ -2849,7 +2873,7 @@ export { pass, none, smart, Use, Placeholder, Bind, RenderApp, toInlineStyle, LE
 // NEW FEATURES:
 
   // todo: injector palceholders: meccanismo per permettere di inserire sottocomponenti in punti specifici di un componente Use: sostanzialmente in una Use possiamo definire dei Placeholder (classe Placeholder), che hanno dei "nomi", e dunque possiamo passare alla Use un dict con i nome i componenti che vogliamo ignettare (via passaggio params). la semplicità del meccanismo è tutta nella definizione della Use, che si occupa di matchare i placeholder (tra i subel) e di rimuovere quelli inutilizzati. trasparente per la factory! ovviamente possibilità di default if not set, e opzione per forzare il match con un id specifico (private) o un rename forzato di un id privato (per far si che si possano definire "interfacce" e usarle)
-  // todo: ricorsione nei sottochild? (solo se stesso ctx, aka non per i nested Use)
+  // done: ricorsione nei sottochild? (solo se stesso ctx, aka non per i nested Use..però se potessi andare anche dentro gli use potrei sustituire la qualunque! il problema è che nella use sostituisco i placeholder..quoindi diventa dura..)
   // todo: valutare se fare copia del default placeholders e/o dell injected
 
   // todo: concetto di "re_emit_as" -> combina in automatico la possibilità di gestire un segnale e rialnciarlo con un altro nome..per propagare i sengali! ovviamente devo inserire il nome di un mio segnale e non di altri.. potrebbe avere senso avere una sentinel del tipo "NewSignal("xxx") per indicare un nuovo segnale ? eìsenza stare a dichiaraare 2 volte..per easy propagation.. vedere bene su..di fatto questa cosa è da realizzare nella on_s lato dev
@@ -2883,6 +2907,7 @@ export { pass, none, smart, Use, Placeholder, Bind, RenderApp, toInlineStyle, LE
   // todo: ragionare se ci piace davveero "private: xxx": "blabla"   o è meglio un   private_xxx: "blibli"
   //       allo stesso tempo potrebbe eanche essere utile invertire: normalmente tutto è privato (aka by $ctx), con public: si va in modalità pubblica..quantomeno per gli id!
 
+  // todo: la computed_template della UseDeclaration dovrebbe essere un gettr con singleton, in modo che venga calcolato solo se utilizzato..cercando di minimizzare le elaborazioni inutili all'avvio
 
 
 // IDEAS:

@@ -162,8 +162,18 @@ const app0 = ()=>{
         "Hello ",
         Placeholder("name", {default_component: "World!"}),
         { button: { text: "click me", attrs: {style: "margin-left: 15px; margin-right: 15px"},  handle: {onclick: $=>$.parent.el.style.backgroundColor = "black"}}},
+        { span: { "=>": { span: { text: "subchild,"} } }},
+        { span: { text: "subchild v2," }},
+        { span: { "=>": 
+          [ 
+            { span: { text: "subchild"} }, 
+            "--",
+            Placeholder("button_2"),
+          ] 
+        }},
         Placeholder("button_2"),
         Placeholder("any_component"),
+        Use({span: {"=>": Placeholder("button_2", {default_component: "CANNOT SUBINJECT IN USE"}) }})
       ]
     }
   }
@@ -332,7 +342,22 @@ const app0 = ()=>{
                   "button_2": { button: { text: "injected button!", attrs: {style: " color: red; margin-right: 15px"}, handle: {onclick: $=>$.parent.el.style.backgroundColor = "gray"}}},
                   "any_component": { input: { attrs: {value: "any stuff injected!", style: "margin-left: 5px;" }}},
                 }
-              } )
+              }),
+              
+              // test strange composition..
+              Use({ div: { meta: {forEach: "num", of: $ => [1,2,3,4,5]},
+
+                "=>": [ 
+                  $ => $.meta.num, ")", 
+                  { span: { meta: { if: $ => $.meta.num % 2 !== 0 },
+                    "=>":[ 
+                      Placeholder("select_button"), Placeholder("deselect_button") ]}
+                  }
+                ]
+              }}, pass, { inject: {
+                "select_button": { button: { text: "select", attrs: {style: "color: red; margin-left: 15px"}, handle: {onclick: $=>$.parent.el.style.backgroundColor = "gray"}}},
+                "deselect_button": { button: { text: "deselect", attrs: {style: "color: red; margin-left: 15px; margin-right:15px"}, handle: {onclick: $=>$.parent.el.style.backgroundColor = "white"}}},
+              }})
 
           ] 
       }
