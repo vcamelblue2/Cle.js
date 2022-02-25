@@ -1402,6 +1402,140 @@ const appTestAnchors = ()=>{
     }
   })
 }
+
+
+const appTestBetterAnchors = ()=>{
+  const notnulls = (...args) =>args.reduce((a,b)=>a && (b !== undefined), true)
+  const UseAnchors = () => {
+    return {
+      // props to define
+      width: undefined, height: undefined, x: undefined, y: undefined, 
+      // marginTop: 0, marginBottom: 0, marginLeft: 0, marginRight: 0,
+      // centerY: $ => $.this.height / 2, 
+      // centerX: $ => $.this.width / 2, 
+      left: $ => $.this.x,
+      right: $ => notnulls($.this.x, $.this.width) && ($.this.x + $.this.width),
+      top: $ => $.this.y,
+      bottom: $ => notnulls($.this.y, $.this.height) && ($.this.y + $.this.height),
+
+      // props to use in other component
+      Width: $ => $.this.width || ( notnulls($.this.left, $.this.right) && $.this.right-$.this.left ) || undefined,
+      Height: $ => $.this.height || ( notnulls($.this.top, $.this.bottom) && $.this.bottom-$.this.top ) || undefined,
+      X: $ => $.this.x || $.this.left || undefined,
+      Y: $ => $.this.y || $.this.top || undefined,
+      Left: $ => $.this.x || $.this.left || undefined,
+      Top: $ => $.this.y || $.this.top || undefined,
+      Right: $ => $.this.Left + $.this.Width || undefined,
+      Bottom: $ => $.this.Top + $.this.Height  || undefined,
+
+      CenterY: $ => $.this.Height / 2, 
+      CenterX: $ => $.this.Width / 2, 
+
+      // f to recall in style
+      Anchors: $ => ({
+        position: "absolute", 
+        width: $.this.Width+"px",  //($.this.width || ($.this.right - ($.this.left || $.this.x)) )+"px", 
+        height:  $.this.Height+"px", //($.this.height || ($.this.bottom - ($.this.top || $.this.y)) )+"px",
+        top: $.this.Top+"px", 
+        left: $.this.Left+"px",
+      })
+    }
+  }
+
+  const app_root = RenderApp(document.body, {
+    div: {
+      id: "root",
+
+      props: {
+        ...UseAnchors(),
+        width: window.innerWidth,
+        height: window.innerHeight,
+      },
+
+      attrs: {style: "width:100%; height:100%; padding: 0px; margin: 0px; position: relative"},
+      onInit: $ => {
+                
+        function resetRootWindowSize() {
+          $.this.width = window.innerWidth;
+          $.this.height = window.innerHeight;
+        }
+
+        window.onresize = resetRootWindowSize;
+        document.body.style.padding = "0px"
+        document.body.style.margin = "0px"
+        resetRootWindowSize()
+      },
+
+      "=>": [
+
+        { div: {
+          id: "navbar",
+
+          props: { ...UseAnchors(), 
+            width: $ => $.parent.Width, 
+            height: 64, 
+            fontSize: 24 
+          },
+
+          attrs: { style: $ => ({ ...$.this.Anchors, backgroundColor: "black", color: "white", fontSize: $.this.fontSize+"px"})},
+
+          // text: "Bar"
+
+          "=>": [
+            { div: {
+              id: "nav_left_text",
+
+              props: { ...UseAnchors(), 
+                width: $ => $.parent.Width / 3, 
+                x: 1, 
+                top: $ => ($.parent.Height/2) - ($.parent.fontSize / 2) - ($.parent.fontSize / 10)
+              },
+
+              attrs: { style: $ => ({ ...$.this.Anchors })},
+
+              text: "Hello Anchors!"
+
+            }},
+
+            { div: {
+              id: "nav_second_text",
+
+              props: { ...UseAnchors(), 
+                width: $ => $.parent.Width / 3, 
+                left: $ => $.le.nav_left_text.Right,  
+                top: $ => ($.parent.Height/2) - ($.parent.fontSize / 2) - ($.parent.fontSize / 10)
+              },
+
+              attrs: { style: $ => ({ ...$.this.Anchors, textAlign:"center"})},
+
+              text: "un testo secondario!"
+
+            }},
+
+            { div: {
+              id: "nav_right_text",
+
+              props: { ...UseAnchors(), 
+                width: $ => $.parent.Width / 3, 
+                left: $ => $.le.nav_second_text.Right, 
+                top: $ => ($.parent.Height/2) - ($.parent.fontSize / 2) - ($.parent.fontSize / 10) 
+              },
+
+              attrs: { style: $ => ({ ...$.this.Anchors, textAlign:"right" })},
+
+              text: "A right Text"
+
+            }},
+
+          ]
+
+        }},
+
+      ]
+    }
+  })
+}
+
 const appDemoStockApi = ()=>{
 
   const SERVER_SCRAPE_TIME = 250 //500
@@ -2527,7 +2661,7 @@ const appDemoStockApi = ()=>{
 }
 
 
-app0()
+// app0()
 // test2way()
 // appTodolist()
 // appTodolistv2()
@@ -2536,5 +2670,6 @@ app0()
 // appTestCssAndPassThis()
 // appTestSuperCtxProblem()
 // appTestAnchors()
+appTestBetterAnchors()
 
 // appDemoStockApi()
