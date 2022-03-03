@@ -1405,37 +1405,52 @@ const appTestAnchors = ()=>{
 
 
 const appTestBetterAnchors = ()=>{
-  const notnulls = (...args) =>args.reduce((a,b)=>a && (b !== undefined), true)
-  const UseAnchors = () => {
+  const notnulls = (...args)=>args.reduce((a,b)=>a && (b !== undefined), true)
+  const firstDefined = (...args)=>args.find(x=>x!==undefined)
+
+  const AnchorsSystmeRootStyle = {position:"relative", width: "100%", height:"100%", padding: "0px", margin: "0px"}
+  const AnchorsSystemInit = $ => {
+    // resetRootWindowSize
+    window.onresize = () => {
+      $.this.width = window.innerWidth;
+      $.this.height = window.innerHeight;
+    }
+    document.body.style.padding = "0px"
+    document.body.style.margin = "0px"
+  }
+
+  const UseAnchors = (positioning = "absolute") => {
     return {
       // props to define
-      width: undefined, height: undefined, x: undefined, y: undefined, 
-      // marginTop: 0, marginBottom: 0, marginLeft: 0, marginRight: 0,
-      // centerY: $ => $.this.height / 2, 
-      // centerX: $ => $.this.width / 2, 
-      left: $ => $.this.x,
-      right: $ => notnulls($.this.x, $.this.width) && ($.this.x + $.this.width),
-      top: $ => $.this.y,
-      bottom: $ => notnulls($.this.y, $.this.height) && ($.this.y + $.this.height),
+      width: undefined, height: undefined, left: 0, top: 0, right: undefined, bottom: undefined,
+
+      // solito problema di castare nei childs e rimappare..
 
       // props to use in other component
-      Width: $ => $.this.width || ( notnulls($.this.left, $.this.right) && $.this.right-$.this.left ) || undefined,
-      Height: $ => $.this.height || ( notnulls($.this.top, $.this.bottom) && $.this.bottom-$.this.top ) || undefined,
-      X: $ => $.this.x || $.this.left || undefined,
-      Y: $ => $.this.y || $.this.top || undefined,
-      Left: $ => $.this.x || $.this.left || undefined,
-      Top: $ => $.this.y || $.this.top || undefined,
-      Right: $ => $.this.Left + $.this.Width || undefined,
-      Bottom: $ => $.this.Top + $.this.Height  || undefined,
+      Width: $ => $.this.width || ( notnulls($.this.left, $.this.right) && $.this.right-$.this.left ) || 0,
+      Height: $ => $.this.height || ( notnulls($.this.top, $.this.bottom) && $.this.bottom-$.this.top ) || 0,
+      Left: $ => $.this.left || (notnulls($.this.width, $.this.right) && $.this.right-$.this.width ) || 0,
+      Top: $ => $.this.top || (notnulls($.this.height, $.this.bottom) && $.this.bottom-$.this.height ) || 0,
+      Right: $ => $.this.right || (notnulls($.this.width, $.this.left) && $.this.left+$.this.width ) || undefined,
+      Bottom: $ => $.this.bottom || (notnulls($.this.height, $.this.top) && $.this.top+$.this.height ) || undefined,
+      HorizontalCenter: $ => $.this.Width / 2, 
+      VerticalCenter: $ => $.this.Height / 2, 
 
-      CenterY: $ => $.this.Height / 2, 
-      CenterX: $ => $.this.Width / 2, 
+      // as child
+      Height_: $ => $.this.Height,
+      Width_: $ => $.this.Width,
+      Left_: $ => 0,
+      Top_: $ => 0,
+      Right_: $ => $.this.Width,
+      Bottom_: $ => $.this.Height,
+      HorizontalCenter_: $ => $.this.Width / 2, 
+      VerticalCenter_: $ => $.this.Height / 2, 
 
       // f to recall in style
       Anchors: $ => ({
-        position: "absolute", 
-        width: $.this.Width+"px",  //($.this.width || ($.this.right - ($.this.left || $.this.x)) )+"px", 
-        height:  $.this.Height+"px", //($.this.height || ($.this.bottom - ($.this.top || $.this.y)) )+"px",
+        position: positioning, // con "fixed", in realtà rimuoveremmo il problema del ricavare il sistema di riferimento ma in realtà poi toccal al dev sobbarcarsi di mettere sempre top e left..
+        width: $.this.Width+"px",
+        height:  $.this.Height+"px",
         top: $.this.Top+"px", 
         left: $.this.Left+"px",
       })
@@ -1452,19 +1467,8 @@ const appTestBetterAnchors = ()=>{
         height: window.innerHeight,
       },
 
-      attrs: {style: "width:100%; height:100%; padding: 0px; margin: 0px; position: relative"},
-      onInit: $ => {
-                
-        function resetRootWindowSize() {
-          $.this.width = window.innerWidth;
-          $.this.height = window.innerHeight;
-        }
-
-        window.onresize = resetRootWindowSize;
-        document.body.style.padding = "0px"
-        document.body.style.margin = "0px"
-        resetRootWindowSize()
-      },
+      attrs: {style: AnchorsSystmeRootStyle },
+      onInit: $ => AnchorsSystemInit($),
 
       "=>": [
 
@@ -1487,8 +1491,7 @@ const appTestBetterAnchors = ()=>{
 
               props: { ...UseAnchors(), 
                 width: $ => $.parent.Width / 3, 
-                x: 1, 
-                top: $ => ($.parent.Height/2) - ($.parent.fontSize / 2) - ($.parent.fontSize / 10)
+                top: $ => ($.parent.VerticalCenter) - ($.parent.fontSize / 2) - ($.parent.fontSize / 10)
               },
 
               attrs: { style: $ => ({ ...$.this.Anchors })},
@@ -1503,7 +1506,7 @@ const appTestBetterAnchors = ()=>{
               props: { ...UseAnchors(), 
                 width: $ => $.parent.Width / 3, 
                 left: $ => $.le.nav_left_text.Right,  
-                top: $ => ($.parent.Height/2) - ($.parent.fontSize / 2) - ($.parent.fontSize / 10)
+                top: $ => ($.parent.VerticalCenter) - ($.parent.fontSize / 2) - ($.parent.fontSize / 10)
               },
 
               attrs: { style: $ => ({ ...$.this.Anchors, textAlign:"center"})},
@@ -1518,7 +1521,7 @@ const appTestBetterAnchors = ()=>{
               props: { ...UseAnchors(), 
                 width: $ => $.parent.Width / 3, 
                 left: $ => $.le.nav_second_text.Right, 
-                top: $ => ($.parent.Height/2) - ($.parent.fontSize / 2) - ($.parent.fontSize / 10) 
+                top: $ => ($.parent.VerticalCenter) - ($.parent.fontSize / 2) - ($.parent.fontSize / 10) 
               },
 
               attrs: { style: $ => ({ ...$.this.Anchors, textAlign:"right" })},
@@ -1531,10 +1534,190 @@ const appTestBetterAnchors = ()=>{
 
         }},
 
+        { div: {
+          id: "container",
+
+          props: { ...UseAnchors(), 
+            width: $=>$.parent.Width - 30, 
+            top: $=>$.le.navbar.Bottom + 15, 
+            bottom: $=>$.parent.Bottom - 15,
+            left: 15,
+          },
+          attrs: { style: $=>({...$.this.Anchors, backgroundColor: "gray"}) },
+
+          "=>": [
+
+            { div: {
+              id: "rect1",
+    
+              props: { ...UseAnchors(), 
+                width: $=>$.this.isSmall ? 200 : 400,
+                height: $=>$.this.isSmall ? 200 : 400,
+                left: 15,
+                top: 15,
+
+                // in caso di uso di fixed!
+                // ...UseAnchors("fixed"), 
+                // width: $=>$.this.isSmall ? 200 : 400,
+                // height: $=>$.this.isSmall ? 200 : 400,
+                // left: $=>$.parent.Left + 15, 
+                // top: $=>$.parent.Top + 15 // in caso di uso di fixed
+
+                isSmall: true
+              },
+              attrs: { style: $=>({...$.this.Anchors, backgroundColor: "red", transition: "left 0.3s, top 0.3s, height 0.3s, width 0.3s ease-in-out"}) },
+              handle: {
+                onclick: $=> $.this.isSmall = !$.this.isSmall
+              }
+            }},
+
+            { div: {
+              id: "rect2",
+    
+              props: { ...UseAnchors(), 
+                width: $=>$.le.rect1.Width,
+                height: $=>!$.le.rect1.isSmall && $.le.lateral_menu.isExpanded ? undefined : $.le.rect1.Height,
+                left: $=>$.le.rect1.Right,
+                top: $=>$.le.rect1.Bottom,
+                bottom: $=>!$.le.rect1.isSmall && $.le.lateral_menu.isExpanded ? $.le.mooving_rect.Top - 15 : undefined // qui trovato bug in framework..non riesco a registrarmi a proprietà di elementi futuri! pechè ancora non esistono..
+              },
+              attrs: { style: $=>({...$.this.Anchors, backgroundColor: "red", transition: "left 0.3s, top 0.3s, height 0.3s, width 0.3s ease-in-out"}) },
+              // on: {
+              //   this: { 
+              //     heightChanged: $=>console.log("heigth changeeed", $.this.height),
+              //     // bottomChanged: $=>console.log("bottom changeeed", $.this.bottom)
+              //   },
+              //   le: { 
+              //     // mooving_rect: {TopChanged: $=>console.log("top changeeeeedddddd", $.le.mooving_rect.Top, $.this.bottom)},
+              //     lateral_menu: {isExpandedChanged: $=>console.log("isExpanded changeeeeedddddd", $.le.lateral_menu.isExpanded, $.this.bottom)},
+              //     rect1: {isSmallChanged: $=>console.log("isSamll changeeeeedddddd", $.le.rect1.isSmall, $.this.bottom)}
+              //   }
+              // }
+            }},
+
+            { div: {
+              id: "rect3",
+    
+              props: { ...UseAnchors(), 
+                width: $=>$.le.rect1.isSmall ? $.le.rect1.Width : undefined,
+                height: $=>$.le.rect1.Height,
+                left: $=>$.le.rect2.Right,
+                bottom: $=>$.le.rect2.Top,
+                right: $=>$.le.rect1.isSmall ? 0 : $.le.lateral_bar.Left - 15
+              },
+              attrs: { style: $=>({...$.this.Anchors, backgroundColor: "red", transition: "left 0.3s, top 0.3s, height 0.3s, width 0.3s ease-in-out"}) },
+            }},
+
+
+            { div: {
+              id: "lateral_menu",
+    
+              props: { 
+                ...UseAnchors("absolute"), 
+                top: 15,
+                right: $=>$.parent.Right_ - 15, 
+                bottom: $=>$.this.isExpanded ? $.parent.Bottom_ - 15 : undefined,
+                width: $=>$.parent.Width / 3,
+                height: $=>$.this.isExpanded ? undefined : 100,
+                // senza usare l'as child:
+                // right: $=>$.parent.Right - $.parent.Left - 15, // necessario risolvere il solito problema del sistema di riferimento..
+                // bottom: $=>$.this.isExpanded ? $.parent.Bottom - $.parent.Top - 15 : undefined,
+
+                // ...UseAnchors("fixed"), 
+                // right: $=>$.parent.Right - 15, 
+                // top: $=>$.parent.Top + 15,
+                // bottom: $=>$.this.isExpanded ? $.parent.Bottom - 15 : undefined,
+                // width: $=>$.parent.Width / 3,
+                // height: $=>$.this.isExpanded ? undefined : 100,
+
+                isExpanded: true
+              },
+              attrs: { style: $=>({...$.this.Anchors, backgroundColor: $.this.isExpanded ? "green" : "orange", transition: "height 0.3s ease-in-out"}) },
+
+              handle: {
+                onclick: $=>$.this.isExpanded = !$.this.isExpanded
+              }
+            }},
+
+            { div: {
+              id: "lateral_bar",
+
+              props: {
+                ...UseAnchors(),
+                right: $=>$.le.lateral_menu.Left - 15, 
+                top: $=>$.le.lateral_menu.Top,
+                width: 60,
+                height: $=>$.le.lateral_menu.Height, 
+              },
+
+              attrs: { style: $=>({...$.this.Anchors, backgroundColor: "yellow", transition: "height 0.3s ease-in-out"}) },
+            }},
+
+
+            { div: {
+              id: "mooving_rect",
+              
+              props: {
+                ...UseAnchors(),
+                // $.le.lateral_menu.isExpanded ? 
+                left: $=>($.le.lateral_menu.isExpanded ? $.parent.Left_ +15 : $.le.lateral_bar.Left),
+                right: $=>($.le.lateral_menu.isExpanded ? $.le.lateral_bar.Left : $.parent.Right_)-15,
+                top: $=>$.le.lateral_menu.isExpanded ? undefined : $.le.lateral_menu.Bottom+15,
+                bottom: $=>$.parent.Bottom_ - 15,
+                height: $=>$.le.lateral_menu.isExpanded ? 200 : undefined,
+
+              },
+
+              attrs: { style: $=>({...$.this.Anchors, backgroundColor: "blue", transition: "left 0.3s, top 0.3s, height 0.3s, width 0.3s ease-in-out"}) },
+            }}
+            
+          ]
+        }}
+
       ]
     }
   })
 }
+
+const appStupidFunction = ()=>{
+
+  // el per definire un el come: el("div alias MyDiv", { ...standard def } )
+  const el = (name, def)=>{
+    let [_id, _type] = name.split(" as ")
+    return {[_type]: {id: _id, ...def}}
+  }
+
+  // slim per usare dot notation ed evitare di essere prolissi in definition, es: div: {blabla, ...slim({ "on.le.MyDiv.propChanged": $=>dosomethign() }) }
+  const slim = (def)=>{
+    let res = {}
+    
+    Object.entries(def).forEach(([k,v])=>{
+      let pointer = res
+      
+      k.split(".").forEach((ref_lvl, idx, arr)=>{
+        if (idx < arr.length-1) { // is last
+          if (pointer[ref_lvl] === undefined) { pointer[ref_lvl] = {} }
+          pointer = pointer[ref_lvl]
+        }
+        else {
+          pointer[ref_lvl] = v
+        }
+      })
+    })
+    
+    return res
+  }
+  // slim_ per usare dot notation ed evitare di essere prolissi in definition, ma come array (a coppie di 2), es: div: {blabla, ...slim("on.le.MyDiv.propChanged", $=>dosomethign()) }
+  const slim_ = (...arr)=>{
+    let paramForSlim = {}
+    for (let i=0; i<arr.length; i+=2){
+      paramForSlim[arr[i]] = arr[i+1]
+    }
+    return slim(paramForSlim)
+  }
+
+}
+
 
 const appDemoStockApi = ()=>{
 
