@@ -397,7 +397,9 @@ const TodoList = { // automatic root div!
 
 
 const DEBUG_ENABLED = false
-const debug = { log: (...args)=> DEBUG_ENABLED && console.log(...args) }
+const DEBUG_INFO_ENABLED = false
+const _debug = { log: (...args)=> DEBUG_ENABLED && console.log(...args) }
+const _info = { log: (...args)=> DEBUG_INFO_ENABLED && console.log(...args) }
 
 // syntatic sentinel..maybe use symbol in future..
 /* export */ const pass = undefined
@@ -434,11 +436,11 @@ const toInlineStyle = /** @param {CSSStyleDeclaration | ()=>CSSStyleDeclaration}
 const isFunction = (what)=>typeof what === "function"
 
 const recursiveAccessor = (pointer, toAccess)=>{
-  // console.log("recursiveAccessor", pointer, toAccess)
+  // _debug.log("recursiveAccessor", pointer, toAccess)
   if (toAccess.length === 1)
     return [pointer, toAccess[0]]
   else {
-    // console.log("ritornerò: ", pointer, toAccess[0], pointer[toAccess[0]])
+    // _debug.log("ritornerò: ", pointer, toAccess[0], pointer[toAccess[0]])
     return recursiveAccessor(pointer[toAccess[0]], toAccess.slice(1))
   }
 }
@@ -489,7 +491,7 @@ class Property{
     // step 2: compute the new deps and register to it
     if (this.isFunc){
       this.dependency = analizeDepsStatically(this._valueFunc)
-      console.log("dependency!!!!", this, this.dependency)
+      _info.log("dependency!!!!", this, this.dependency)
       this.registeredDependency = this.registerToDepsHelper(this, this.dependency) // it's my parent competence to actually coonect deps!
     }
   }
@@ -524,7 +526,7 @@ class Property{
 
   // manually, useful for deps
   markAsChanged(){
-    debug.log("marked as changed!", this)
+    _debug.log("marked as changed!", this)
     if(this._onSet === undefined){console.log("la onSet è undefined!!!!!", this);return} // todo: teeemp!! c'è un bug più subdolo da risolvere..riguarda gli le-for e le-if nested..
     let _v = this.__getRealVaule()
     this._onSet(_v, this._valueFunc, this)
@@ -691,7 +693,7 @@ class UseComponentDeclaration{
               resolved[k] = {...resolved[k]}
             }
             Object.entries(v).forEach(([kk,vv])=>{
-              console.log(k, kk, vv)
+              _info.log(k, kk, vv)
               resolved[k][kk] = vv
             })
           }
@@ -758,7 +760,7 @@ class UseComponentDeclaration{
 
         })
         
-        console.log("RESOLVED!", this.component[componentType], this.redefinitions, resolved)
+        _info.log("RESOLVED!", this.component[componentType], this.redefinitions, resolved)
 
       }
     }
@@ -768,7 +770,7 @@ class UseComponentDeclaration{
     let childs_def_typology = ["childs", "contains", "text", ">>", "=>", "_"]
     const recursive_check_injection = (resolved_component, lvl=0) =>{
 
-      // console.log("livello: ", lvl, resolved_component)
+      // _debug.log("livello: ", lvl, resolved_component)
 
       if (typeof resolved_component === "function" || typeof resolved_component === "string" || (resolved_component instanceof UseComponentDeclaration) ){
         return resolved_component
@@ -781,7 +783,7 @@ class UseComponentDeclaration{
         resolved_component = resolved_component[getComponentType(resolved_component)]
       }
   
-      // console.log("non bloccato, livello: ", lvl, resolved_component)
+      // _debug.log("non bloccato, livello: ", lvl, resolved_component)
 
       childs_def_typology.forEach( childs_def_key => {
         let childs_def = resolved_component[childs_def_key] 
@@ -885,7 +887,7 @@ const getComponentType = (template)=>{
   }
   
   let entries = Object.entries(template)
-  console.log(template, entries)
+  _info.log(template, entries)
   if(entries.length > 1){
     throw new Error()
   }
@@ -952,11 +954,11 @@ const ComponentProxy = (context, lvl=0)=>{
       get: (target, prop, receiver)=>{
         let prop_or_value_target = target[prop];
         if (prop_or_value_target instanceof Property){
-          debug.log(prop, "--", lvl, "--->", target, "isProperty!");
+          _debug.log(prop, "--", lvl, "--->", target, "isProperty!");
           return prop_or_value_target.value
           // todo: questo sarebbe un ottimo punto per intervenire dinamicamente su array e object, per far si che una modifica di 1,2 o x livello diretta possa effettivamente scatenare la change..esempio proxando i metodi tipo push etc per fare una markAsChanged
         }
-        debug.log(prop, "--", lvl, "--->", target);
+        _debug.log(prop, "--", lvl, "--->", target);
         return prop_or_value_target
 
         // // deps_stack.push([prop, lvl]);
@@ -971,7 +973,7 @@ const ComponentProxy = (context, lvl=0)=>{
       },
 
       set: function(target, prop, value) {
-        debug.log("SET", target, prop, value)
+        _debug.log("SET", target, prop, value)
 
         let prop_or_value_target = target[prop];
         if (prop_or_value_target instanceof Property){
@@ -991,7 +993,7 @@ class ComponentsContainerProxy {
 
     this.proxy = new Proxy(this, { // todo..proxy è visibile all'interno?????? bug???
       get: function (target, prop, receiver){
-        debug.log(target, prop, target[prop], target[prop].$this.this)
+        _debug.log(target, prop, target[prop], target[prop].$this.this)
         return target[prop].$this.this
       }
     })
@@ -1192,13 +1194,13 @@ class Component {
   }
   getMy$meta(){ // as singleton/generator
     if(this.isA$ctxComponent){
-      console.log("Component metaaaaaaaaa", this.meta, this.oj_definition, this)
+      _info.log("Component metaaaaaaaaa", this.meta, this.oj_definition, this)
       return ComponentProxy(this.meta)
     }
 
     else{
       if (this.parent !== undefined && (this.parent instanceof Component)){
-        console.log("parernt metaaaaaaaaa", this.parent.meta, this.oj_definition, this)
+        _info.log("parernt metaaaaaaaaa", this.parent.meta, this.oj_definition, this)
         return ComponentProxy(this.getMyFullMeta())
       }
       
@@ -1311,19 +1313,19 @@ class Component {
           let depsRemover = []
 
           deps.$this_deps?.forEach(d=>{
-            debug.log("pushooooo")
+            _debug.log("pushooooo")
             let depRemover = this.properties[d]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() ) // qui il ? server affinche si ci registri solo alle props (e non alle func etc!)
             depRemover && depsRemover.push(depRemover)
           }) // supporting multiple deps, but only of first order..
 
           deps.$parent_deps?.forEach(d=>{
-            debug.log("pushooooo")
+            _debug.log("pushooooo")
             let depRemover = this.parent.properties[d]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
             depRemover && depsRemover.push(depRemover)
           })
 
           deps.$le_deps?.forEach(d=>{ // [le_id, property]
-            debug.log("pushooooo")
+            _debug.log("pushooooo")
             let depRemover = this.$le[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
             depRemover && depsRemover.push(depRemover)
             // let registerAction = ()=>{
@@ -1341,7 +1343,7 @@ class Component {
           })
 
           deps.$ctx_deps?.forEach(d=>{ // [le_id, property]
-            debug.log("pushooooo")
+            _debug.log("pushooooo")
             let depRemover = this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
             depRemover && depsRemover.push(depRemover)
           })
@@ -1356,7 +1358,7 @@ class Component {
         this.signals[signalName] = new Signal(signalName, "stream => (newValue: any, oldValue: any) - property change signal")
         this.properties[manualMarkSignalName] = ()=>this.properties[k].markAsChanged() // via on set scatenerà il signal etc!
       })
-      console.log(this, this.signals, this.properties)
+      _info.log(this, this.signals, this.properties)
     }
 
     // signals def
@@ -1366,7 +1368,7 @@ class Component {
         this.signals[s] = realSignal
         this.properties[s] = Signal.getSignalProxy(realSignal)
       })
-      console.log(this, this.signals, this.properties)
+      _info.log(this, this.signals, this.properties)
     }
 
     // function def // NO DEPS SCAN AT THIS TIME
@@ -1397,7 +1399,7 @@ class Component {
     // on (property) | on_s (signal) def // todo: trigger on inti?
     [this.convertedDefinition.on, this.convertedDefinition.on_s /*, this.convertedDefinition.on_a*/].forEach( handle_on_definition => {
       if (handle_on_definition !== undefined){
-        console.log("ho un on/on_s/on_a definito", this)
+        _info.log("ho un on/on_s/on_a definito", this)
         Object.entries(handle_on_definition).forEach(([typologyNamespace, defs ])=>{
           if (typologyNamespace === "this"){
             Object.entries(defs).forEach(([s, fun])=>{
@@ -1415,7 +1417,7 @@ class Component {
                 // exponential retry to handle signal
                 const setUpSignalHandler = (num_retry=0)=>{
                   try{
-                    // console.log("provo ad agganciare signal", leItem, s)
+                    // _info.log("provo ad agganciare signal", leItem, s)
                     let remover = this.$le[leItem].signals[s].addHandler(this, (...args)=>fun.bind(undefined, this.$this, ...args)())
                   }
                   catch{
@@ -1438,7 +1440,7 @@ class Component {
                 // exponential retry to handle signal
                 const setUpSignalHandler = (num_retry=0)=>{
                   try{
-                    // console.log("provo ad agganciare signal", leItem, s)
+                    // _info.log("provo ad agganciare signal", leItem, s)
                     let remover = this.$ctx[ctxItem].signals[s].addHandler(this, (...args)=>fun.bind(undefined, this.$this, ...args)())
                   }
                   catch{
@@ -1466,19 +1468,19 @@ class Component {
         // finally init!
         this.properties[k].init(
           v,
-          ()=>debug.log(k, "getted!!"), 
-          (v, ojV, self)=>{ debug.log(k, "setted!!", this); 
+          ()=>_debug.log(k, "getted!!"), 
+          (v, ojV, self)=>{ _debug.log(k, "setted!!", this); 
             this.signals[k+"Changed"].emit(v, this.properties[k]._latestResolvedValue);
           },
           //()=>{console.log("TODO: on destroy clear stuff and signal!!")}
         )
-        debug.log("!!!!!", this, this.properties)
+        _debug.log("!!!!!", this, this.properties)
       })
     }
 
     // attributes, TODO: support function etc
     if (this.convertedDefinition.attrs !== undefined){
-      debug.log("attrs ", this.convertedDefinition.attrs)
+      _debug.log("attrs ", this.convertedDefinition.attrs)
 
       // let has2WayBinding = Object.values(this.convertedDefinition.attrs).find(v=>v instanceof Binding) !== undefined
       let _2WayPropertyBindingToHandle = {}
@@ -1486,7 +1488,7 @@ class Component {
       Object.entries(this.convertedDefinition.attrs).forEach(([k,v])=>{
         
         const toExecMabyLazy = (k)=>{
-          debug.log("attr: ", k,v)
+          _debug.log("attr: ", k,v)
 
           if (k.includes(".")){ // devo andare a settare l'attr as property dinamicamente [nested!]
             console.log("WARNING!!! ATTRS does not support '.' property navigation!!")
@@ -1508,25 +1510,25 @@ class Component {
 
               if (isFunction(v)){
                 let staticDeps = analizeDepsStatically(v) // WARNING actally w're bypassing the "deps storage" machanism..this wil break deps update in future!!!
-                debug.log("attr static deps", staticDeps)
+                _debug.log("attr static deps", staticDeps)
 
                 staticDeps.$this_deps?.forEach(d=>{
-                  debug.log("pushooooo")
+                  _debug.log("pushooooo")
                   this.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupStyle(v) ) // questa cosa da rivdere...il who non lo salviam ma in generale ora questa roba deve essere una prop, fully automated!
                 }) // supporting multiple deps, but only of first order..
 
                 staticDeps.$parent_deps?.forEach(d=>{
-                  debug.log("pushooooo")
+                  _debug.log("pushooooo")
                   this.parent.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupStyle(v) )
                 })
 
                 staticDeps.$le_deps?.forEach(d=>{ // [le_id, property]
-                  debug.log("pushooooo")
+                  _debug.log("pushooooo")
                   this.$le[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k], ()=>setupStyle(v) )
                 })
 
                 staticDeps.$ctx_deps?.forEach(d=>{ // [ctx_id, property]
-                  debug.log("pushooooo")
+                  _debug.log("pushooooo")
                   this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k], ()=>setupStyle(v) )
                 })
 
@@ -1551,25 +1553,25 @@ class Component {
                 }
 
                 let staticDeps = analizeDepsStatically(v) // WARNING actally w're bypassing the "deps storage" machenism..this wil break deps update in future!!!
-                console.log("attr static deps", staticDeps)
+                _info.log("attr static deps", staticDeps)
 
                 staticDeps.$this_deps?.forEach(d=>{
-                  debug.log("pushooooo")
+                  _debug.log("pushooooo")
                   this.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
                 }) // supporting multiple deps, but only of first order..
 
                 staticDeps.$parent_deps?.forEach(d=>{
-                  debug.log("pushooooo")
+                  _debug.log("pushooooo")
                   this.parent.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
                 })
 
                 staticDeps.$le_deps?.forEach(d=>{ // [le_id, property]
-                  debug.log("pushooooo")
+                  _debug.log("pushooooo")
                   this.$le[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
                 })
 
                 staticDeps.$ctx_deps?.forEach(d=>{ // [ctx_id, property]
-                  debug.log("pushooooo")
+                  _debug.log("pushooooo")
                   this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
                 })
 
@@ -1577,7 +1579,7 @@ class Component {
 
             }
             else if (v instanceof Binding){ 
-              console.log("binding attr: ", k,v, this)
+              _info.log("binding attr: ", k,v, this)
 
               const _binding = v;
               v = v.bindFunc
@@ -1591,28 +1593,28 @@ class Component {
               }
 
               let staticDeps = analizeDepsStatically(v) // WARNING actally w're bypassing the "deps storage" machenism..this wil break deps update in future!!!
-              console.log("attr static deps", staticDeps)
+              _info.log("attr static deps", staticDeps)
               // todo: in realtà è mutualmente escusivo, e solo 1 dep il property binding!
               staticDeps.$this_deps?.forEach(d=>{
-                debug.log("pushooooo")
+                _debug.log("pushooooo")
                 this.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
                 _2WayPropertyBindingToHandle[k] = ()=>this.properties[d]
               }) 
 
               staticDeps.$parent_deps?.forEach(d=>{
-                debug.log("pushooooo")
+                _debug.log("pushooooo")
                 this.parent.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
                 _2WayPropertyBindingToHandle[k] = ()=>this.parent.properties[d]
               })
 
               staticDeps.$le_deps?.forEach(d=>{ // [le_id, property]
-                debug.log("pushooooo")
+                _debug.log("pushooooo")
                 this.$le[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
                 _2WayPropertyBindingToHandle[k] = ()=>this.$le[d[0]].properties[d[1]]
               })
 
               staticDeps.$ctx_deps?.forEach(d=>{ // [ctx_id, property]
-                debug.log("pushooooo")
+                _debug.log("pushooooo")
                 this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
                 _2WayPropertyBindingToHandle[k] = ()=>this.$ctx[d[0]].properties[d[1]]
               })
@@ -1620,9 +1622,9 @@ class Component {
               // now manually configure the binding
               if ((this.htmlElementType === "input" || this.htmlElementType === "div") && ["value", "checked"].includes(k)){
                 if ( ( ! ["button", "hidden", "image", "reset", "submit", "file"].includes(this.convertedDefinition.attrs.type)) ){
-                  console.log("2 way bidning, ci sonooooooooo", k, this)
+                  _info.log("2 way bidning, ci sonooooooooo", k, this)
                   let handlerFor2WayDataBinding = (e)=>{ 
-                    console.log("changed handled!!")
+                    _info.log("changed handled!!")
                     // e.stopPropagation(); 
                     let bindedProps = _2WayPropertyBindingToHandle[k]()
                     let newValue = _binding.remap !== undefined ? _binding.remap.bind(undefined, this.$this)(e.target[k], e) : e.target[k]
@@ -1630,7 +1632,7 @@ class Component {
                       bindedProps.value = newValue
                     }
                   }
-                  console.log("scelgoooooooo", _binding.event ?? "input", k, this)
+                  _info.log("scelgoooooooo", _binding.event ?? "input", k, this)
                   this.html_pointer_element.addEventListener(_binding.event ?? "input", handlerFor2WayDataBinding)
                   let remover = ()=>this.html_pointer_element.removeEventListener(_binding.event ?? "input", handlerFor2WayDataBinding) // per la destroy..
                 }
@@ -1672,7 +1674,7 @@ class Component {
         }
 
         if (k.startsWith("@lazy:")){
-          console.log("laaaaazyyyyyyy")
+          _info.log("laaaaazyyyyyyy")
           setTimeout(()=>toExecMabyLazy(k.replace("@lazy:", "")), 10)
         }
         else {
@@ -1726,7 +1728,7 @@ class Component {
 
     // attributes, TODO: support function etc
     if (this.convertedDefinition.hattrs !== undefined){
-      debug.log("hattrs ", this.convertedDefinition.hattrs)
+      _debug.log("hattrs ", this.convertedDefinition.hattrs)
 
       let _2WayPropertyBindingToHandle = {}
 
@@ -1735,7 +1737,7 @@ class Component {
         const toExecMabyLazy = (k)=>{
 
           
-          debug.log("attr: ", k,v)
+          _debug.log("attr: ", k,v)
 
           let _oj_k = k
 
@@ -1751,25 +1753,25 @@ class Component {
               }
 
               let staticDeps = analizeDepsStatically(v) // WARNING actally w're bypassing the "deps storage" machenism..this wil break deps update in future!!!
-              console.log("attr static deps", staticDeps)
+              _info.log("attr static deps", staticDeps)
 
               staticDeps.$this_deps?.forEach(d=>{
-                debug.log("pushooooo")
+                _debug.log("pushooooo")
                 this.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
               }) // supporting multiple deps, but only of first order..
 
               staticDeps.$parent_deps?.forEach(d=>{
-                debug.log("pushooooo")
+                _debug.log("pushooooo")
                 this.parent.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
               })
 
               staticDeps.$le_deps?.forEach(d=>{ // [le_id, property]
-                debug.log("pushooooo")
+                _debug.log("pushooooo")
                 this.$le[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
               })
 
               staticDeps.$ctx_deps?.forEach(d=>{ // [ctx_id, property]
-                debug.log("pushooooo")
+                _debug.log("pushooooo")
                 this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
               })
 
@@ -1777,7 +1779,7 @@ class Component {
 
             }
             else if (v instanceof Binding){ 
-              console.log("binding attr: ", k,v, this)
+              _info.log("binding attr: ", k,v, this)
 
               const _binding = v;
               v = v.bindFunc
@@ -1791,37 +1793,37 @@ class Component {
               }
 
               let staticDeps = analizeDepsStatically(v) // WARNING actally w're bypassing the "deps storage" machenism..this wil break deps update in future!!!
-              console.log("attr static deps", staticDeps)
+              _info.log("attr static deps", staticDeps)
               // todo: in realtà è mutualmente escusivo, e solo 1 dep il property binding!
               staticDeps.$this_deps?.forEach(d=>{
-                debug.log("pushooooo")
+                _debug.log("pushooooo")
                 this.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
                 _2WayPropertyBindingToHandle[k] = ()=>this.properties[d]
               }) 
 
               staticDeps.$parent_deps?.forEach(d=>{
-                debug.log("pushooooo")
+                _debug.log("pushooooo")
                 this.parent.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
                 _2WayPropertyBindingToHandle[k] = ()=>this.parent.properties[d]
               })
 
               staticDeps.$le_deps?.forEach(d=>{ // [le_id, property]
-                debug.log("pushooooo")
+                _debug.log("pushooooo")
                 this.$le[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
                 _2WayPropertyBindingToHandle[k] = ()=>this.$le[d[0]].properties[d[1]]
               })
 
               staticDeps.$ctx_deps?.forEach(d=>{ // [ctx_id, property]
-                debug.log("pushooooo")
+                _debug.log("pushooooo")
                 this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
                 _2WayPropertyBindingToHandle[k] = ()=>this.$ctx[d[0]].properties[d[1]]
               })
 
 
               // now manually configure the binding
-              console.log("2 way bidning, ci sonooooooooo", k, this)
+              _info.log("2 way bidning, ci sonooooooooo", k, this)
               let handlerFor2WayDataBinding = (e)=>{ 
-                console.log("changed handled!!")
+                _info.log("changed handled!!")
                 // e.stopPropagation(); 
                 let bindedProps = _2WayPropertyBindingToHandle[k]()
 
@@ -1832,7 +1834,7 @@ class Component {
                   bindedProps.value = newValue
                 }
               }
-              console.log("scelgoooooooo", _binding.event ?? "input", k, this)
+              _info.log("scelgoooooooo", _binding.event ?? "input", k, this)
               this.html_pointer_element.addEventListener(_binding.event ?? "input", handlerFor2WayDataBinding)
               let remover = ()=>this.html_pointer_element.removeEventListener(_binding.event ?? "input", handlerFor2WayDataBinding) // per la destroy..
 
@@ -1851,25 +1853,25 @@ class Component {
               }
 
               let staticDeps = analizeDepsStatically(v) // WARNING actally w're bypassing the "deps storage" machenism..this wil break deps update in future!!!
-              console.log("attr static deps", staticDeps)
+              _info.log("attr static deps", staticDeps)
 
               staticDeps.$this_deps?.forEach(d=>{
-                debug.log("pushooooo")
+                _debug.log("pushooooo")
                 this.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
               }) // supporting multiple deps, but only of first order..
 
               staticDeps.$parent_deps?.forEach(d=>{
-                debug.log("pushooooo")
+                _debug.log("pushooooo")
                 this.parent.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
               })
 
               staticDeps.$le_deps?.forEach(d=>{ // [le_id, property]
-                debug.log("pushooooo")
+                _debug.log("pushooooo")
                 this.$le[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
               })
 
               staticDeps.$ctx_deps?.forEach(d=>{ // [ctx_id, property]
-                debug.log("pushooooo")
+                _debug.log("pushooooo")
                 this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
               })
 
@@ -1877,7 +1879,7 @@ class Component {
 
           }
           else if (v instanceof Binding){ 
-            console.log("binding attr: ", k,v, this)
+            _info.log("binding attr: ", k,v, this)
 
             const _binding = v;
             v = v.bindFunc
@@ -1891,37 +1893,37 @@ class Component {
             }
 
             let staticDeps = analizeDepsStatically(v) // WARNING actally w're bypassing the "deps storage" machenism..this wil break deps update in future!!!
-            console.log("attr static deps", staticDeps)
+            _info.log("attr static deps", staticDeps)
             // todo: in realtà è mutualmente escusivo, e solo 1 dep il property binding!
             staticDeps.$this_deps?.forEach(d=>{
-              debug.log("pushooooo")
+              _debug.log("pushooooo")
               this.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
               _2WayPropertyBindingToHandle[k] = ()=>this.properties[d]
             }) 
 
             staticDeps.$parent_deps?.forEach(d=>{
-              debug.log("pushooooo")
+              _debug.log("pushooooo")
               this.parent.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
               _2WayPropertyBindingToHandle[k] = ()=>this.parent.properties[d]
             })
 
             staticDeps.$le_deps?.forEach(d=>{ // [le_id, property]
-              debug.log("pushooooo")
+              _debug.log("pushooooo")
               this.$le[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
               _2WayPropertyBindingToHandle[k] = ()=>this.$le[d[0]].properties[d[1]]
             })
 
             staticDeps.$ctx_deps?.forEach(d=>{ // [ctx_id, property]
-              debug.log("pushooooo")
+              _debug.log("pushooooo")
               this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
               _2WayPropertyBindingToHandle[k] = ()=>this.$ctx[d[0]].properties[d[1]]
             })
 
 
             // now manually configure the binding
-            console.log("2 way bidning, ci sonooooooooo", k, this)
+            _info.log("2 way bidning, ci sonooooooooo", k, this)
             let handlerFor2WayDataBinding = (e)=>{ 
-              console.log("changed handled!!")
+              _info.log("changed handled!!")
               // e.stopPropagation(); 
               let bindedProps = _2WayPropertyBindingToHandle[k]()
               let newValue = _binding.remap !== undefined ? _binding.remap.bind(undefined, this.$this)(e.target[k], e) : e.target[k]
@@ -1929,7 +1931,7 @@ class Component {
                 bindedProps.value = newValue
               }
             }
-            console.log("scelgoooooooo", _binding.event ?? "input", k, this)
+            _info.log("scelgoooooooo", _binding.event ?? "input", k, this)
             this.html_pointer_element.addEventListener(_binding.event ?? "input", handlerFor2WayDataBinding)
             let remover = ()=>this.html_pointer_element.removeEventListener(_binding.event ?? "input", handlerFor2WayDataBinding) // per la destroy..
           
@@ -1945,7 +1947,7 @@ class Component {
         }
 
         if (k.startsWith("@lazy:")){
-          console.log("laaaaazyyyyyyy")
+          _info.log("laaaaazyyyyyyy")
           setTimeout(()=>toExecMabyLazy(k.replace("@lazy:", "")), 10)
         }
         else {
@@ -2169,7 +2171,7 @@ class Component {
       return component
     }
 
-    console.log(parent, template)
+    _info.log(parent, template)
     let componentType = getComponentType(template)
     let componentDef = (template instanceof UseComponentDeclaration ? template.computedTemplate : template) [componentType]
 
@@ -2235,7 +2237,7 @@ class TextNodeComponent {
   analizeDeps(){
     if (typeof this.definition === "function"){
       this.staticAnDeps = analizeDepsStatically(this.definition)
-      debug.log("analysis: ", this, this.staticAnDeps)
+      _debug.log("analysis: ", this, this.staticAnDeps)
     }
 
   }
@@ -2243,7 +2245,7 @@ class TextNodeComponent {
   create(){
     
     this.analizeDeps()
-    debug.log("createeed")
+    _debug.log("createeed")
 
     // todo: fattorizzare perchè così non ha senso..
 
@@ -2503,7 +2505,7 @@ class ConditionalComponent extends Component{
 
       this.html_pointer_element_anchor.after(this.html_pointer_element)
 
-      console.log("inserted after commenttttttt!!!!")
+      _info.log("inserted after commenttttttt!!!!")
 
     }
 
@@ -2511,7 +2513,7 @@ class ConditionalComponent extends Component{
 
   // real "create", wrapped in the conditional system
   _create(){
-    console.log("sto per ricreare", this)
+    _info.log("sto per ricreare", this)
     super.defineAndRegisterId()
     super.buildSkeleton()
     super.buildChildsSkeleton()
@@ -2521,33 +2523,33 @@ class ConditionalComponent extends Component{
   create(){
     this.buildPropertiesRef()
     // step 1: geenrate If property, and configure to create (that build) or destry component!
-    this.visible = new Property(this.convertedDefinition.meta.if, none, (v, _, prop)=>{ console.log("seeeetttinnggggggg", v, _, prop); if (v !== prop._latestResolvedValue) { v ? this._create() : this._destroy() } }, pass, ()=>this.$this, (thisProp, deps)=>{
+    this.visible = new Property(this.convertedDefinition.meta.if, none, (v, _, prop)=>{ _info.log("seeeetttinnggggggg", v, _, prop); if (v !== prop._latestResolvedValue) { v ? this._create() : this._destroy() } }, pass, ()=>this.$this, (thisProp, deps)=>{
 
       let depsRemover = []
       
-      console.log("calculating deeeeeepsssssss!!!!!")
+      _info.log("calculating deeeeeepsssssss!!!!!")
       // deps connection logic
       deps.$parent_deps?.forEach(d=>{
-        debug.log("pushooooo")
+        _debug.log("pushooooo")
         let depRemover = this.parent.properties[d]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
         depRemover && depsRemover.push(depRemover)
       })
 
       deps.$le_deps?.forEach(d=>{ // [le_id, property]
-        debug.log("pushooooo")
+        _debug.log("pushooooo")
         let depRemover = this.$le[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
         depRemover && depsRemover.push(depRemover)
       })
 
       deps.$ctx_deps?.forEach(d=>{ // [le_id, property]
-        debug.log("pushooooo")
+        _debug.log("pushooooo")
         let depRemover = this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
         depRemover && depsRemover.push(depRemover)
       })
       return depsRemover
     }, true)
 
-    console.log("ultimooooooooooo", this, this.convertedDefinition.meta.if)
+    _info.log("ultimooooooooooo", this, this.convertedDefinition.meta.if)
     // try {
       this.visible.value && this._create()
     // }
@@ -2588,12 +2590,12 @@ class IterableComponent extends Component{
       // define:{ index:"idx", first:"isFirst", last:"isLast", length:"len", iterable:"arr" }
       Object.entries(this.meta_config.define).forEach(([define_var, dev_var_name])=>{
         this.meta[dev_var_name] = new Property(this.meta_config.define_helper[define_var], none, none, none, ()=>this.$this, none, true)
-        // console.log("ho delle define nel meta!!", this.meta, define_var, dev_var_name, this.meta_config.define)
+        _info.log("ho delle define nel meta!!", this.meta, define_var, dev_var_name, this.meta_config.define)
       })
     }
-    // console.log("prima del meta", this.$meta, this.parent.$meta, this.meta, this.parent.meta, this.parent)
+    _info.log("prima del meta", this.$meta, this.parent.$meta, this.meta, this.parent.meta, this.parent)
     this.$meta = this.getMy$meta() // rebuild
-    // console.log("dopo del meta", this.$meta, this.parent.$meta, this.meta, this.parent.meta, this.parent)
+    _info.log("dopo del meta", this.$meta, this.parent.$meta, this.meta, this.parent.meta, this.parent)
   }
 
   // ridefinisco la crezione dell'html pointer, e definisco anche se devo autoeliminarmi..o ci pensa il parent
@@ -2708,7 +2710,7 @@ class IterableViewComponent{
 
   // real "create", wrapped in the conditional system
   _create(){
-    console.log("sto per ricreare", this)
+    _info.log("sto per ricreare", this)
     this.buildChildsSkeleton()
   }
 
@@ -2722,7 +2724,7 @@ class IterableViewComponent{
       this.meta_def.of, 
       none, 
       (v, _, prop)=>{ 
-        console.log("seeeetttinnggggggg iterablee", v, _, prop); 
+        _info.log("seeeetttinnggggggg iterablee", v, _, prop); 
         if (v !== prop._latestResolvedValue) { 
           this._create()
         } 
@@ -2731,22 +2733,22 @@ class IterableViewComponent{
       // aggancio gli autoaggiornamenti della property per far in modo che la set vada a buon fine senza una "set" reale e diretta
       ()=>this.$this, (thisProp, deps)=>{
         let depsRemover = []
-        console.log("calculating deeeeeepsssssss!!!!!")
+        _info.log("calculating deeeeeepsssssss!!!!!")
         // deps connection logic
         deps.$parent_deps?.forEach(d=>{
-          debug.log("pushooooo")
+          _debug.log("pushooooo")
           let depRemover = this.parent.properties[d]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
           depRemover && depsRemover.push(depRemover)
         })
 
         deps.$le_deps?.forEach(d=>{ // [le_id, property]
-          debug.log("pushooooo")
+          _debug.log("pushooooo")
           let depRemover = this.$le[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
           depRemover && depsRemover.push(depRemover)
         })
 
         deps.$ctx_deps?.forEach(d=>{ // [le_id, property]
-          debug.log("pushooooo")
+          _debug.log("pushooooo")
           let depRemover = this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
           depRemover && depsRemover.push(depRemover)
         })
@@ -2755,7 +2757,7 @@ class IterableViewComponent{
       true
     )
 
-    console.log("ultimooooooooooo", this, this.meta_def.of)
+    _info.log("ultimooooooooooo", this, this.meta_def.of)
     
     // try {
     this.iterableProperty.value.length > 0 && this._create()
@@ -2796,7 +2798,7 @@ const LE_LoadScript = (url, {do_microwait=undefined, attr={}, scriptDestructor=(
     return new Promise(function(resolve, reject) {
         
         if (window._Caged_LE_Loaded[url] !== undefined){
-            debug && console.log("js already loaded!")
+            debug && _info.log("js already loaded!")
             if (do_microwait !== undefined){ setTimeout(() => { resolve(window._Caged_LE_Loaded[url]) }, do_microwait); }
             else{ resolve(window._Caged_LE_Loaded[url]) }
             return;
@@ -2807,7 +2809,7 @@ const LE_LoadScript = (url, {do_microwait=undefined, attr={}, scriptDestructor=(
         script.onload = (e)=>{
             window._Caged_LE_Loaded[url] = script; 
             script.LE_removeScript = ()=>{window._Caged_LE_Loaded[url].remove(); scriptDestructor(); delete window._Caged_LE_Loaded[url] } 
-            debug && console.log("resolved!", e)
+            debug && _info.log("resolved!", e)
             if (do_microwait !== undefined){ setTimeout(() => { resolve(window._Caged_LE_Loaded[url]) }, do_microwait); }
             else{ resolve(window._Caged_LE_Loaded[url]) }
         };
@@ -2831,7 +2833,7 @@ const LE_LoadCss = (url, {do_microwait=undefined, attr={}, debug=false}={})=>{
     return new Promise(function(resolve, reject) { 
         
         if (window._Caged_LE_Loaded[url] !== undefined){
-            console.log("css already loaded!")
+            _info.log("css already loaded!")
             if (do_microwait !== undefined){ setTimeout(() => { resolve(window._Caged_LE_Loaded[url]) }, do_microwait); }
             else{ resolve(window._Caged_LE_Loaded[url]) }
             return;
@@ -2845,7 +2847,7 @@ const LE_LoadCss = (url, {do_microwait=undefined, attr={}, debug=false}={})=>{
 
         s.onload = (e)=>{
             window._Caged_LE_Loaded[url] = s;
-            debug && console.log("resolved!", e)
+            debug && _info.log("resolved!", e)
             s.LE_removeStyle = ()=>{window._Caged_LE_Loaded[url].remove(); delete window._Caged_LE_Loaded[url] } 
             if (do_microwait !== undefined){ setTimeout(() => { resolve(window._Caged_LE_Loaded[url]) }, do_microwait); }
             else{ resolve(window._Caged_LE_Loaded[url]) }
@@ -2877,7 +2879,7 @@ export { pass, none, smart, Use, Placeholder, Bind, RenderApp, toInlineStyle, LE
 
   // todo: bugfix reale della _onSet che sparisce per gli le-if nested in un le-for
 
-  // todo: rimuovere commenti e metterli (sensati) in modalità: debug, extended_debug etc.
+  // todo: rendere i _debug e _info sensati, fare i warn/err
 
   // done: support def deps on TextNode..only for ordinary def (not namespaces). easy: only need to test & find in defDep for "namespace.defname"
   // todo: dipendenze delle def..perchè al momento non posso usare in una Property e avere l'autoaggiornamneto..anche se a dirla tutta, avrebbe poco senso! nel caso pensare ai "trasformer" ovvero delle "pure_def" che sono appunto funzioni pure senza side effects e quinid utilizzabili in modo safe da noi --> quetsa nota deriva dal questo commento // noooo...potenzialmente buggato! specialmente in ricorsione..perchè se uso una funzione che assegna invece di usare aggiungo una dipendenza inutile.. dovrei accertarmi che non sto a sinistra di un uguale..ma non solo! forse va specificata questa cosa e usato un paradigma appisito, "pure_def", ovvero funzioni pure senza side effects! poi sta al dev capire che fare..
