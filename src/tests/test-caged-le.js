@@ -2844,6 +2844,304 @@ const appDemoStockApi = ()=>{
 }
 
 
+const appSimpleCalendarOrganizer = async ()=>{
+
+  const range = (start, end, increment=1)=>{
+    let res = []
+    for (let i=start; i<=end; i+=increment){
+      res.push(i) 
+    }
+    return res
+  }
+  
+  // https://www.w3schools.com/html/html5_draganddrop.asp
+
+  const DraggableEl = { 
+    div: {
+      // id: "draggable",
+
+      props: {
+        color: "yellow",
+      },
+
+      attrs: { 
+        style: $=>({ position:"absolute", display: "inline-block", backgroundColor: $.this.color, width: "80px", height: "80px", textAlign:"center"}),
+        draggable:"true", 
+      },
+
+      handle: {
+        ondragstart: ($, ev)=>{
+          console.log("draggin now! my parent is:", $.parent, "has day:", $.meta.day )
+          ev.dataTransfer.setData("old_day", $.meta.day)
+        }
+      },
+
+      text: "draggable"
+
+    }
+  }
+
+  const Calendar = { 
+    div: { meta: { forEach: "day", of: $ => $.le.app.days },
+
+      props: {
+        day: $=>$.meta.day // todo: bug da risolvere..a quanto pare i $.meta.xxx non funzionano bene se usati in le-if dentro un le-for
+      },
+      
+      attrs: { 
+        style: { display: "inline-block", width: (100/7)+"%", height: 0, margin:"0px", paddin:"0px", paddingBottom: (100/7)+"%", border: "1px solid gray"}, // dynamic width and equal height: https://stackoverflow.com/a/13625843
+      }, 
+
+      handle: {
+        ondragover: ($, ev)=>{
+          ev.preventDefault()
+        },
+        ondrop: ($, ev)=>{
+          ev.preventDefault()
+
+          let old_day = parseInt(ev.dataTransfer.getData("old_day"))
+          $.le.app.actual_multi_drag_container = [...$.le.app.actual_multi_drag_container.filter(x=>x!==old_day), $.this.day ]
+          console.log("ricevuto", old_day)
+          console.log($.le.app.actual_multi_drag_container)
+
+        }
+      },
+
+      "=>": [
+
+        $ => $.meta.day,
+
+        Use(DraggableEl, { meta: { if: $=>$.le.app.actual_multi_drag_container.includes($.meta.day) },  text: "Multi Drag", props:{color: "red"}  }).computedTemplate //computed template per non creare un nuovo meta..direttamente
+        
+      ],
+
+    }
+  }
+
+  RenderApp(document.body, { 
+    div: {
+      id: "app",
+
+      props: { 
+        days: range(1,31),
+
+        actual_multi_drag_container: [],
+        
+      },
+
+      attrs: { style: "width: 100%; height: 100%; padding: 0px; margin: 0px;" },
+
+      css: [
+        `* { box-sizing: border-box !important;}`, 
+        'body {padding: 0px; margin: 0px; }'
+      ],
+
+      "=>": [
+
+        Use(Calendar),
+
+
+        Use(DraggableEl, { text: "Multi Drag" })
+
+      ]
+
+    }
+  })
+  
+}
+
+const appCalendarOrganizer = async ()=>{
+
+  const range = (start, end, increment=1)=>{
+    let res = []
+    for (let i=start; i<=end; i+=increment){
+      res.push(i) 
+    }
+    return res
+  }
+  
+  // https://www.w3schools.com/html/html5_draganddrop.asp
+
+  const Model = {
+    Model: {
+      id: "model",
+
+      data: {
+        slots: ["9-11", "11-13", "14-16", "16-18"],
+        dates: range(1,31).map(x=>String(x)),
+        
+        diba: [ 
+          {diba_id:"diba1", label:"Diba 1", color:"yellow"}, 
+          {diba_id:"diba2", label:"Diba 2", color:"red"},
+          {diba_id:"diba3", label:"Diba 3", color:"green"},
+          {diba_id:"diba4", label:"Diba 4", color:"blue"},
+        ],
+
+        tasks: [] //[ {diba_id:"diba1", date:"1", slot:"9-11", sub_todo:[]} ],
+      },
+
+      def: {
+        getDibaByTask: ($, task) => $.this.diba.find(x=>x.diba_id === task.diba_id),
+        setTasks: ($, tasks) => { $.this.tasks = tasks}
+      }
+    }
+  }
+
+  const DraggableEl = { 
+    div: {
+
+      props: {
+        task: undefined,//{diba_id:"diba1", date:"1", slot:"9-11", sub_todo:[]},
+        diba: $=>$.le.model.diba[0],
+        isSource: $=>$.this.task === undefined,
+      },
+
+      attrs: { 
+        style: $=>({ position: $.this.isSource ? undefined : "absolute", display: "inline-block", backgroundColor: $.this.diba.color, width: $.this.isSource ? "160px" : "100px", height: $.this.isSource ? "80px" : "90px", borderRadius: $.this.isSource ? undefined : "5px", textAlign:"center"}),
+        draggable:"true", 
+      },
+
+      handle: {
+        ondragstart: ($, ev)=>{
+
+          // console.log("draggin now! my parent is:", $.parent, "has date:", $.meta.date )
+          ev.dataTransfer.setData("old_date", $.meta.date)
+          ev.dataTransfer.setData("old_slot", $.meta.slot)
+          ev.dataTransfer.setData("diba_id", $.this.diba.diba_id)
+        }
+      },
+
+      text: $=>$.this.diba.label
+
+    }
+  }
+
+  const Calendar = { 
+    div: { meta: { forEach: "date", of: $ => $.le.model.dates },
+      
+      attrs: { 
+        style: $=>({ display: "inline-block", width: (100/7)+"%", height: 0, margin:"0px", paddin:"0px", paddingBottom: (100/7)+"%", border: "1px solid gray", backgroundColor: ["6", "7", "13", "14", "20", "21", "27", "28"].includes($.meta.date)?"#cccccc":undefined}), // dynamic width and equal height: https://stackoverflow.com/a/13625843
+      }, 
+
+      "=>": [
+
+        { div: { meta: {forEach: "slot", of: $ => $.le.model.slots},
+
+          // props: {
+          //   // task: undefined 
+          //   task: $=>$.le.model.tasks.find(x=>x.date===$.meta.date && x.slot===$.meta.slot)
+          // },
+
+          attrs: { 
+            style: { display: "inline-block", width: (100/2)+"%", height: 0, margin:"0px", paddin:"0px", paddingBottom: (100/2)+"%", border: "1px solid #dddddd"}, // dynamic width and equal height: https://stackoverflow.com/a/13625843
+          }, 
+
+          handle: {
+            ondragover: ($, ev)=>{ ev.preventDefault() },
+            ondrop: ($, ev)=>{
+              ev.preventDefault()
+    
+              let old_date = ev.dataTransfer.getData("old_date")
+              let old_slot = ev.dataTransfer.getData("old_slot")
+              let diba_id = ev.dataTransfer.getData("diba_id")
+
+
+              // let new_task = {diba_id: diba_id, date: $.meta.date, slot: $.meta.slot, sub_todo: []}
+              // let old_task = $.this.task
+              // $.this.task = new_task
+              // let edited_tasks = $.le.model.tasks.filter(x=>!(x.date===old_date && x.slot===old_slot)) // remove from the old slot
+              // if (old_task !== undefined) {
+              //   edited_tasks = $.le.model.tasks.filter(x=>!(x.date===old_task.date && x.slot===old_task.slot)) // remove from this slot
+              // }
+              // // console.log("peedit-ricevuto", old_date, old_slot, diba_id)
+              // // console.log("peedit-io sono", $.meta.date, $.meta.slot, new_task, old_task)
+              // // console.log("peedit-pre", $.le.model.tasks)
+              // // console.log("peedit-pre-p", $.le.model.tasks.map(x=>!(x.date===old_date && x.slot===old_slot)), $.le.model.tasks.filter(x=>!(x.date===old_date && x.slot===old_slot)).map(x=>!(x.date===old_task?.date && x.slot===old_task?.slot)))
+              // // console.log("setto task", $.le.model.tasks.filter(x=>!(x.date===old_date && x.slot===old_slot) && !(x.date===$.meta.date && x.slot===$.meta.slot)), {diba_id: diba_id, date: $.meta.date, slot: $.meta.slot, sub_todo: []})
+              // // console.log("peeditd- sarà", [...$.le.model.tasks.filter(x=>(x.date!==old_date && x.slot!==old_slot) && (x.date!==$.meta.date && x.slot!==$.meta.slot)), {diba_id: diba_id, date: $.meta.date, slot: $.meta.slot, sub_todo: []} ])
+              // $.le.model.tasks = [ ...edited_tasks, new_task]
+              // // console.log("peedit-post", $.le.model.tasks)
+
+              $.le.model.tasks = [...$.le.model.tasks.filter(x=>!(x.date==old_date && x.slot==old_slot) && !(x.date==$.meta.date && x.slot==$.meta.slot)), {diba_id: diba_id, date: $.meta.date, slot: $.meta.slot, sub_todo: []} ]
+            }
+          },
+
+          "=>": [
+            {b: {text: $=>$.meta.date}}, {i: {attrs: {style: {fontSize:"10px"}},  text: $=>" (" + $.meta.slot + ")"}},
+
+            {br: {}},
+            
+            { div: { meta: {forEach: "diba", of: $=>$.le.model.diba },
+              "=>":[
+                Use(DraggableEl, { meta: { if: $=>$.le.model.tasks.filter(x=>x.diba_id === $.meta.diba.diba_id && x.date===$.meta.date && x.slot===$.meta.slot).length>0 }, 
+                  data:{
+                    task: $ => $.le.model.tasks.find(x=>x.diba_id === $.meta.diba.diba_id && x.date===$.meta.date && x.slot===$.meta.slot),
+                    diba: $ => $.le.model.diba.find(x=>x.diba_id === $.this.task.diba_id)
+                  }, 
+                  handle: {
+                    onclick: $=>{
+                      $.le.model.tasks = $.le.model.tasks.filter(x=>x!==$.this.task)
+                    }
+                  }
+                }).computedTemplate //computed template per non creare un nuovo meta..direttamente
+              ]
+            }}
+
+            // Use(DraggableEl, { meta: { if: $=>$.parent.task !== undefined }, 
+            //   data:{
+            //     task: $ => $.parent.task,
+            //     diba: $ => $.le.model.diba.find(x=>x.diba_id === $.parent.task.diba_id)
+            //   }
+            // }).computedTemplate //computed template per non creare un nuovo meta..direttamente
+          ]
+
+        }}
+        
+      ],
+
+    }
+  }
+
+
+  RenderApp(document.body, { 
+    div: {
+      id: "app",
+
+      attrs: { style: "width: 100%; height: 100%; padding: 0px; margin: 0px;" },
+
+      css: [
+        `* { box-sizing: border-box !important;}`, 
+        'body {padding: 0px; margin: 0px; }'
+      ],
+
+      "=>": [
+
+        Use(Model),
+
+        { div: {
+
+          hattrs: {style: {width:"100%", height: "100px", border: "1pc solid green"}},
+
+          "=>":[
+            "DIBA", 
+            
+            {br:{}},
+
+            Use(DraggableEl, { meta: {forEach: "diba", of: $=>$.le.model.diba }, props: { diba: $=>$.meta.diba }}),
+          ]
+        }},
+
+        Use(Calendar)
+        
+      ]
+
+    }
+  })
+
+  
+}
+
+
 // app0()
 // test2way()
 // appTodolist()
@@ -2853,6 +3151,8 @@ const appDemoStockApi = ()=>{
 // appTestCssAndPassThis()
 // appTestSuperCtxProblem()
 // appTestAnchors()
-appTestBetterAnchors()
+// appTestBetterAnchors()
+// appSimpleCalendarOrganizer()
+appCalendarOrganizer()
 
 // appDemoStockApi()
