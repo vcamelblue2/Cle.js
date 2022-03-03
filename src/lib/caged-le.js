@@ -512,6 +512,7 @@ class Property{
     return this.__getRealVaule()
   }
   set value(v){
+    if(this._onSet === undefined){console.log("la onSet è undefined!!!!!", this);return} // todo: teeemp!! c'è un bug più subdolo da risolvere..riguarda gli le-for e le-if nested..
     this.isFunc = isFunction(v)
     this._valueFunc = v
     this.__analyzeAndConnectDeps()
@@ -524,6 +525,7 @@ class Property{
   // manually, useful for deps
   markAsChanged(){
     debug.log("marked as changed!", this)
+    if(this._onSet === undefined){console.log("la onSet è undefined!!!!!", this);return} // todo: teeemp!! c'è un bug più subdolo da risolvere..riguarda gli le-for e le-if nested..
     let _v = this.__getRealVaule()
     this._onSet(_v, this._valueFunc, this)
     this.fireOnChangedSignal()
@@ -1324,6 +1326,18 @@ class Component {
             debug.log("pushooooo")
             let depRemover = this.$le[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
             depRemover && depsRemover.push(depRemover)
+            // let registerAction = ()=>{
+            //   let depRemover = this.$le[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+            //   depRemover && depsRemover.push(depRemover)
+            // }
+            // if(this.$le[d[0]].properties[d[1]] !== undefined){
+            //   registerAction()
+            // }
+            // else {
+            //   setTimeout(() => {
+            //     registerAction()
+            //   }, 1);
+            // }
           })
 
           deps.$ctx_deps?.forEach(d=>{ // [le_id, property]
@@ -2145,6 +2159,7 @@ class Component {
 
   }
 
+  // step 0: Analyze, convert and Create
   static componentFactory = (parent, template, $le) => {
 
     let component;
@@ -2856,7 +2871,13 @@ export { pass, none, smart, Use, Placeholder, Bind, RenderApp, toInlineStyle, LE
 
 // BUGFIX:
 
-  // todo: rimuovere commenti e metterli (sensati) in modalità: debug, extended_debug
+  // todo: MEGA->al momento è imposibile registrarsi a proprità di elementi che sono dopo di me..perchè l'elemento è vero che esiste, ma non esistono sncora le sue prop! quindi fallirà sempre, e con il "?" non esplode e non trovi il bu facilmente. la soluzione è la retry, da implementare alla riga 1327 e ovunque ci sia questa logica! alternativa semplice: spostare (e testare!) la creazione delle Property nella fase 2 (build skeleton) e non nella 3 (create). nella fase 2 all'ultimo, dopo la creazione dei contesti..perchè tanto definiamo solo le prop, senza dargli val ne deps ne nulla, ma esistendo tutte non avremo problemi ad agganciarle dopo..aka codice da riga 1300 a 1288
+  //       --> ancora meglio fare un componente che gestisce queste cose a lungo termine..ovvero quando provo a fare lu sub e non riesco mando la richiesta un gestore che la completerà per me dopo. qundo? quand un componente viene creato (le sue prop etc) chiede prima della fine al rgistro se qualcuno lo ha cercato, e il registro completa le op pending. l'importanza del registro (oltre a dover implementare sta roba anche nei signal al posto della retry) è quella dei componenti dinamici: dovrà anche essere avvisato delle destroy, in modo che possa ricreare i binding quando il componente viene eventualmente ricreato.
+  //           ciò ovviamenete ci porta anche a dover migliorare le destroy e soprattutto la parte dinamica..che al momento è solo abbozzata: vedi sotto
+
+  // todo: bugfix reale della _onSet che sparisce per gli le-if nested in un le-for
+
+  // todo: rimuovere commenti e metterli (sensati) in modalità: debug, extended_debug etc.
 
   // done: support def deps on TextNode..only for ordinary def (not namespaces). easy: only need to test & find in defDep for "namespace.defname"
   // todo: dipendenze delle def..perchè al momento non posso usare in una Property e avere l'autoaggiornamneto..anche se a dirla tutta, avrebbe poco senso! nel caso pensare ai "trasformer" ovvero delle "pure_def" che sono appunto funzioni pure senza side effects e quinid utilizzabili in modo safe da noi --> quetsa nota deriva dal questo commento // noooo...potenzialmente buggato! specialmente in ricorsione..perchè se uso una funzione che assegna invece di usare aggiungo una dipendenza inutile.. dovrei accertarmi che non sto a sinistra di un uguale..ma non solo! forse va specificata questa cosa e usato un paradigma appisito, "pure_def", ovvero funzioni pure senza side effects! poi sta al dev capire che fare..
@@ -2873,7 +2894,7 @@ export { pass, none, smart, Use, Placeholder, Bind, RenderApp, toInlineStyle, LE
 
 
 // NEW FEATURES:
-  // todo: injector palceholders: meccanismo per permettere di inserire sottocomponenti in punti specifici di un componente Use: sostanzialmente in una Use possiamo definire dei Placeholder (classe Placeholder), che hanno dei "nomi", e dunque possiamo passare alla Use un dict con i nome i componenti che vogliamo ignettare (via passaggio params). la semplicità del meccanismo è tutta nella definizione della Use, che si occupa di matchare i placeholder (tra i subel) e di rimuovere quelli inutilizzati. trasparente per la factory! ovviamente possibilità di default if not set, e opzione per forzare il match con un id specifico (private) o un rename forzato di un id privato (per far si che si possano definire "interfacce" e usarle)
+  // semi-done: injector palceholders: meccanismo per permettere di inserire sottocomponenti in punti specifici di un componente Use: sostanzialmente in una Use possiamo definire dei Placeholder (classe Placeholder), che hanno dei "nomi", e dunque possiamo passare alla Use un dict con i nome i componenti che vogliamo ignettare (via passaggio params). la semplicità del meccanismo è tutta nella definizione della Use, che si occupa di matchare i placeholder (tra i subel) e di rimuovere quelli inutilizzati. trasparente per la factory! ovviamente possibilità di default if not set, e opzione per forzare il match con un id specifico (private) o un rename forzato di un id privato (per far si che si possano definire "interfacce" e usarle)
   // done: ricorsione nei sottochild? (solo se stesso ctx, aka non per i nested Use..però se potessi andare anche dentro gli use potrei sustituire la qualunque! il problema è che nella use sostituisco i placeholder..quoindi diventa dura..)
   // todo: valutare se fare copia del default placeholders e/o dell injected
 
@@ -2900,9 +2921,13 @@ export { pass, none, smart, Use, Placeholder, Bind, RenderApp, toInlineStyle, LE
   // todo: component scafholding via notazione semplice..anche natural lang like (script a se)
 
   // todo: debug, possibilità di avere albero struttura rendered con id
+  
+  // todo: all'interno degli iterable component potrebbe essere utile (nel meta) definire previus e next: due variabili in cui mettiamo l'elemento precedente e quello successivo. in questo modo posso fare $.meta.previus.prop/def etc etc..utile ad esempio in anchors, per fare flow like interface..
 
 
 // IMPROVEMENTS:
+
+  // todo: tipi
 
   // todo: lanciare eccezioni quando parso dei componenenti (anche Use) con nome di proprietà non conosciuti! magari regole di similarità per hint su cosa si voleva scrivere!
 
