@@ -2959,6 +2959,38 @@ const appCalendarOrganizer = async ()=>{
     }
     return res
   }
+
+  const getMonthDays = ()=>{
+    let today_date = new Date()
+    let today_date_as_millis = today_date.getTime()
+    let today_day = today_date.getDate()+1
+    let first_day_as_millis = today_date_as_millis - ((today_day-1) * (24*60*60*1000))
+    let first_day_date = new Date(first_day_as_millis)
+    
+    let first_day_week_day = first_day_date.getDay()
+    first_day_week_day = first_day_week_day === 0 ? 6 : first_day_week_day-1
+    while(first_day_week_day !== 0){
+
+      first_day_as_millis = first_day_date - (24*60*60*1000)
+      first_day_date = new Date(first_day_as_millis)
+      
+      first_day_week_day = first_day_date.getDay()
+      first_day_week_day = first_day_week_day === 0 ? 6 : first_day_week_day-1
+      console.log(first_day_date)
+    }
+
+    let next_date = new Date(first_day_date.getTime())
+
+    let result = []
+    
+    while(next_date.getMonth() <= today_date.getMonth() || next_date.getDay()!==1){ //cerco lunedì in eng version
+      result.push((next_date.getMonth()+1) + "-" + next_date.getDate())
+      next_date = new Date(next_date.getTime() + (24*60*60*1000))
+    }
+
+    return result
+
+  }
   
   // https://www.w3schools.com/html/html5_draganddrop.asp
 
@@ -2967,14 +2999,17 @@ const appCalendarOrganizer = async ()=>{
       id: "model",
 
       data: {
+        today: new Date(),
+
         slots: ["9-11", "11-13", "14-16", "16-18"],
-        dates: range(1,31).map(x=>String(x)),
+        dates: getMonthDays(),//range(1,31).map(x=>String(x)),
         
         diba: [ 
-          {diba_id:"diba1", label:"Diba 1", color:"yellow"}, 
-          {diba_id:"diba2", label:"Diba 2", color:"red"},
-          {diba_id:"diba3", label:"Diba 3", color:"green"},
-          {diba_id:"diba4", label:"Diba 4", color:"blue"},
+          {diba_id:"diba1", label:"Diba 1", color:"#f1c40f"}, 
+          {diba_id:"diba2", label:"Diba 2", color:"#e74c3c"},
+          {diba_id:"diba3", label:"Diba 3", color:"#2ecc71"},
+          {diba_id:"diba4", label:"Diba 4", color:"#3498db"},
+          // {diba_id:"diba5", label:"Diba 5", color:"#8e44ad"},
         ],
 
         tasks: [] //[ {diba_id:"diba1", date:"1", slot:"9-11", sub_todo:[]} ],
@@ -2983,6 +3018,28 @@ const appCalendarOrganizer = async ()=>{
       def: {
         getDibaByTask: ($, task) => $.this.diba.find(x=>x.diba_id === task.diba_id),
         setTasks: ($, tasks) => { $.this.tasks = tasks}
+      },
+
+      on: {
+        this: {
+          tasksChanged: $ => {
+            localStorage.setItem("caged-le-demo.calendar.tasks", JSON.stringify($.this.tasks))
+          },
+          dibaChanged: $ => {
+            localStorage.setItem("caged-le-demo.calendar.diba", JSON.stringify($.this.diba))
+          }
+        }
+      },
+
+      onInit: $=>{
+        let tasks_on_disk = localStorage.getItem("caged-le-demo.calendar.tasks")
+        let diba_on_disk = localStorage.getItem("caged-le-demo.calendar.diba")
+        if (diba_on_disk){
+          $.this.diba = JSON.parse(diba_on_disk)
+        }
+        if (tasks_on_disk){
+          $.this.tasks = JSON.parse(tasks_on_disk)
+        }
       }
     }
   }
@@ -2992,18 +3049,27 @@ const appCalendarOrganizer = async ()=>{
 
       props: {
         task: undefined,//{diba_id:"diba1", date:"1", slot:"9-11", sub_todo:[]},
-        diba: $=>$.le.model.diba[0],
+        diba: undefined,// $=>$.le.model.diba[0],
         isSource: $=>$.this.task === undefined,
       },
 
       attrs: { 
-        style: $=>({ position: $.this.isSource ? undefined : "absolute", display: "inline-block", backgroundColor: $.this.diba.color, width: $.this.isSource ? "160px" : "100px", height: $.this.isSource ? "80px" : "90px", borderRadius: $.this.isSource ? undefined : "5px", textAlign:"center"}),
+        style: $=>({ 
+          position: $.this.isSource ? undefined : "absolute", 
+          display: $.this.isSource ? "flex" : "inline-block", 
+          flex: $.this.isSource ? "1 1 auto" : undefined,
+          backgroundColor: $.this.diba.color, 
+          width: $.this.isSource ? "160px" : "100%", 
+          height: $.this.isSource ? "80px" : undefined, 
+          borderRadius: $.this.isSource ? undefined : "10px",
+          top: $.this.isSource ? undefined : "35px",
+          bottom: $.this.isSource ? undefined : "5px"
+        }),
         draggable:"true", 
       },
 
       handle: {
         ondragstart: ($, ev)=>{
-
           // console.log("draggin now! my parent is:", $.parent, "has date:", $.meta.date )
           ev.dataTransfer.setData("old_date", $.meta.date)
           ev.dataTransfer.setData("old_slot", $.meta.slot)
@@ -3011,97 +3077,169 @@ const appCalendarOrganizer = async ()=>{
         }
       },
 
-      text: $=>$.this.diba.label
-
-    }
-  }
-
-  const Calendar = { 
-    div: { meta: { forEach: "date", of: $ => $.le.model.dates },
-      
-      attrs: { 
-        style: $=>({ display: "inline-block", width: (100/7)+"%", height: 0, margin:"0px", paddin:"0px", paddingBottom: (100/7)+"%", border: "1px solid gray", backgroundColor: ["6", "7", "13", "14", "20", "21", "27", "28"].includes($.meta.date)?"#cccccc":undefined}), // dynamic width and equal height: https://stackoverflow.com/a/13625843
-      }, 
-
       "=>": [
+        { div: {
+          
+          props: { diba:$=>$.parent.diba, isSource: $=>$.parent.isSource },
 
-        { div: { meta: {forEach: "slot", of: $ => $.le.model.slots},
+          attrs: {style: "width: 100%; height: 100%; display:flex; justify-content: center; align-items: center; color: #ffffff"},
+          
+          "=>":[
 
-          // props: {
-          //   // task: undefined 
-          //   task: $=>$.le.model.tasks.find(x=>x.date===$.meta.date && x.slot===$.meta.slot)
-          // },
+            { div: { meta: { if: $=>!$.parent.isSource},
+              text: $=>$.parent.diba.label
+            }},
 
-          attrs: { 
-            style: { display: "inline-block", width: (100/2)+"%", height: 0, margin:"0px", paddin:"0px", paddingBottom: (100/2)+"%", border: "1px solid #dddddd"}, // dynamic width and equal height: https://stackoverflow.com/a/13625843
-          }, 
+            { input: { meta: { if: $=>$.parent.isSource},
 
-          handle: {
-            ondragover: ($, ev)=>{ ev.preventDefault() },
-            ondrop: ($, ev)=>{
-              ev.preventDefault()
-    
-              let old_date = ev.dataTransfer.getData("old_date")
-              let old_slot = ev.dataTransfer.getData("old_slot")
-              let diba_id = ev.dataTransfer.getData("diba_id")
+              attrs: { style: "margin-left: 5px; margin-right: 5px; text-align: center; border-bottom:none"},
 
+              hattrs: { 
+                value: $ => $.parent.diba?.label
+              },
+              
+              handle: {
+                onchange: ($, e)=>{
+                  $.parent.diba.label = e.target.value
+                  $.le.model._mark_diba_as_changed()
+                }
+              }
 
-              // let new_task = {diba_id: diba_id, date: $.meta.date, slot: $.meta.slot, sub_todo: []}
-              // let old_task = $.this.task
-              // $.this.task = new_task
-              // let edited_tasks = $.le.model.tasks.filter(x=>!(x.date===old_date && x.slot===old_slot)) // remove from the old slot
-              // if (old_task !== undefined) {
-              //   edited_tasks = $.le.model.tasks.filter(x=>!(x.date===old_task.date && x.slot===old_task.slot)) // remove from this slot
-              // }
-              // // console.log("peedit-ricevuto", old_date, old_slot, diba_id)
-              // // console.log("peedit-io sono", $.meta.date, $.meta.slot, new_task, old_task)
-              // // console.log("peedit-pre", $.le.model.tasks)
-              // // console.log("peedit-pre-p", $.le.model.tasks.map(x=>!(x.date===old_date && x.slot===old_slot)), $.le.model.tasks.filter(x=>!(x.date===old_date && x.slot===old_slot)).map(x=>!(x.date===old_task?.date && x.slot===old_task?.slot)))
-              // // console.log("setto task", $.le.model.tasks.filter(x=>!(x.date===old_date && x.slot===old_slot) && !(x.date===$.meta.date && x.slot===$.meta.slot)), {diba_id: diba_id, date: $.meta.date, slot: $.meta.slot, sub_todo: []})
-              // // console.log("peeditd- sarà", [...$.le.model.tasks.filter(x=>(x.date!==old_date && x.slot!==old_slot) && (x.date!==$.meta.date && x.slot!==$.meta.slot)), {diba_id: diba_id, date: $.meta.date, slot: $.meta.slot, sub_todo: []} ])
-              // $.le.model.tasks = [ ...edited_tasks, new_task]
-              // // console.log("peedit-post", $.le.model.tasks)
-
-              $.le.model.tasks = [...$.le.model.tasks.filter(x=>!(x.date==old_date && x.slot==old_slot) && !(x.date==$.meta.date && x.slot==$.meta.slot)), {diba_id: diba_id, date: $.meta.date, slot: $.meta.slot, sub_todo: []} ]
-            }
-          },
-
-          "=>": [
-            {b: {text: $=>$.meta.date}}, {i: {attrs: {style: {fontSize:"10px"}},  text: $=>" (" + $.meta.slot + ")"}},
-
-            {br: {}},
-            
-            { div: { meta: {forEach: "diba", of: $=>$.le.model.diba },
-              "=>":[
-                Use(DraggableEl, { meta: { if: $=>$.le.model.tasks.filter(x=>x.diba_id === $.meta.diba.diba_id && x.date===$.meta.date && x.slot===$.meta.slot).length>0 }, 
-                  data:{
-                    task: $ => $.le.model.tasks.find(x=>x.diba_id === $.meta.diba.diba_id && x.date===$.meta.date && x.slot===$.meta.slot),
-                    diba: $ => $.le.model.diba.find(x=>x.diba_id === $.this.task.diba_id)
-                  }, 
-                  handle: {
-                    onclick: $=>{
-                      $.le.model.tasks = $.le.model.tasks.filter(x=>x!==$.this.task)
-                    }
-                  }
-                }).computedTemplate //computed template per non creare un nuovo meta..direttamente
-              ]
             }}
-
-            // Use(DraggableEl, { meta: { if: $=>$.parent.task !== undefined }, 
-            //   data:{
-            //     task: $ => $.parent.task,
-            //     diba: $ => $.le.model.diba.find(x=>x.diba_id === $.parent.task.diba_id)
-            //   }
-            // }).computedTemplate //computed template per non creare un nuovo meta..direttamente
           ]
-
         }}
-        
-      ],
+      ]
 
     }
   }
 
+  const Calendar = { div: {
+    "=>":[
+
+      { div: { meta: { forEach: "weekDay", of: $ => ["Lundì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"] },
+        
+        attrs: { 
+          style: $=>({ 
+            display: "inline-block", 
+            width: "calc("+(100/7)+"% - 10px)", 
+            // height: "50px", 
+            margin:"-2px 5px", 
+            padding:"5px", 
+            border: "1px solid #dddddd", 
+            backgroundColor: ["Sabato", "Domenica"].includes($.meta.weekDay)?"#bdc3c7":"#ecf0f1", 
+            overflow: "hidden", 
+            borderRadius:"15px",
+            textAlign: "center"
+          })
+        }, 
+        "=>": $=>$.meta.weekDay
+      }},
+
+      { div: { meta: { forEach: "date", of: $ => $.le.model.dates, define:{index:"date_idx"} },
+        
+        attrs: { 
+          style: $=>({ 
+            display: "inline-block", 
+            width: "calc("+(100/7)+"% - 10px)", 
+            height: 0, 
+            margin:"2.5px 5px", 
+            paddin:"0px", 
+            paddingBottom: "calc("+(100/7)+"% - 10px)", 
+            border: ($.le.model.today.getDay()-1 == $.meta.date.split("-")[1] ? "3px solid  orange" : "1px solid #dddddd"), 
+            backgroundColor: (($.meta.date_idx+1)%7 === 0) || (($.meta.date_idx+2)%7 === 0) ?"#bdc3c7" : "#ecf0f1", 
+            opacity: $.le.model.today.getMonth()+1 != $.meta.date.split("-")[0] ? 0.3 : undefined,
+            overflow: "hidden", 
+            borderRadius:"15px"
+          }), // dynamic width and equal height: https://stackoverflow.com/a/13625843
+        }, 
+
+        "=>": [
+
+          { div: { meta: {forEach: "slot", of: $ => $.le.model.slots},
+
+            props: {
+              // task: undefined 
+              // task: $=>$.le.model.tasks.find(x=>x.date===$.meta.date && x.slot===$.meta.slot)
+              isToday: $=>$.le.model.today.getDay()-1 == $.meta.date.split("-")[1]
+            },
+
+            attrs: { 
+              style: { position: "relative", display: "inline-block", width: (100/2)+"%", height: 0, margin:"0px", paddin:"0px", paddingBottom: (100/2)+"%", border: "1px solid #dddddd"}, // dynamic width and equal height: https://stackoverflow.com/a/13625843
+            }, 
+
+            handle: {
+              ondragover: ($, ev)=>{ ev.preventDefault() },
+              ondrop: ($, ev)=>{
+                ev.preventDefault()
+      
+                let old_date = ev.dataTransfer.getData("old_date")
+                let old_slot = ev.dataTransfer.getData("old_slot")
+                let diba_id = ev.dataTransfer.getData("diba_id")
+
+                $.le.model.tasks = [
+                  ...$.le.model.tasks.filter(
+                    x=>!(x.date==old_date && x.slot==old_slot) && !(x.date==$.meta.date && x.slot==$.meta.slot)
+                  ), 
+                  {diba_id: diba_id, date: $.meta.date, slot: $.meta.slot, sub_todo: []} 
+                ]
+              }
+            },
+
+            "=>": [
+              { b: { meta:{if: $=>$.meta.slot === "11-13"}, 
+                attrs: { 
+                  style:$=>"margin-top: -3px; font-size:24px; position: absolute; right: 7px; z-index:999; color:"+($.parent.isToday ? "#f39c12" : "black"), 
+                  // class: $=>$.parent.isToday ? "active-text-shadow" : "text-shadow"
+                }, 
+                text: $=>$.meta.date.split("-")[1]
+              }}, 
+              { i: {attrs: {style: {position: "absolute", marginLeft: "5px", marginTop: "7px", fontSize:"10px"}},  text: $=>" (" + $.meta.slot + ")"}},
+
+              { br: {}},
+              
+              { div: { meta: {forEach: "diba", of: $=>$.le.model.diba },
+                "=>":[
+                  Use(DraggableEl, { meta: { if: $=>$.le.model.tasks.filter(x=>x.diba_id === $.meta.diba.diba_id && x.date===$.meta.date && x.slot===$.meta.slot).length>0 }, 
+                    data:{
+                      task: $ => $.le.model.tasks.find(x=>x.diba_id === $.meta.diba.diba_id && x.date===$.meta.date && x.slot===$.meta.slot),
+                      diba: $ => $.le.model.diba.find(x=>x.diba_id === $.this.task.diba_id)
+                    }, 
+                    handle: {
+                      onclick: $=>{
+                        $.le.model.tasks = $.le.model.tasks.filter(x=>x!==$.this.task)
+                      }
+                    }
+                  }).computedTemplate //computed template per non creare un nuovo meta..direttamente
+                ]
+              }}
+
+              // Use(DraggableEl, { meta: { if: $=>$.parent.task !== undefined }, 
+              //   data:{
+              //     task: $ => $.parent.task,
+              //     diba: $ => $.le.model.diba.find(x=>x.diba_id === $.parent.task.diba_id)
+              //   }
+              // }).computedTemplate //computed template per non creare un nuovo meta..direttamente
+            ]
+
+          }}
+          
+        ],
+
+      }}
+    ]
+  }}
+
+  await Promise.all([
+    LE_LoadCss("https://fonts.googleapis.com/css?family=Inconsolata"),
+    LE_LoadCss("https://fonts.googleapis.com/icon?family=Material+Icons"),
+    LE_LoadCss("https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css"),
+  ])
+
+  await Promise.all([
+    LE_LoadScript("https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"),
+    LE_LoadScript("https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.10.4/dayjs.min.js", {attr: { crossorigin:"anonymous"}}),
+    LE_LoadScript("https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.10.4/locale/it.min.js", {attr: { crossorigin:"anonymous"}}),
+  ])
 
   RenderApp(document.body, { 
     div: {
@@ -3110,26 +3248,65 @@ const appCalendarOrganizer = async ()=>{
       attrs: { style: "width: 100%; height: 100%; padding: 0px; margin: 0px;" },
 
       css: [
-        `* { box-sizing: border-box !important;}`, 
-        'body {padding: 0px; margin: 0px; }'
+        `
+        * { box-sizing: border-box !important;}
+
+        body { padding: 0px; margin: 0px; }
+
+        .text-shadow{
+          text-shadow: 0px 3px 15px rgb(50 50 50 / 32%);
+        }
+        .active-text-shadow{
+          text-shadow: 0px 3px 19px rgb(25 25 25 / 40%);
+        }
+
+        .shadow{
+            border-radius: 55px;
+            -webkit-box-shadow: 0px 6px 32px -1px rgb(0 0 0 / 42%);
+            -moz-box-shadow: 0px 6px 32px -1px rgb(0 0 0 / 42%);
+            box-shadow: 0px 6px 32px -1px rgb(0 0 0 / 42%);
+        }
+
+        .active-shadow{
+            border-radius: 55px;
+            -webkit-box-shadow: 0px 6px 32px -1px rgb(0 0 200 / 32%);
+            -moz-box-shadow: 0px 6px 32px -1px rgb(0 0 200 / 32%);
+            box-shadow: 0px 6px 32px -1px rgb(0 0 200 / 32%);
+        }`
       ],
 
       "=>": [
 
         Use(Model),
 
+        { h1: {
+          attrs: {style: {width:"100%", margin: "10px 0 ",  display: "flex", justifyContent: "center"}},
+          text: $=>({"2":"Febbraio", "3":"Marzo"}[$.le.model.today.getMonth()+1] + " " + $.le.model.today.getFullYear())
+        }},
+
         { div: {
 
-          hattrs: {style: {width:"100%", height: "100px", border: "1pc solid green"}},
+          attrs: {style: {width:"100%", marginBottom: "10px",  display: "flex", justifyContent: "center"}},
 
           "=>":[
-            "DIBA", 
-            
-            {br:{}},
+            // "DIBA", 
 
             Use(DraggableEl, { meta: {forEach: "diba", of: $=>$.le.model.diba }, props: { diba: $=>$.meta.diba }}),
           ]
         }},
+
+        // { input: { meta: {forEach: "diba", of: $=>$.le.model.diba},
+        //   hattrs: { 
+        //     value: $ => $.meta.diba.label
+        //   },
+        //   handle: {
+        //     onchange: ($, e)=>{
+        //       $.meta.diba.label = e.target.value
+        //       $.le.model._mark_diba_as_changed()
+        //     }
+        //   }
+
+        // }},
 
         Use(Calendar)
         
