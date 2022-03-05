@@ -1,5 +1,5 @@
 
-import {pass, none, smart, Use, Placeholder, Bind, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp} from "../lib/caged-le.js"
+import {pass, none, smart, Use, Extended, Placeholder, Bind, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp} from "../lib/caged-le.js"
 
 const app0 = ()=>{
 
@@ -2992,6 +2992,20 @@ const appCalendarOrganizer = async ()=>{
 
   }
   
+
+  await Promise.all([
+    LE_LoadCss("https://fonts.googleapis.com/css?family=Inconsolata"),
+    LE_LoadCss("https://fonts.googleapis.com/icon?family=Material+Icons"),
+    LE_LoadCss("https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css"),
+  ])
+
+  await Promise.all([
+    LE_LoadScript("https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"),
+    LE_LoadScript("https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.10.4/dayjs.min.js", {attr: { crossorigin:"anonymous"}}),
+    LE_LoadScript("https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.10.4/locale/it.min.js", {attr: { crossorigin:"anonymous"}}),
+  ])
+
+
   // https://www.w3schools.com/html/html5_draganddrop.asp
 
   const Model = {
@@ -3000,9 +3014,8 @@ const appCalendarOrganizer = async ()=>{
 
       data: {
         today: new Date(),
-
-        slots: ["9-11", "11-13", "14-16", "16-18"],
         dates: getMonthDays(),//range(1,31).map(x=>String(x)),
+        slots: ["9-11", "11-13", "14-16", "16-18"],
         
         diba: [ 
           {diba_id:"diba1", label:"Diba 1", color:"#f1c40f"}, 
@@ -3020,6 +3033,7 @@ const appCalendarOrganizer = async ()=>{
         setTasks: ($, tasks) => { $.this.tasks = tasks}
       },
 
+      // auto local storage
       on: {
         this: {
           tasksChanged: $ => {
@@ -3044,7 +3058,7 @@ const appCalendarOrganizer = async ()=>{
     }
   }
 
-  const DraggableEl = { 
+  const Diba = { 
     div: {
 
       props: {
@@ -3058,7 +3072,7 @@ const appCalendarOrganizer = async ()=>{
           position: $.this.isSource ? undefined : "absolute", 
           display: $.this.isSource ? "flex" : "inline-block", 
           flex: $.this.isSource ? "1 1 auto" : undefined,
-          backgroundColor: $.this.diba.color, 
+          backgroundColor: $.this.diba?.color, 
           width: $.this.isSource ? "160px" : "100%", 
           height: $.this.isSource ? "80px" : undefined, 
           borderRadius: $.this.isSource ? undefined : "10px",
@@ -3087,7 +3101,7 @@ const appCalendarOrganizer = async ()=>{
           "=>":[
 
             { div: { meta: { if: $=>!$.parent.isSource},
-              text: $=>$.parent.diba.label
+              text: $=>$.parent.diba?.label
             }},
 
             { input: { meta: { if: $=>$.parent.isSource},
@@ -3116,7 +3130,7 @@ const appCalendarOrganizer = async ()=>{
   const Calendar = { div: {
     "=>":[
 
-      { div: { meta: { forEach: "weekDay", of: $ => ["Lundì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"] },
+      { div: { meta: { forEach: "weekDay", of: $ => ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"] },
         
         attrs: { 
           style: $=>({ 
@@ -3158,9 +3172,9 @@ const appCalendarOrganizer = async ()=>{
           { div: { meta: {forEach: "slot", of: $ => $.le.model.slots},
 
             props: {
-              // task: undefined 
-              // task: $=>$.le.model.tasks.find(x=>x.date===$.meta.date && x.slot===$.meta.slot)
-              isToday: $=>$.le.model.today.getDay()-1 == $.meta.date.split("-")[1]
+              isToday: $=>$.le.model.today.getDay()-1 == $.meta.date.split("-")[1],
+              task: $=>$.le.model.tasks.find(x=>x.date===$.meta.date && x.slot===$.meta.slot),
+              diba: $=>$.this.task !== undefined ? $.le.model.diba.find(x=>x.diba_id === $.this.task.diba_id) : undefined
             },
 
             attrs: { 
@@ -3193,32 +3207,26 @@ const appCalendarOrganizer = async ()=>{
                 }, 
                 text: $=>$.meta.date.split("-")[1]
               }}, 
-              { i: {attrs: {style: {position: "absolute", marginLeft: "5px", marginTop: "7px", fontSize:"10px"}},  text: $=>" (" + $.meta.slot + ")"}},
+
+              { i: {attrs: {style: {position: "absolute", marginLeft: "5px", marginTop: "7px", fontSize:"10px"}}, text: $=>" (" + $.meta.slot + ")"}},
 
               { br: {}},
-              
-              { div: { meta: {forEach: "diba", of: $=>$.le.model.diba },
-                "=>":[
-                  Use(DraggableEl, { meta: { if: $=>$.le.model.tasks.filter(x=>x.diba_id === $.meta.diba.diba_id && x.date===$.meta.date && x.slot===$.meta.slot).length>0 }, 
-                    data:{
-                      task: $ => $.le.model.tasks.find(x=>x.diba_id === $.meta.diba.diba_id && x.date===$.meta.date && x.slot===$.meta.slot),
-                      diba: $ => $.le.model.diba.find(x=>x.diba_id === $.this.task.diba_id)
-                    }, 
-                    handle: {
-                      onclick: $=>{
-                        $.le.model.tasks = $.le.model.tasks.filter(x=>x!==$.this.task)
-                      }
-                    }
-                  }).computedTemplate //computed template per non creare un nuovo meta..direttamente
-                ]
-              }}
+            
+              Extended(Diba, { meta: { if: $=>$.parent.task !== undefined },
 
-              // Use(DraggableEl, { meta: { if: $=>$.parent.task !== undefined }, 
-              //   data:{
-              //     task: $ => $.parent.task,
-              //     diba: $ => $.le.model.diba.find(x=>x.diba_id === $.parent.task.diba_id)
-              //   }
-              // }).computedTemplate //computed template per non creare un nuovo meta..direttamente
+                props:{
+                  task: $ => $.parent.task,
+                  diba: $ => $.parent.diba
+                },
+
+                handle: {
+                  onclick: $=>{
+                    $.le.model.tasks = $.le.model.tasks.filter(x=>x!==$.this.task)
+                  }
+                }
+
+              }) // per non creare un nuovo meta..direttamente
+              
             ]
 
           }}
@@ -3228,18 +3236,6 @@ const appCalendarOrganizer = async ()=>{
       }}
     ]
   }}
-
-  await Promise.all([
-    LE_LoadCss("https://fonts.googleapis.com/css?family=Inconsolata"),
-    LE_LoadCss("https://fonts.googleapis.com/icon?family=Material+Icons"),
-    LE_LoadCss("https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css"),
-  ])
-
-  await Promise.all([
-    LE_LoadScript("https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"),
-    LE_LoadScript("https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.10.4/dayjs.min.js", {attr: { crossorigin:"anonymous"}}),
-    LE_LoadScript("https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.10.4/locale/it.min.js", {attr: { crossorigin:"anonymous"}}),
-  ])
 
   RenderApp(document.body, { 
     div: {
@@ -3280,8 +3276,9 @@ const appCalendarOrganizer = async ()=>{
         Use(Model),
 
         { h1: {
+          props: { monthLabel: {"1":"Gennaio","2":"Febbraio", "3":"Marzo", "4":"Aprile", "5":"Maggio", "6":"Giugno", "7":"Luglio", "8":"Agosto", "9":"Settembre", "10":"Ottobre", "11":"Novembre", "12":"Dicembre"} },
           attrs: {style: {width:"100%", margin: "10px 0 ",  display: "flex", justifyContent: "center"}},
-          text: $=>({"2":"Febbraio", "3":"Marzo"}[$.le.model.today.getMonth()+1] + " " + $.le.model.today.getFullYear())
+          text: $=>($.this.monthLabel[$.le.model.today.getMonth()+1] + " " + $.le.model.today.getFullYear())
         }},
 
         { div: {
@@ -3291,22 +3288,10 @@ const appCalendarOrganizer = async ()=>{
           "=>":[
             // "DIBA", 
 
-            Use(DraggableEl, { meta: {forEach: "diba", of: $=>$.le.model.diba }, props: { diba: $=>$.meta.diba }}),
+            Use(Diba, { meta: {forEach: "diba", of: $=>$.le.model.diba }, props: { diba: $=>$.meta.diba }}),
           ]
         }},
 
-        // { input: { meta: {forEach: "diba", of: $=>$.le.model.diba},
-        //   hattrs: { 
-        //     value: $ => $.meta.diba.label
-        //   },
-        //   handle: {
-        //     onchange: ($, e)=>{
-        //       $.meta.diba.label = e.target.value
-        //       $.le.model._mark_diba_as_changed()
-        //     }
-        //   }
-
-        // }},
 
         Use(Calendar)
         
