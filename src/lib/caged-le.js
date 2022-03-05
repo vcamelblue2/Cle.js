@@ -823,6 +823,9 @@ class UseComponentDeclaration{
 
 }
 
+// export // utils per fare estensioni rapide senza dichiarare un nuovo meta..
+const Extended = (...args) => Use(...args).computedTemplate
+
 // export // todo: valutare se qui ci vuole la copia!
 const Placeholder = (name, {default_component=undefined, must_be_redefined=false, forced_id=undefined, forced_ctx_id=undefined, replace_if_different=true}={}) => {
   return new PlaceholderDeclaration(name, {default_component:default_component, must_be_redefined:must_be_redefined, forced_id:forced_id, forced_ctx_id:forced_ctx_id, replace_if_different:replace_if_different})
@@ -2862,7 +2865,7 @@ const LE_InitWebApp = (appDef)=>{ document.addEventListener("DOMContentLoaded", 
 // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // 
 
 
-export { pass, none, smart, Use, Placeholder, Bind, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp }
+export { pass, none, smart, Use, Extended, Placeholder, Bind, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp }
 // full import: {pass, none, smart, Use, Bind, RenderApp, LE_LoadScript, LE_LoadCss, LE_InitWebApp}
 
 
@@ -2905,6 +2908,7 @@ export { pass, none, smart, Use, Placeholder, Bind, RenderApp, toInlineStyle, LE
   // todo: questa cosa come molte altre in realtà mette in luce il fatto che ogni componente e sottocomponete dovrebbe subire una prima "trasformazione" in una sintassi migliori per il framework, che ha diverse opzioni e modi di scrivere..come più o meno avvine già, ma dovrebbe essere la "first of all"
 
   // todo: concetto di "re_emit_as" -> combina in automatico la possibilità di gestire un segnale e rialnciarlo con un altro nome..per propagare i sengali! ovviamente devo inserire il nome di un mio segnale e non di altri.. potrebbe avere senso avere una sentinel del tipo "NewSignal("xxx") per indicare un nuovo segnale ? eìsenza stare a dichiaraare 2 volte..per easy propagation.. vedere bene su..di fatto questa cosa è da realizzare nella on_s lato dev
+  // todo: se non risolviamo il problema del seguire proprietà "parent.parent..." potremmo dhicarare un "rexpose_parent_props"..in cui selezionare chi riesporre oppure un bool per riesporre tutto. utile per il problema del parent.parent senza nome..
 
   // todo: "SelfStyle" o altro meccanismo per esplicitare hoisting del css..vedi su..alternativa andare di replace e tutto è "pubblico" (aka ng-deep) di default..in questo caso è compito dello sviluppatore inserire un "replacer" che indica all'engine che quella classe è "locale"
   // todo: tutti gli elementi devono avere un attributo che mappa un identificativo univoco dell'elemento (stabile nel tempo, anche per gli ng-if e ng-for) per poter aiutare l'hoisting..
@@ -2924,7 +2928,11 @@ export { pass, none, smart, Use, Placeholder, Bind, RenderApp, toInlineStyle, LE
 
   // todo: debug, possibilità di avere albero struttura rendered con id
   
-  // todo: all'interno degli iterable component potrebbe essere utile (nel meta) definire previus e next: due variabili in cui mettiamo l'elemento precedente e quello successivo. in questo modo posso fare $.meta.previus.prop/def etc etc..utile ad esempio in anchors, per fare flow like interface..
+  // todo: all'interno degli iterable component potrebbe essere utile (nel meta) definire previus e next: due variabili in cui mettiamo l'elemento precedente e quello successivo. in questo modo posso fare $.meta.previus.prop/def etc etc..utile ad esempio in anchors, per fare flow like interface..ù
+
+  // todo: cached property..ovvero la get non deve rieseguire se ha già eseguito e la cache è valida (non è stata marked as changed..)
+
+  // todo: standardizzare un po la parte di syncback di una var nel local storage..in modo da poter indicare "@autosync_in_local_storage", o nel name come per lazy o in altra roba apposita. in quest'ultimo caso possiamo anche specificare come scriverle, quali e l'ordine di recupero
 
 
 // IMPROVEMENTS:
