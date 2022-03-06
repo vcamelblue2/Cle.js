@@ -3202,7 +3202,7 @@ const appCalendarOrganizer = async ()=>{
             "=>": [
               { b: { meta:{if: $=>$.meta.slot === "11-13"}, 
                 attrs: { 
-                  style:$=>"margin-top: -3px; font-size:24px; position: absolute; right: 7px; z-index:999; color:"+($.parent.isToday ? "#f39c12" : "black"), 
+                  style:$=>"margin-top: -3px; font-size:24px; position: absolute; right: 7px; z-index:1; color:"+($.parent.isToday ? "#f39c12" : "black"), 
                   // class: $=>$.parent.isToday ? "active-text-shadow" : "text-shadow"
                 }, 
                 text: $=>$.meta.date.split("-")[1]
@@ -3220,8 +3220,11 @@ const appCalendarOrganizer = async ()=>{
                 },
 
                 handle: {
-                  onclick: $=>{
+                  ondblclick: $=>{
                     $.le.model.tasks = $.le.model.tasks.filter(x=>x!==$.this.task)
+                  },
+                  onclick: $=>{
+                    $.le.lateral_menu_controller.selectedTask = $.this.task
                   }
                 }
 
@@ -3236,6 +3239,83 @@ const appCalendarOrganizer = async ()=>{
       }}
     ]
   }}
+
+
+  // View
+  const TodoInput = { 
+    input: {
+
+      ctx_id: "todo_input",
+
+      data: { 
+        text: "" 
+      },
+
+      signals: {
+        newInputConfirmed: "stream => (text: string)"
+      },
+
+      hattrs: {
+        value: Bind($ => $.this.text)
+      },
+
+      handle: {
+        onkeypress: ($, e) => { e.key === "Enter" && $.this.newInputConfirmed.emit($.this.text) },
+      },
+
+    }
+  }
+
+
+  const TodoListItem = { 
+    div: {
+
+      // onInit: $=> M.AutoInit(),
+
+      "=>": [
+        // todo with checkbox
+        { span: {
+          "=>": [
+            { label: { 
+              "=>": [  // si poteva fare anche con style..
+                { input: { 
+                  attrs: { type: "checkbox", class: "browser-default"},
+                  hattrs: { 
+                    // type: "checkbox", 
+                    checked: $ => $.meta.todo.done, 
+                    name: $ => $.meta.todo._id
+                  }, 
+                  // handle: { onchange: $ => {
+                    // $.le.model.chnageDoneStatus($.meta.todo)
+                  // } }
+                }}, 
+                
+                { span: { meta: {if: $ => !$.meta.todo.done}, 
+                  text: $ => $.meta.todo.todo
+                }}, 
+                { s: { meta: {if: $ => $.meta.todo.done}, 
+                  text: $ => $.meta.todo.todo 
+                }},
+              ], 
+              hattrs: {for: $ => $.meta.todo._id} 
+            }}
+          ] 
+        }},
+        // remove button
+        { button: {  
+          text: "close", 
+          // handle: { 
+          //   onclick: $ => $.le.model.remove($.meta.todo) 
+          // }, 
+          attrs: { 
+            style: {position: "absolute", right:"2px", color: "#565656", backgroundColor:"transparent"},
+            class: "btn-floating material-icons"
+          }  
+        }},
+      ]
+    }
+  }
+
 
   RenderApp(document.body, { 
     div: {
@@ -3293,7 +3373,148 @@ const appCalendarOrganizer = async ()=>{
         }},
 
 
-        Use(Calendar)
+        Use(Calendar),
+
+
+        // lateral menu
+
+        { Controller: {
+          id: "lateral_menu_controller",
+
+          props: {
+            isOpened: false,
+            selectedTask: undefined,
+            selectedDiba: $=>$.this.selectedTask !== undefined ? $.le.model.diba.find(x=>x.diba_id === $.this.selectedTask.diba_id) : undefined
+          },
+
+          on: { this: {
+            selectedDibaChanged: $=>{
+              $.this.isOpened = true
+            }
+          }}
+
+        }},
+
+        { div: {
+
+          id: "lateral_menu",
+
+          attrs: { 
+            style: $=>({
+              // visibility: $.le.lateral_menu_controller.isOpened ? null : "hidden",
+              opacity: $.le.lateral_menu_controller.isOpened ? 1 : 0.75,
+              position: "absolute",
+              backgroundColor: $.le.lateral_menu_controller.selectedDiba?.color || "white",
+              borderRadius: "25px",
+              top: "25px",
+              // right: "25px",
+              bottom: "25px",
+              // left: $.le.lateral_menu_controller.isOpened ? "65%" : "calc(100% - 25px)",
+              left: $.le.lateral_menu_controller.isOpened ? "65%" : "100%",
+              width: $.le.lateral_menu_controller.isOpened ? "calc(35% - 25px)" : 0,
+
+              zIndex: "2",
+              overflow: "hidden",
+              padding: $.le.lateral_menu_controller.isOpened ? "25px" : "0",
+              transition: "left 0.3s, width " + ($.le.lateral_menu_controller.isOpened ? 0.3 : 0.6) + "s, padding 0.3s, opacity 0.3s, background-color 0.3s ease-in-out"
+            }),
+            class: "shadow"
+          },
+
+          on: { le: { lateral_menu_controller: {
+            isOpenedChanged: $=>{
+              if(!$.le.lateral_menu_controller.isOpened) {
+                setTimeout(()=>{
+                  $.this.el.style.visibility="hidden"
+                }, 290)
+              }
+            }
+          }}},
+
+          "=>":[
+            //  $=>$.le.lateral_menu_controller.selectedDiba?.label,
+
+             { h2: {
+               attrs: {style: {marginTop:"5px"}},
+               text: $=> $.le.lateral_menu_controller.selectedDiba?.label,
+             }},
+
+             { h4: {
+              text: $=> $.le.lateral_menu_controller.selectedTask?.date,
+             }},
+
+             { button: {
+               
+               attrs: {
+                 style: $=>({position: "absolute", right: "20px", top: "40px", color: "#565656", backgroundColor:"#ecf0f1"}),
+                 class: "btn-floating material-icons"
+               },
+
+               handle: {
+                 onclick: $=>{
+                   $.le.lateral_menu_controller.isOpened = false
+                 }
+               },
+
+               text: "close",
+
+             }},
+
+             // todo list container
+             { div: {
+          
+                "=>": [
+                  Use({ div: { 
+                    props: {
+                      todos: $=>[...($.le.lateral_menu_controller.selectedTask !== undefined ? $.le.lateral_menu_controller.selectedTask.sub_todo : [])]
+                    },
+                    on: { 
+                      le: {lateral_menu_controller: { selectedTaskChanged: $=>console.log("cambiatoooo")}},
+                      this: {
+                        todosChanged: $=>console.log("todos changed..")
+                      }
+                    },  
+                    "=>": [ // gen new meta..
+
+                      Extended(TodoInput, {attrs: {style: "width: calc(100% - 165px)"}}),
+
+                      { button: { 
+                        text: "Add Todo", 
+                        attrs: {style: "margin-left: 15px; width: 150px; color: #565656; background-color: #ecf0f1", class: "btn"}, 
+
+                        on_s: { ctx: { todo_input: {
+                          newInputConfirmed: $=>{
+                            $.this.insertTodo()
+                          }
+                        }}},
+
+                        handle: { onclick: $ => $.this.insertTodo() },
+
+                        def: {
+                          insertTodo: $=>{
+                            $.le.lateral_menu_controller.selectedTask.sub_todo.push({ _id: 0, todo: $.ctx.todo_input.text, done: false }) 
+                            // $.le.lateral_menu_controller.selectedTask = {...$.le.lateral_menu_controller.selectedTask}
+                            $.le.model._mark_tasks_as_changed()
+                            $.le.lateral_menu_controller._mark_selectedTask_as_changed()
+                            $.le.lateral_menu_controller._mark_selectedDiba_as_changed()
+                            $.ctx.todo_input.text = ""
+                          }
+                        },
+                      }},
+
+                      Extended(TodoListItem,  { meta: { forEach: "todo", of: $ => $.parent.todos} } )
+
+                    ]
+                  }})
+                ]
+
+              }
+            }
+             
+
+          ]
+
+        }}
         
       ]
 
