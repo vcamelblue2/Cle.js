@@ -1716,6 +1716,27 @@ const appStupidFunction = ()=>{
     return slim(paramForSlim)
   }
 
+  // ...Reuse("attrs").From(MyComponent) --> Reuse("a.b.0.c").From({div: {a: {b: [{c: 123}, {d: 456}]}}})
+  const Reuse = (what) => {
+    if (what.includes(".")){
+      return { 
+        From: (componenent)=>{
+          let pointer = Object.values(componenent)[0]
+          for (let part of what.split(".")){
+            pointer = pointer[part]
+          }
+          return {[part]: pointer}
+        } 
+      }
+    }
+    else {
+      return { From: (componenent)=>({[what]: Object.values(componenent)[0][what]}) }
+    }
+  }
+
+
+
+
 }
 
 
