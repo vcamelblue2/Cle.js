@@ -3127,6 +3127,98 @@ const appCalendarOrganizer = async ()=>{
     }
   }
 
+
+  const CalendarDaySlot = { div: { meta: {forEach: "slot", of: $ => $.le.model.slots},
+
+    props: {
+      isToday: $=>$.le.model.today.getDay()-1 == $.meta.date.split("-")[1],
+      task: $=>$.le.model.tasks.find(x=>x.date===$.meta.date && x.slot===$.meta.slot),
+      diba: $=>$.this.task !== undefined ? $.le.model.diba.find(x=>x.diba_id === $.this.task.diba_id) : undefined
+    },
+
+    attrs: { 
+      style: { position: "relative", display: "inline-block", width: (100/2)+"%", height: 0, margin:"0px", paddin:"0px", paddingBottom: (100/2)+"%", border: "1px solid #dddddd"}, // dynamic width and equal height: https://stackoverflow.com/a/13625843
+    }, 
+
+    handle: {
+      ondragover: ($, ev)=>{ ev.preventDefault() },
+      ondrop: ($, ev)=>{
+        ev.preventDefault()
+
+        let old_date = ev.dataTransfer.getData("old_date")
+        let old_slot = ev.dataTransfer.getData("old_slot")
+        let diba_id = ev.dataTransfer.getData("diba_id")
+
+        $.le.model.tasks = [
+          ...$.le.model.tasks.filter(
+            x=>!(x.date==old_date && x.slot==old_slot) && !(x.date==$.meta.date && x.slot==$.meta.slot)
+          ), 
+          {diba_id: diba_id, date: $.meta.date, slot: $.meta.slot, sub_todo: []} 
+        ]
+      }
+    },
+
+    "=>": [
+      { b: { meta:{if: $=>$.meta.slot === "11-13"}, 
+        attrs: { 
+          style:$=>"margin-top: -3px; font-size:24px; position: absolute; right: 7px; z-index:1; color:"+($.parent.isToday ? "#f39c12" : "black"), 
+          // class: $=>$.parent.isToday ? "active-text-shadow" : "text-shadow"
+        }, 
+        text: $=>$.meta.date.split("-")[1]
+      }}, 
+
+      { i: {attrs: {style: {position: "absolute", marginLeft: "5px", marginTop: "7px", fontSize:"10px"}}, text: $=>" (" + $.meta.slot + ")"}},
+
+      { br: {}},
+    
+      Extended(Diba, { meta: { if: $=>$.parent.task !== undefined },
+
+        props:{
+          task: $ => $.parent.task,
+          diba: $ => $.parent.diba
+        },
+
+        handle: {
+          ondblclick: $=>{
+            $.le.model.tasks = $.le.model.tasks.filter(x=>x!==$.this.task)
+          },
+          onclick: $=>{
+            $.le.lateral_menu_controller.selectedTask = $.this.task
+          }
+        }
+
+      }) // per non creare un nuovo meta..direttamente
+      
+    ]
+
+  }}
+
+  const CalendarDay = { div: { meta: { forEach: "date", of: $ => $.le.model.dates, define:{index:"date_idx"} },
+        
+    attrs: { 
+      style: $=>({ 
+        display: "inline-block", 
+        width: "calc("+(100/7)+"% - 10px)", 
+        height: 0, 
+        margin:"2.5px 5px", 
+        paddin:"0px", 
+        paddingBottom: "calc("+(100/7)+"% - 10px)", 
+        border: ($.le.model.today.getDay()-1 == $.meta.date.split("-")[1] ? "3px solid  orange" : "1px solid #dddddd"), 
+        backgroundColor: (($.meta.date_idx+1)%7 === 0) || (($.meta.date_idx+2)%7 === 0) ?"#bdc3c7" : "#ecf0f1", 
+        opacity: $.le.model.today.getMonth()+1 != $.meta.date.split("-")[0] ? 0.3 : undefined,
+        overflow: "hidden", 
+        borderRadius:"15px"
+      }), // dynamic width and equal height: https://stackoverflow.com/a/13625843
+    }, 
+
+    "=>": [
+
+      CalendarDaySlot
+      
+    ],
+
+  }}
+
   const Calendar = { div: {
     "=>":[
 
@@ -3149,99 +3241,12 @@ const appCalendarOrganizer = async ()=>{
         "=>": $=>$.meta.weekDay
       }},
 
-      { div: { meta: { forEach: "date", of: $ => $.le.model.dates, define:{index:"date_idx"} },
-        
-        attrs: { 
-          style: $=>({ 
-            display: "inline-block", 
-            width: "calc("+(100/7)+"% - 10px)", 
-            height: 0, 
-            margin:"2.5px 5px", 
-            paddin:"0px", 
-            paddingBottom: "calc("+(100/7)+"% - 10px)", 
-            border: ($.le.model.today.getDay()-1 == $.meta.date.split("-")[1] ? "3px solid  orange" : "1px solid #dddddd"), 
-            backgroundColor: (($.meta.date_idx+1)%7 === 0) || (($.meta.date_idx+2)%7 === 0) ?"#bdc3c7" : "#ecf0f1", 
-            opacity: $.le.model.today.getMonth()+1 != $.meta.date.split("-")[0] ? 0.3 : undefined,
-            overflow: "hidden", 
-            borderRadius:"15px"
-          }), // dynamic width and equal height: https://stackoverflow.com/a/13625843
-        }, 
+      CalendarDay
 
-        "=>": [
-
-          { div: { meta: {forEach: "slot", of: $ => $.le.model.slots},
-
-            props: {
-              isToday: $=>$.le.model.today.getDay()-1 == $.meta.date.split("-")[1],
-              task: $=>$.le.model.tasks.find(x=>x.date===$.meta.date && x.slot===$.meta.slot),
-              diba: $=>$.this.task !== undefined ? $.le.model.diba.find(x=>x.diba_id === $.this.task.diba_id) : undefined
-            },
-
-            attrs: { 
-              style: { position: "relative", display: "inline-block", width: (100/2)+"%", height: 0, margin:"0px", paddin:"0px", paddingBottom: (100/2)+"%", border: "1px solid #dddddd"}, // dynamic width and equal height: https://stackoverflow.com/a/13625843
-            }, 
-
-            handle: {
-              ondragover: ($, ev)=>{ ev.preventDefault() },
-              ondrop: ($, ev)=>{
-                ev.preventDefault()
-      
-                let old_date = ev.dataTransfer.getData("old_date")
-                let old_slot = ev.dataTransfer.getData("old_slot")
-                let diba_id = ev.dataTransfer.getData("diba_id")
-
-                $.le.model.tasks = [
-                  ...$.le.model.tasks.filter(
-                    x=>!(x.date==old_date && x.slot==old_slot) && !(x.date==$.meta.date && x.slot==$.meta.slot)
-                  ), 
-                  {diba_id: diba_id, date: $.meta.date, slot: $.meta.slot, sub_todo: []} 
-                ]
-              }
-            },
-
-            "=>": [
-              { b: { meta:{if: $=>$.meta.slot === "11-13"}, 
-                attrs: { 
-                  style:$=>"margin-top: -3px; font-size:24px; position: absolute; right: 7px; z-index:1; color:"+($.parent.isToday ? "#f39c12" : "black"), 
-                  // class: $=>$.parent.isToday ? "active-text-shadow" : "text-shadow"
-                }, 
-                text: $=>$.meta.date.split("-")[1]
-              }}, 
-
-              { i: {attrs: {style: {position: "absolute", marginLeft: "5px", marginTop: "7px", fontSize:"10px"}}, text: $=>" (" + $.meta.slot + ")"}},
-
-              { br: {}},
-            
-              Extended(Diba, { meta: { if: $=>$.parent.task !== undefined },
-
-                props:{
-                  task: $ => $.parent.task,
-                  diba: $ => $.parent.diba
-                },
-
-                handle: {
-                  ondblclick: $=>{
-                    $.le.model.tasks = $.le.model.tasks.filter(x=>x!==$.this.task)
-                  },
-                  onclick: $=>{
-                    $.le.lateral_menu_controller.selectedTask = $.this.task
-                  }
-                }
-
-              }) // per non creare un nuovo meta..direttamente
-              
-            ]
-
-          }}
-          
-        ],
-
-      }}
     ]
   }}
 
 
-  // View
   const TodoInput = { 
     input: {
 
@@ -3265,7 +3270,6 @@ const appCalendarOrganizer = async ()=>{
 
     }
   }
-
 
   const TodoListItem = { 
     div: {
@@ -3316,6 +3320,155 @@ const appCalendarOrganizer = async ()=>{
     }
   }
 
+  const LateralMenuController = { Controller: {
+    id: "lateral_menu_controller",
+
+    props: {
+      isOpened: false,
+      selectedTask: undefined,
+      selectedDiba: $=>$.this.selectedTask !== undefined ? $.le.model.diba.find(x=>x.diba_id === $.this.selectedTask.diba_id) : undefined
+    },
+
+    on: { this: {
+      selectedDibaChanged: $=>{
+        $.this.isOpened = true
+      }
+    }}
+
+  }}
+
+  const LateralMenu = { div: {
+
+    id: "lateral_menu",
+
+    attrs: { 
+      style: $=>({
+        // visibility: $.le.lateral_menu_controller.isOpened ? null : "hidden",
+        opacity: $.le.lateral_menu_controller.isOpened ? 1 : 0.75,
+        position: "absolute",
+        backgroundColor: $.le.lateral_menu_controller.selectedDiba?.color || "white",
+        borderRadius: "25px",
+        top: "25px",
+        // right: "25px",
+        bottom: "25px",
+        // left: $.le.lateral_menu_controller.isOpened ? "65%" : "calc(100% - 25px)",
+        left: $.le.lateral_menu_controller.isOpened ? "65%" : "100%",
+        width: $.le.lateral_menu_controller.isOpened ? "calc(35% - 25px)" : 0,
+
+        zIndex: "2",
+        overflow: "hidden",
+        padding: $.le.lateral_menu_controller.isOpened ? "25px" : "0",
+        transition: "left 0.3s, width " + ($.le.lateral_menu_controller.isOpened ? 0.3 : 0.6) + "s, padding 0.3s, opacity 0.3s, background-color 0.3s ease-in-out"
+      }),
+      class: "shadow"
+    },
+
+    on: { le: { lateral_menu_controller: {
+      isOpenedChanged: $=>{
+        if(!$.le.lateral_menu_controller.isOpened) {
+          setTimeout(()=>{
+            $.this.el.style.visibility="hidden"
+          }, 290)
+        }
+      }
+    }}},
+
+    "=>":[
+      //  $=>$.le.lateral_menu_controller.selectedDiba?.label,
+
+        { h2: {
+          attrs: {style: {marginTop:"5px"}},
+          text: $=> $.le.lateral_menu_controller.selectedDiba?.label,
+        }},
+
+        { h4: {
+        text: $=> $.le.lateral_menu_controller.selectedTask?.date,
+        }},
+
+        { button: {
+          
+          attrs: {
+            style: $=>({position: "absolute", right: "20px", top: "40px", color: "#565656", backgroundColor:"#ecf0f1"}),
+            class: "btn-floating material-icons"
+          },
+
+          handle: {
+            onclick: $=>{
+              $.le.lateral_menu_controller.isOpened = false
+            }
+          },
+
+          text: "close",
+
+        }},
+
+        // todo list container
+        { div: {
+    
+          "=>": [
+            Use({ div: { 
+              props: {
+                todos: $=>[...($.le.lateral_menu_controller.selectedTask !== undefined ? $.le.lateral_menu_controller.selectedTask.sub_todo : [])]
+              },
+              on: { 
+                le: {lateral_menu_controller: { selectedTaskChanged: $=>console.log("cambiatoooo")}},
+                this: {
+                  todosChanged: $=>console.log("todos changed..")
+                }
+              },  
+              "=>": [ // gen new meta..
+
+                Extended(TodoInput, {attrs: {style: "width: calc(100% - 165px)"}}),
+
+                { button: { 
+                  text: "Add Todo", 
+                  attrs: {style: "margin-left: 15px; width: 150px; color: #565656; background-color: #ecf0f1", class: "btn"}, 
+
+                  on_s: { ctx: { todo_input: {
+                    newInputConfirmed: $=>{
+                      $.this.insertTodo()
+                    }
+                  }}},
+
+                  handle: { onclick: $ => $.this.insertTodo() },
+
+                  def: {
+                    insertTodo: $=>{
+                      $.le.lateral_menu_controller.selectedTask.sub_todo.push({ _id: 0, todo: $.ctx.todo_input.text, done: false }) 
+                      // $.le.lateral_menu_controller.selectedTask = {...$.le.lateral_menu_controller.selectedTask}
+                      $.le.model._mark_tasks_as_changed()
+                      $.le.lateral_menu_controller._mark_selectedTask_as_changed()
+                      $.le.lateral_menu_controller._mark_selectedDiba_as_changed()
+                      $.ctx.todo_input.text = ""
+                    }
+                  },
+                }},
+
+                Extended(TodoListItem,  { meta: { forEach: "todo", of: $ => $.parent.todos} } )
+
+              ]
+            }})
+          ]
+
+        }
+      }
+        
+
+    ]
+
+  }}
+
+  const DibaToolbar = { div: {
+
+    attrs: {style: {width:"100%", marginBottom: "10px",  display: "flex", justifyContent: "center"}},
+
+    "=>":[
+      // "DIBA", 
+
+      Use(Diba, { meta: {forEach: "diba", of: $=>$.le.model.diba }, props: { diba: $=>$.meta.diba }}),
+    ]
+  }}
+
 
   RenderApp(document.body, { 
     div: {
@@ -3361,161 +3514,17 @@ const appCalendarOrganizer = async ()=>{
           text: $=>($.this.monthLabel[$.le.model.today.getMonth()+1] + " " + $.le.model.today.getFullYear())
         }},
 
-        { div: {
-
-          attrs: {style: {width:"100%", marginBottom: "10px",  display: "flex", justifyContent: "center"}},
-
-          "=>":[
-            // "DIBA", 
-
-            Use(Diba, { meta: {forEach: "diba", of: $=>$.le.model.diba }, props: { diba: $=>$.meta.diba }}),
-          ]
-        }},
+        DibaToolbar,
 
 
         Use(Calendar),
 
 
         // lateral menu
+        LateralMenuController,
 
-        { Controller: {
-          id: "lateral_menu_controller",
+        LateralMenu
 
-          props: {
-            isOpened: false,
-            selectedTask: undefined,
-            selectedDiba: $=>$.this.selectedTask !== undefined ? $.le.model.diba.find(x=>x.diba_id === $.this.selectedTask.diba_id) : undefined
-          },
-
-          on: { this: {
-            selectedDibaChanged: $=>{
-              $.this.isOpened = true
-            }
-          }}
-
-        }},
-
-        { div: {
-
-          id: "lateral_menu",
-
-          attrs: { 
-            style: $=>({
-              // visibility: $.le.lateral_menu_controller.isOpened ? null : "hidden",
-              opacity: $.le.lateral_menu_controller.isOpened ? 1 : 0.75,
-              position: "absolute",
-              backgroundColor: $.le.lateral_menu_controller.selectedDiba?.color || "white",
-              borderRadius: "25px",
-              top: "25px",
-              // right: "25px",
-              bottom: "25px",
-              // left: $.le.lateral_menu_controller.isOpened ? "65%" : "calc(100% - 25px)",
-              left: $.le.lateral_menu_controller.isOpened ? "65%" : "100%",
-              width: $.le.lateral_menu_controller.isOpened ? "calc(35% - 25px)" : 0,
-
-              zIndex: "2",
-              overflow: "hidden",
-              padding: $.le.lateral_menu_controller.isOpened ? "25px" : "0",
-              transition: "left 0.3s, width " + ($.le.lateral_menu_controller.isOpened ? 0.3 : 0.6) + "s, padding 0.3s, opacity 0.3s, background-color 0.3s ease-in-out"
-            }),
-            class: "shadow"
-          },
-
-          on: { le: { lateral_menu_controller: {
-            isOpenedChanged: $=>{
-              if(!$.le.lateral_menu_controller.isOpened) {
-                setTimeout(()=>{
-                  $.this.el.style.visibility="hidden"
-                }, 290)
-              }
-            }
-          }}},
-
-          "=>":[
-            //  $=>$.le.lateral_menu_controller.selectedDiba?.label,
-
-             { h2: {
-               attrs: {style: {marginTop:"5px"}},
-               text: $=> $.le.lateral_menu_controller.selectedDiba?.label,
-             }},
-
-             { h4: {
-              text: $=> $.le.lateral_menu_controller.selectedTask?.date,
-             }},
-
-             { button: {
-               
-               attrs: {
-                 style: $=>({position: "absolute", right: "20px", top: "40px", color: "#565656", backgroundColor:"#ecf0f1"}),
-                 class: "btn-floating material-icons"
-               },
-
-               handle: {
-                 onclick: $=>{
-                   $.le.lateral_menu_controller.isOpened = false
-                 }
-               },
-
-               text: "close",
-
-             }},
-
-             // todo list container
-             { div: {
-          
-                "=>": [
-                  Use({ div: { 
-                    props: {
-                      todos: $=>[...($.le.lateral_menu_controller.selectedTask !== undefined ? $.le.lateral_menu_controller.selectedTask.sub_todo : [])]
-                    },
-                    on: { 
-                      le: {lateral_menu_controller: { selectedTaskChanged: $=>console.log("cambiatoooo")}},
-                      this: {
-                        todosChanged: $=>console.log("todos changed..")
-                      }
-                    },  
-                    "=>": [ // gen new meta..
-
-                      Extended(TodoInput, {attrs: {style: "width: calc(100% - 165px)"}}),
-
-                      { button: { 
-                        text: "Add Todo", 
-                        attrs: {style: "margin-left: 15px; width: 150px; color: #565656; background-color: #ecf0f1", class: "btn"}, 
-
-                        on_s: { ctx: { todo_input: {
-                          newInputConfirmed: $=>{
-                            $.this.insertTodo()
-                          }
-                        }}},
-
-                        handle: { onclick: $ => $.this.insertTodo() },
-
-                        def: {
-                          insertTodo: $=>{
-                            $.le.lateral_menu_controller.selectedTask.sub_todo.push({ _id: 0, todo: $.ctx.todo_input.text, done: false }) 
-                            // $.le.lateral_menu_controller.selectedTask = {...$.le.lateral_menu_controller.selectedTask}
-                            $.le.model._mark_tasks_as_changed()
-                            $.le.lateral_menu_controller._mark_selectedTask_as_changed()
-                            $.le.lateral_menu_controller._mark_selectedDiba_as_changed()
-                            $.ctx.todo_input.text = ""
-                          }
-                        },
-                      }},
-
-                      Extended(TodoListItem,  { meta: { forEach: "todo", of: $ => $.parent.todos} } )
-
-                    ]
-                  }})
-                ]
-
-              }
-            }
-             
-
-          ]
-
-        }}
-        
       ]
 
     }
