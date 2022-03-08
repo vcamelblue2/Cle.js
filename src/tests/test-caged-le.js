@@ -2961,9 +2961,9 @@ const appCalendarOrganizer = async ()=>{
   }
 
   const getMonthDays = ()=>{
-    let today_date = new Date()
+    let today_date = new Date() //"04/1/22")
     let today_date_as_millis = today_date.getTime()
-    let today_day = today_date.getDate()+1
+    let today_day = today_date.getDate()
     let first_day_as_millis = today_date_as_millis - ((today_day-1) * (24*60*60*1000))
     let first_day_date = new Date(first_day_as_millis)
     
@@ -3013,58 +3013,79 @@ const appCalendarOrganizer = async ()=>{
       id: "model",
 
       data: {
-        today: new Date(),
+        today: new Date(), //"04/1/22"),
         dates: getMonthDays(),//range(1,31).map(x=>String(x)),
+        
         slots: ["9-11", "11-13", "14-16", "16-18"],
         
-        diba: [ 
-          {diba_id:"diba1", label:"Diba 1", color:"#f1c40f"}, 
-          {diba_id:"diba2", label:"Diba 2", color:"#e74c3c"},
-          {diba_id:"diba3", label:"Diba 3", color:"#2ecc71"},
-          {diba_id:"diba4", label:"Diba 4", color:"#3498db"},
-          // {diba_id:"diba5", label:"Diba 5", color:"#8e44ad"},
+        projects_progressive: 0,
+        projects: [ 
+          {project_id:"project1", label:"Project 1", color:"#f1c40f", tasks: []}, 
+          {project_id:"project2", label:"Project 2", color:"#e74c3c", tasks: []},
+          {project_id:"project3", label:"Project 3", color:"#2ecc71", tasks: []},
+          {project_id:"project4", label:"Project 4", color:"#3498db", tasks: []},
+          // {project_id:"project5", label:"Project 5", color:"#8e44ad", tasks: []},
         ],
+        tasks_progressive: 0,
 
-        tasks: [] //[ {diba_id:"diba1", date:"1", slot:"9-11", sub_todo:[]} ],
+        // plans_progressive: 0,
+        plans: [], //[ {project_id:"project1", date:"1", slot:"9-11", tasks_id:[]} ],
+
+        selectedPlan: undefined
+
       },
 
       def: {
-        getDibaByTask: ($, task) => $.this.diba.find(x=>x.diba_id === task.diba_id),
-        setTasks: ($, tasks) => { $.this.tasks = tasks}
+        getProjectByPlan: ($, plan) => $.this.projects.find(x=>x.project_id === plan.project_id),
+        setPlans: ($, plans) => { $.this.plans = plans },
+        getNextTaskProgressive: $=>{
+          $.this.tasks_progressive = $.this.tasks_progressive + 1
+          return $.this.tasks_progressive
+        }
       },
 
       // auto local storage
       on: {
         this: {
-          tasksChanged: $ => {
-            localStorage.setItem("caged-le-demo.calendar.tasks", JSON.stringify($.this.tasks))
+          plansChanged: $ => {
+            localStorage.setItem("caged-le-demo.calendar.plans", JSON.stringify($.this.plans))
           },
-          dibaChanged: $ => {
-            localStorage.setItem("caged-le-demo.calendar.diba", JSON.stringify($.this.diba))
+          projectsChanged: $ => {
+            localStorage.setItem("caged-le-demo.calendar.projects", JSON.stringify($.this.projects))
+          },
+          tasks_progressiveChanged: $ => {
+            localStorage.setItem("caged-le-demo.calendar.tasks_progressive", JSON.stringify($.this.tasks_progressive))
           }
         }
       },
 
       onInit: $=>{
-        let tasks_on_disk = localStorage.getItem("caged-le-demo.calendar.tasks")
-        let diba_on_disk = localStorage.getItem("caged-le-demo.calendar.diba")
-        if (diba_on_disk){
-          $.this.diba = JSON.parse(diba_on_disk)
+        let tasks_progressive_on_disk = localStorage.getItem("caged-le-demo.calendar.tasks_progressive")
+        let projects_on_disk = localStorage.getItem("caged-le-demo.calendar.projects")
+        let plans_on_disk = localStorage.getItem("caged-le-demo.calendar.plans")
+
+        if (tasks_progressive_on_disk){
+          $.this.tasks_progressive = JSON.parse(tasks_progressive_on_disk)
         }
-        if (tasks_on_disk){
-          $.this.tasks = JSON.parse(tasks_on_disk)
+        if (projects_on_disk){
+          $.this.projects = JSON.parse(projects_on_disk)
+        }
+        if (plans_on_disk){
+          $.this.plans = JSON.parse(plans_on_disk)
         }
       }
+
     }
   }
 
-  const Diba = { 
+
+  const Project = { 
     div: {
 
       props: {
-        task: undefined,//{diba_id:"diba1", date:"1", slot:"9-11", sub_todo:[]},
-        diba: undefined,// $=>$.le.model.diba[0],
-        isSource: $=>$.this.task === undefined,
+        plan: undefined,//{project_id:"project1", date:"1", slot:"9-11", tasks_id:[]},
+        project: undefined,// $=>$.le.model.projects[0],
+        isSource: $=>$.this.plan === undefined,
       },
 
       attrs: { 
@@ -3072,7 +3093,7 @@ const appCalendarOrganizer = async ()=>{
           position: $.this.isSource ? undefined : "absolute", 
           display: $.this.isSource ? "flex" : "inline-block", 
           flex: $.this.isSource ? "1 1 auto" : undefined,
-          backgroundColor: $.this.diba?.color, 
+          backgroundColor: $.this.project?.color, 
           width: $.this.isSource ? "160px" : "100%", 
           height: $.this.isSource ? "80px" : undefined, 
           borderRadius: $.this.isSource ? undefined : "10px",
@@ -3087,21 +3108,39 @@ const appCalendarOrganizer = async ()=>{
           // console.log("draggin now! my parent is:", $.parent, "has date:", $.meta.date )
           ev.dataTransfer.setData("old_date", $.meta.date)
           ev.dataTransfer.setData("old_slot", $.meta.slot)
-          ev.dataTransfer.setData("diba_id", $.this.diba.diba_id)
+          ev.dataTransfer.setData("project_id", $.this.project.project_id)
         }
       },
 
       "=>": [
         { div: {
           
-          props: { diba:$=>$.parent.diba, isSource: $=>$.parent.isSource },
+          props: { plan: $=>$.parent.plan, project: $=>$.parent.project, isSource: $=>$.parent.isSource },
 
           attrs: {style: "width: 100%; height: 100%; display:flex; justify-content: center; align-items: center; color: #ffffff"},
           
           "=>":[
 
             { div: { meta: { if: $=>!$.parent.isSource},
-              text: $=>$.parent.diba?.label
+              
+              props: { plan: $=>$.parent.plan, project: $=>$.parent.project, isSource: $=>$.parent.isSource },
+
+              text: [
+                $=>$.parent.project?.label,
+                { div: { 
+                  attrs: { style: {
+                    position: "absolute",
+                    top: "5px",
+                    right: "5px",
+                    width: "0.65rem",
+                    fontSize: "0.6rem",
+                    textAlign: "center",
+                    borderRadius: "50px",
+                    background: "#ffffff55",
+                  }},
+                  text: $=>$.parent.plan !== undefined && $.parent.plan?.tasks_id.length > 0 ? $.parent.plan?.tasks_id.length: ""
+                }}
+              ]
             }},
 
             { input: { meta: { if: $=>$.parent.isSource},
@@ -3109,13 +3148,13 @@ const appCalendarOrganizer = async ()=>{
               attrs: { style: "margin-left: 5px; margin-right: 5px; text-align: center; border-bottom:none"},
 
               hattrs: { 
-                value: $ => $.parent.diba?.label
+                value: $ => $.parent.project?.label
               },
               
               handle: {
                 onchange: ($, e)=>{
-                  $.parent.diba.label = e.target.value
-                  $.le.model._mark_diba_as_changed()
+                  $.parent.project.label = e.target.value
+                  $.le.model._mark_projects_as_changed()
                 }
               }
 
@@ -3128,12 +3167,26 @@ const appCalendarOrganizer = async ()=>{
   }
 
 
+
+  const ProjectToolbar = { div: {
+
+    attrs: {style: {width:"100%", marginBottom: "10px",  display: "flex", justifyContent: "center"}},
+
+    "=>":[
+      // "Project", 
+
+      Use(Project, { meta: {forEach: "project", of: $=>$.le.model.projects }, props: { project: $=>$.meta.project }}),
+    ]
+  }}
+
+
+
   const CalendarDaySlot = { div: { meta: {forEach: "slot", of: $ => $.le.model.slots},
 
     props: {
-      isToday: $=>$.le.model.today.getDay()-1 == $.meta.date.split("-")[1],
-      task: $=>$.le.model.tasks.find(x=>x.date===$.meta.date && x.slot===$.meta.slot),
-      diba: $=>$.this.task !== undefined ? $.le.model.diba.find(x=>x.diba_id === $.this.task.diba_id) : undefined
+      isToday: $=>$.parent.isToday,
+      plan: $=>$.le.model.plans.find(x=>x.date===$.meta.date && x.slot===$.meta.slot),
+      project: $=>$.this.plan !== undefined ? $.le.model.projects.find(x=>x.project_id === $.this.plan.project_id) : undefined
     },
 
     attrs: { 
@@ -3147,13 +3200,13 @@ const appCalendarOrganizer = async ()=>{
 
         let old_date = ev.dataTransfer.getData("old_date")
         let old_slot = ev.dataTransfer.getData("old_slot")
-        let diba_id = ev.dataTransfer.getData("diba_id")
+        let project_id = ev.dataTransfer.getData("project_id")
 
-        $.le.model.tasks = [
-          ...$.le.model.tasks.filter(
+        $.le.model.plans = [
+          ...$.le.model.plans.filter(
             x=>!(x.date==old_date && x.slot==old_slot) && !(x.date==$.meta.date && x.slot==$.meta.slot)
           ), 
-          {diba_id: diba_id, date: $.meta.date, slot: $.meta.slot, sub_todo: []} 
+          {project_id: project_id, date: $.meta.date, slot: $.meta.slot, tasks_id: []} 
         ]
       }
     },
@@ -3171,19 +3224,19 @@ const appCalendarOrganizer = async ()=>{
 
       { br: {}},
     
-      Extended(Diba, { meta: { if: $=>$.parent.task !== undefined },
+      Extended(Project, { meta: { if: $=>$.parent.plan !== undefined },
 
         props:{
-          task: $ => $.parent.task,
-          diba: $ => $.parent.diba
+          plan: $ => $.parent.plan,
+          project: $ => $.parent.project
         },
 
         handle: {
           ondblclick: $=>{
-            $.le.model.tasks = $.le.model.tasks.filter(x=>x!==$.this.task)
+            $.le.model.plans = $.le.model.plans.filter(x=>x!==$.this.plan)
           },
           onclick: $=>{
-            $.le.lateral_menu_controller.selectedTask = $.this.task
+            $.le.model.selectedPlan = $.this.plan
           }
         }
 
@@ -3194,6 +3247,10 @@ const appCalendarOrganizer = async ()=>{
   }}
 
   const CalendarDay = { div: { meta: { forEach: "date", of: $ => $.le.model.dates, define:{index:"date_idx"} },
+
+    props: {
+      isToday: $=>(($.le.model.today.getMonth()+1) + "-" +$.le.model.today.getDate()) == $.meta.date,
+    },
         
     attrs: { 
       style: $=>({ 
@@ -3203,7 +3260,7 @@ const appCalendarOrganizer = async ()=>{
         margin:"2.5px 5px", 
         paddin:"0px", 
         paddingBottom: "calc("+(100/7)+"% - 10px)", 
-        border: ($.le.model.today.getDay()-1 == $.meta.date.split("-")[1] ? "3px solid  orange" : "1px solid #dddddd"), 
+        border: $.this.isToday ? "3px solid  orange" : "1px solid #dddddd", 
         backgroundColor: (($.meta.date_idx+1)%7 === 0) || (($.meta.date_idx+2)%7 === 0) ?"#bdc3c7" : "#ecf0f1", 
         opacity: $.le.model.today.getMonth()+1 != $.meta.date.split("-")[0] ? 0.3 : undefined,
         overflow: "hidden", 
@@ -3247,6 +3304,7 @@ const appCalendarOrganizer = async ()=>{
   }}
 
 
+
   const TodoInput = { 
     input: {
 
@@ -3274,64 +3332,151 @@ const appCalendarOrganizer = async ()=>{
   const TodoListItem = { 
     div: {
 
-      // onInit: $=> M.AutoInit(),
+      attrs: { style: { marginTop: "15px"}},
 
       "=>": [
         // todo with checkbox
-        { span: {
-          "=>": [
-            { label: { 
-              "=>": [  // si poteva fare anche con style..
-                { input: { 
-                  attrs: { type: "checkbox", class: "browser-default"},
-                  hattrs: { 
-                    // type: "checkbox", 
-                    checked: $ => $.meta.todo.done, 
-                    name: $ => $.meta.todo._id
-                  }, 
-                  // handle: { onchange: $ => {
-                    // $.le.model.chnageDoneStatus($.meta.todo)
-                  // } }
-                }}, 
-                
-                { span: { meta: {if: $ => !$.meta.todo.done}, 
+        { label: { 
+          "=>": [  // si poteva fare anche con style..
+            
+            { input: { 
+
+              attrs: { type: "checkbox"},
+
+              hattrs: { 
+                // type: "checkbox", 
+                checked: $ => $.meta.todo.done, 
+                name: $ => $.meta.todo.todo_id
+              }, 
+
+              handle: { onchange: $ => {
+                $.ctx.todolist_container.changeTodoStatus($.meta.todo.todo_id)
+              }}
+
+            }}, 
+            
+            { span: {
+
+              "=>": [ 
+
+                {span: { meta: {if: $ => !$.meta.todo.done},
                   text: $ => $.meta.todo.todo
-                }}, 
+                }},
+                    
                 { s: { meta: {if: $ => $.meta.todo.done}, 
                   text: $ => $.meta.todo.todo 
-                }},
-              ], 
-              hattrs: {for: $ => $.meta.todo._id} 
-            }}
-          ] 
+                }}, 
+              ]
+            }}, 
+
+          ], 
+          hattrs: {for: $ => $.meta.todo.todo_id} 
         }},
+
         // remove button
-        { button: {  
-          text: "close", 
-          // handle: { 
-          //   onclick: $ => $.le.model.remove($.meta.todo) 
-          // }, 
+        { a: {  
+          
           attrs: { 
-            style: {position: "absolute", right:"2px", color: "#565656", backgroundColor:"transparent"},
-            class: "btn-floating material-icons"
-          }  
+            style: {position: "absolute", right:"25px", color: "#565656", backgroundColor:"transparent"},
+            class: "waves-effect waves-teal btn-flat"
+          },
+
+          handle: { 
+            onclick: $ => $.ctx.todolist_container.deleteTodo($.meta.todo.todo_id) 
+          }, 
+          
+          text: { i: { attrs: {class: "material-icons"}, text: "close"}}
         }},
       ]
     }
   }
+
+  const TodoListContainer = { div: {
+
+    "=>": [
+      Use({ div: { 
+
+        ctx_id: "todolist_container",
+
+        props: {
+          todos_id: $=>[...($.le.lateral_menu_controller.selectedPlan !== undefined ? $.le.lateral_menu_controller.selectedPlan.tasks_id : [])],
+          todos: $=> $.le.lateral_menu_controller.selectedProject!==undefined && $.this.todos_id.length>0 ? $.le.lateral_menu_controller.selectedProject.tasks.filter(t=>$.ctx.todolist_container.todos_id.includes(t.todo_id)) : []
+        },
+
+        def: {
+          insertTodo: $=>{
+            let todo_id = $.le.model.getNextTaskProgressive()
+
+            $.le.lateral_menu_controller.selectedProject.tasks.push({ todo_id: todo_id, todo: $.ctx.todo_input.text, done: false })
+            $.le.lateral_menu_controller.selectedPlan.tasks_id.push(todo_id) 
+
+            $.le.model._mark_projects_as_changed()
+            $.le.model._mark_plans_as_changed()
+
+            $.ctx.todo_input.text = ""
+          },
+
+          deleteTodo: ($, todo_id) =>{
+
+            $.le.lateral_menu_controller.selectedPlan.tasks_id = $.le.lateral_menu_controller.selectedPlan.tasks_id.filter(t=>t!==todo_id)
+            $.le.lateral_menu_controller.selectedProject.tasks = $.le.lateral_menu_controller.selectedProject.tasks.filter(t=>t.todo_id !== todo_id)
+
+            $.le.model._mark_plans_as_changed()
+            $.le.model._mark_projects_as_changed()
+
+          },
+
+          changeTodoStatus: ($, todo_id) =>{
+
+            $.le.lateral_menu_controller.selectedProject.tasks = $.le.lateral_menu_controller.selectedProject.tasks.map(t=>t.todo_id === todo_id ? {...t, done: !t.done } : t)
+
+            $.le.model._mark_projects_as_changed()
+            $.le.model._mark_plans_as_changed()
+
+          }
+        },
+
+        on_s: { ctx: { 
+          todo_input: {
+            newInputConfirmed: $=> $.this.insertTodo()
+          }
+
+        }},
+
+        "=>": [ // gen new meta..
+
+          Extended(TodoInput, {attrs: {style: "width: calc(100% - 165px)"}}),
+
+          { button: { 
+
+            text: "Add Todo", 
+
+            attrs: {style: "margin-left: 15px; width: 150px; color: #565656; background-color: #ecf0f1", class: "btn"}, 
+
+            handle: { onclick: $ => $.ctx.todolist_container.insertTodo() },
+
+          }},
+
+          Extended(TodoListItem,  { meta: { forEach: "todo", of: $ => $.parent.todos } } )
+
+        ]
+      }})
+    ]
+
+  }}
 
   const LateralMenuController = { Controller: {
     id: "lateral_menu_controller",
 
     props: {
       isOpened: false,
-      selectedTask: undefined,
-      selectedDiba: $=>$.this.selectedTask !== undefined ? $.le.model.diba.find(x=>x.diba_id === $.this.selectedTask.diba_id) : undefined
+      selectedPlan: $=>$.le.model.selectedPlan,
+      selectedProject: $=>$.this.selectedPlan !== undefined ? $.le.model.projects.find(x=>x.project_id === $.this.selectedPlan.project_id) : undefined
     },
 
     on: { this: {
-      selectedDibaChanged: $=>{
-        $.this.isOpened = true
+      selectedProjectChanged: $=>{
+        $.this.isOpened = $.this.selectedProject !== undefined
       }
     }}
 
@@ -3346,7 +3491,7 @@ const appCalendarOrganizer = async ()=>{
         // visibility: $.le.lateral_menu_controller.isOpened ? null : "hidden",
         opacity: $.le.lateral_menu_controller.isOpened ? 1 : 0.75,
         position: "absolute",
-        backgroundColor: $.le.lateral_menu_controller.selectedDiba?.color || "white",
+        backgroundColor: $.le.lateral_menu_controller.selectedProject?.color || "white",
         borderRadius: "25px",
         top: "25px",
         // right: "25px",
@@ -3374,15 +3519,15 @@ const appCalendarOrganizer = async ()=>{
     }}},
 
     "=>":[
-      //  $=>$.le.lateral_menu_controller.selectedDiba?.label,
+      //  $=>$.le.lateral_menu_controller.selectedProject?.label,
 
         { h2: {
           attrs: {style: {marginTop:"5px"}},
-          text: $=> $.le.lateral_menu_controller.selectedDiba?.label,
+          text: $=> $.le.lateral_menu_controller.selectedProject?.label,
         }},
 
         { h4: {
-        text: $=> $.le.lateral_menu_controller.selectedTask?.date,
+        text: $=> $.le.lateral_menu_controller.selectedPlan?.date,
         }},
 
         { button: {
@@ -3403,70 +3548,10 @@ const appCalendarOrganizer = async ()=>{
         }},
 
         // todo list container
-        { div: {
-    
-          "=>": [
-            Use({ div: { 
-              props: {
-                todos: $=>[...($.le.lateral_menu_controller.selectedTask !== undefined ? $.le.lateral_menu_controller.selectedTask.sub_todo : [])]
-              },
-              on: { 
-                le: {lateral_menu_controller: { selectedTaskChanged: $=>console.log("cambiatoooo")}},
-                this: {
-                  todosChanged: $=>console.log("todos changed..")
-                }
-              },  
-              "=>": [ // gen new meta..
-
-                Extended(TodoInput, {attrs: {style: "width: calc(100% - 165px)"}}),
-
-                { button: { 
-                  text: "Add Todo", 
-                  attrs: {style: "margin-left: 15px; width: 150px; color: #565656; background-color: #ecf0f1", class: "btn"}, 
-
-                  on_s: { ctx: { todo_input: {
-                    newInputConfirmed: $=>{
-                      $.this.insertTodo()
-                    }
-                  }}},
-
-                  handle: { onclick: $ => $.this.insertTodo() },
-
-                  def: {
-                    insertTodo: $=>{
-                      $.le.lateral_menu_controller.selectedTask.sub_todo.push({ _id: 0, todo: $.ctx.todo_input.text, done: false }) 
-                      // $.le.lateral_menu_controller.selectedTask = {...$.le.lateral_menu_controller.selectedTask}
-                      $.le.model._mark_tasks_as_changed()
-                      $.le.lateral_menu_controller._mark_selectedTask_as_changed()
-                      $.le.lateral_menu_controller._mark_selectedDiba_as_changed()
-                      $.ctx.todo_input.text = ""
-                    }
-                  },
-                }},
-
-                Extended(TodoListItem,  { meta: { forEach: "todo", of: $ => $.parent.todos} } )
-
-              ]
-            }})
-          ]
-
-        }
-      }
-        
+        TodoListContainer
 
     ]
 
-  }}
-
-  const DibaToolbar = { div: {
-
-    attrs: {style: {width:"100%", marginBottom: "10px",  display: "flex", justifyContent: "center"}},
-
-    "=>":[
-      // "DIBA", 
-
-      Use(Diba, { meta: {forEach: "diba", of: $=>$.le.model.diba }, props: { diba: $=>$.meta.diba }}),
-    ]
   }}
 
 
@@ -3514,7 +3599,7 @@ const appCalendarOrganizer = async ()=>{
           text: $=>($.this.monthLabel[$.le.model.today.getMonth()+1] + " " + $.le.model.today.getFullYear())
         }},
 
-        DibaToolbar,
+        ProjectToolbar,
 
 
         Use(Calendar),
