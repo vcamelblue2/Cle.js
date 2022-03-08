@@ -3126,14 +3126,16 @@ const appCalendarOrganizer = async ()=>{
               props: { plan: $=>$.parent.plan, project: $=>$.parent.project, isSource: $=>$.parent.isSource },
 
               text: [
+                
                 $=>$.parent.project?.label,
+
                 { div: { 
                   attrs: { style: {
                     position: "absolute",
                     top: "5px",
                     right: "5px",
-                    width: "0.65rem",
-                    fontSize: "0.6rem",
+                    width: "0.9rem",
+                    fontSize: "0.7rem",
                     textAlign: "center",
                     borderRadius: "50px",
                     background: "#ffffff55",
@@ -3145,7 +3147,7 @@ const appCalendarOrganizer = async ()=>{
 
             { input: { meta: { if: $=>$.parent.isSource},
 
-              attrs: { style: "margin-left: 5px; margin-right: 5px; text-align: center; border-bottom:none"},
+              attrs: { style: "margin-left: 5px; margin-right: 5px; text-align: center; border-bottom:none; color: #ffffff"},
 
               hattrs: { 
                 value: $ => $.parent.project?.label
@@ -3614,6 +3616,8 @@ const appCalendarOrganizer = async ()=>{
 
     }
   })
+
+  // todo: fare che posso avere delle note e che esiste semore una dib "generic" che si comporta diversamente..in pratica in quello slot di 2 h riutilizzo il concetto di ico-export..quindi ho una zona in cui mettere manualmente come l'app attuale
 
   
 }
