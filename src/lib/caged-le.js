@@ -2934,6 +2934,9 @@ export { pass, none, smart, Use, Extended, Placeholder, Bind, RenderApp, toInlin
 
   // todo: standardizzare un po la parte di syncback di una var nel local storage..in modo da poter indicare "@autosync_in_local_storage", o nel name come per lazy o in altra roba apposita. in quest'ultimo caso possiamo anche specificare come scriverle, quali e l'ordine di recupero
 
+  // todo: possibilità di definire la "struct" di una Property, in modo da provare a seguire i cambiamenti di valore nested..es se ho un dict o un array..deve essere un cosa persistente anche a successive set di valore..nonchè trasparente, in modo da dare problemi agli sviluppatori
+  //       una cosa carina sarebbe definire una classe che eredita da una nostra classe base, per cui definiamo delle cose e che fa la magia automaticmante!
+
 
 // IMPROVEMENTS:
 
@@ -2955,6 +2958,11 @@ export { pass, none, smart, Use, Extended, Placeholder, Bind, RenderApp, toInlin
 
 
 // IDEAS:
+  // todo: novita della novità rispetto a tutto quello che c'è dopo: il modo più semplice per una handle di qualcosa di un mio figlio ma senza nome è usare il concetto di slot e connect: in pratica il parent dichiara uno slot: ovvero una funzione che ha un nome e che gestisce un segnale di un qualcuno generico, e i figli possono fare la connect di un proprio signal allo slot del parent. in questo modo davvero si elimina il problema di non avere id, visto che per il contrario (parent to child) basta una property o un signal che i figli interessati seguono..dove mettiamo la logica per discriminare se è o meno interessante per me. infine, se si vuole andare di codice imperativo si possono definire delle var (es selected, se c'è una cosa del genere) in cui i figli inseriscono se stessi alla init..
+  //       anche se in realtà alla fine la child to parent non è un problema..visto che in modo imperativo posso sempre fare parent.blabla
+
+  // todo: resta il fatto che 99% delle problematiche si risolverebbero in realtà con: catena dei parent, meta che ingloba i super meta, ctx che ingloba i super ctx (o è già così?), e infine un flag per dire di riportare tutte le props del mio parent (anche in scrittura!! ergo ci vuole una sorta di Bind)
+
 
   // todo: rispetto a tutto quello che ho scritto qui sotto, forse la cosa migliore per gestire le on e on_s (non ovviamente tutti gli altri problemi..) almeno di 1 livello (child diretti) è quella di aggiungere una on: {direct_childs: ... }, che da realizzare sarebbe mooolto semplice..in quanto devo solo andare sui miei child (dopo la creazione dei child, o con retry) a cercare di sottoscrivermi..easy e via! in congiunzione con l'inserimento in properties di una ".childs" in grado quindi di poter fare $.this.childs[0].doSomething. a quel punto posso sottoscrivermi alle onchange e ai signal del figlio (per attaccarmi alle props), e chiamare su di lui cose senza nome!
 
