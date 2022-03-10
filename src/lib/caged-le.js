@@ -2962,6 +2962,8 @@ export { pass, none, smart, Use, Extended, Placeholder, Bind, RenderApp, toInlin
   //       anche se in realtà alla fine la child to parent non è un problema..visto che in modo imperativo posso sempre fare parent.blabla
 
   // todo: resta il fatto che 99% delle problematiche si risolverebbero in realtà con: catena dei parent, meta che ingloba i super meta, ctx che ingloba i super ctx (o è già così?), e infine un flag per dire di riportare tutte le props del mio parent (anche in scrittura!! ergo ci vuole una sorta di Bind)
+  
+  // todo: una cosa più semplice da fare sarebbe quella di avere un nuovo campo "ref_id" e poi $.ref.up/down/same|lvl.refxxx oer andare in ricerca sull'albero del ref..ovviamente first is return
 
 
   // todo: rispetto a tutto quello che ho scritto qui sotto, forse la cosa migliore per gestire le on e on_s (non ovviamente tutti gli altri problemi..) almeno di 1 livello (child diretti) è quella di aggiungere una on: {direct_childs: ... }, che da realizzare sarebbe mooolto semplice..in quanto devo solo andare sui miei child (dopo la creazione dei child, o con retry) a cercare di sottoscrivermi..easy e via! in congiunzione con l'inserimento in properties di una ".childs" in grado quindi di poter fare $.this.childs[0].doSomething. a quel punto posso sottoscrivermi alle onchange e ai signal del figlio (per attaccarmi alle props), e chiamare su di lui cose senza nome!
