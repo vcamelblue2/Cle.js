@@ -3036,8 +3036,12 @@ const appCalendarOrganizer = async ()=>{
       data: {
         today: new Date(), //"04/1/22"),
         dates: getMonthDays(),//range(1,31).map(x=>String(x)),
+        monthLabelMapping: {"1":"Gennaio","2":"Febbraio", "3":"Marzo", "4":"Aprile", "5":"Maggio", "6":"Giugno", "7":"Luglio", "8":"Agosto", "9":"Settembre", "10":"Ottobre", "11":"Novembre", "12":"Dicembre"},
         
         slots: ["9-11", "11-13", "14-16", "16-18"],
+        slot_size_in_hh: 2,
+
+        colors: ["#f1c40f", "#e67e22", "#e74c3c", "#2ecc71", "#1abc9c", "#3498db", "#9b59b6"],
         
         projects_progressive: 0,
         projects: [ 
@@ -3111,7 +3115,7 @@ const appCalendarOrganizer = async ()=>{
 
       attrs: { 
         style: $=>({ 
-          position: $.this.isSource ? undefined : "absolute", 
+          position: $.this.isSource ? "relative" : "absolute", 
           display: $.this.isSource ? "flex" : "inline-block", 
           flex: $.this.isSource ? "1 1 auto" : undefined,
           backgroundColor: $.this.project?.color, 
@@ -3142,6 +3146,7 @@ const appCalendarOrganizer = async ()=>{
           
           "=>":[
 
+            // NOT SOURCE
             { div: { meta: { if: $=>!$.parent.isSource},
               
               props: { plan: $=>$.parent.plan, project: $=>$.parent.project, isSource: $=>$.parent.isSource },
@@ -3151,24 +3156,34 @@ const appCalendarOrganizer = async ()=>{
                 $=>$.parent.project?.label,
 
                 { div: { 
-                  attrs: { style: {
+
+                  props: {
+                    todo_count: $=> $.parent.plan !== undefined ? $.parent.plan.tasks_id.length : 0,
+                    done_count: $=> $.parent.plan !== undefined ? $.parent.plan.tasks_id.length-$.parent.project.tasks.filter(t=>!t.done && $.parent.plan.tasks_id.includes(t.todo_id )).length : 0,
+                    all_done: $=>$.this.todo_count === $.this.done_count,
+                  },
+
+                  attrs: { style: $=>({
                     position: "absolute",
                     top: "5px",
                     right: "5px",
-                    width: "0.9rem",
+                    width: "1.5rem",
                     fontSize: "0.7rem",
                     textAlign: "center",
                     borderRadius: "50px",
-                    background: "#ffffff55",
-                  }},
-                  text: $=>$.parent.plan !== undefined && $.parent.plan?.tasks_id.length > 0 ? $.parent.plan?.tasks_id.length: ""
+                    background: $.this.all_done ? "#ffffff55" : "#55555599",
+                  })},
+                  // todo: migliorare, troppo onerosa!
+                  // text: $=>$.parent.plan !== undefined && $.parent.project.tasks.filter(t=>$.parent.plan.tasks_id.includes(t.todo_id )).length > 0 ? $.parent.plan.tasks_id.length-$.parent.project.tasks.filter(t=>!t.done && $.parent.plan.tasks_id.includes(t.todo_id )).length + "/" + $.parent.plan.tasks_id.length: ""
+                  text: $=>$.this.todo_count > 0 ? $.this.done_count + "/" + $.this.todo_count : ""
                 }}
               ]
             }},
 
+            // IS SOURCE
             { input: { meta: { if: $=>$.parent.isSource},
 
-              attrs: { style: "margin-left: 5px; margin-right: 5px; text-align: center; border-bottom:none; color: #ffffff"},
+              attrs: { style: "margin-left: 5px; margin-right: 5px; text-align: center; border-bottom:none; color: #ffffff; font-size: 1.25rem;"},
 
               hattrs: { 
                 value: $ => $.parent.project?.label
@@ -3181,6 +3196,26 @@ const appCalendarOrganizer = async ()=>{
                 }
               }
 
+            }},
+            { div: { meta: { if: $=>$.parent.isSource},
+
+              props: {
+                todo_count: $=> $.parent.project?.tasks.length,
+                done_count: $=> $.parent.project?.tasks.filter(t=>t.done).length,
+                all_done: $=> $.this.todo_count === $.this.done_count
+              },
+
+              attrs: { style: $=>({
+                position: "absolute",
+                top: "5px",
+                right: "5px",
+                width: "1.5rem",
+                fontSize: "0.7rem",
+                textAlign: "center",
+                borderRadius: "50px",
+                background: $.this.all_done ? "#ffffff55" : "#55555599",
+              })},
+              text: $=>$.this.todo_count > 0 ? $.this.done_count + "/" + $.this.todo_count : ""
             }}
           ]
         }}
@@ -3225,11 +3260,20 @@ const appCalendarOrganizer = async ()=>{
         let old_slot = ev.dataTransfer.getData("old_slot")
         let project_id = ev.dataTransfer.getData("project_id")
 
+        let old_tasks = $.le.model.plans.find(
+          x=>(x.date==old_date && x.slot==old_slot)
+        )
+
+        // console.log("old tasks!!!!", old_date, old_slot, old_tasks)
+        if (old_tasks !== undefined){
+          old_tasks = [...old_tasks.tasks_id]
+        }
+
         $.le.model.plans = [
           ...$.le.model.plans.filter(
             x=>!(x.date==old_date && x.slot==old_slot) && !(x.date==$.meta.date && x.slot==$.meta.slot)
           ), 
-          {project_id: project_id, date: $.meta.date, slot: $.meta.slot, tasks_id: []} 
+          {project_id: project_id, date: $.meta.date, slot: $.meta.slot, tasks_id: old_tasks || []} 
         ]
       }
     },
@@ -3355,7 +3399,9 @@ const appCalendarOrganizer = async ()=>{
   const TodoListItem = { 
     div: {
 
-      attrs: { style: { marginTop: "15px"}},
+      props: { isPlanSpecific: false, disabled: $=>!$.this.isPlanSpecific && $.parent.todos_id.includes($.meta.todo.todo_id) },
+
+      attrs: { style: $=>({ marginTop: "15px", opacity: $.this.disabled ? 0.3 : undefined}), class:"todolist-item"},
 
       "=>": [
         // todo with checkbox
@@ -3380,6 +3426,8 @@ const appCalendarOrganizer = async ()=>{
             
             { span: {
 
+              attrs: { style: { color: "white" }},
+
               "=>": [ 
 
                 {span: { meta: {if: $ => !$.meta.todo.done},
@@ -3396,25 +3444,51 @@ const appCalendarOrganizer = async ()=>{
           hattrs: {for: $ => $.meta.todo.todo_id} 
         }},
 
-        // remove button
+        // move button
         { a: {  
-          
+          props: { isPlanSpecific: $=>$.parent.isPlanSpecific },
+
           attrs: { 
-            style: {position: "absolute", right:"25px", color: "#565656", backgroundColor:"transparent"},
+            style: {position: "absolute", right:"70px", color: "#565656", backgroundColor:"transparent"},
             class: "waves-effect waves-teal btn-flat"
           },
 
           handle: { 
-            onclick: $ => $.ctx.todolist_container.deleteTodo($.meta.todo.todo_id) 
+            onclick: $ => $.parent.isPlanSpecific ? $.ctx.todolist_container.removeFromPlan($.meta.todo.todo_id) : $.ctx.todolist_container.addToPlan($.meta.todo.todo_id) 
           }, 
           
-          text: { i: { attrs: {class: "material-icons"}, text: "close"}}
+          text: { i: { attrs: {style: {color: "white"}, class: "material-icons"}, text: $=>$.parent.isPlanSpecific ? "arrow_downward" : "arrow_upward"}}
+        }},
+
+        // remove button
+        { a: {  
+          
+          attrs: { 
+            style: {position: "absolute", right:"20px", color: "#565656", backgroundColor:"transparent"},
+            class: "waves-effect waves-teal btn-flat"
+          },
+
+          handle: { 
+            onclick: $ => {
+              let response = prompt("Are you sure do you whant to delete this task? This operation cannot be reversed! (y/n)", "n")
+              if (response === "y"){
+                $.ctx.todolist_container.deleteTodo($.meta.todo.todo_id)
+              }
+            }
+          }, 
+          
+          text: { i: { attrs: {style: {color: "white"}, class: "material-icons"}, text: "close"}}
         }},
       ]
     }
   }
 
   const TodoListContainer = { div: {
+
+    css: [
+      '.todolist-item [type="checkbox"]+span:not(.lever):before, .todolist-item [type="checkbox"]:not(.filled-in)+span:not(.lever):after{border: 2px solid white;}',
+      '.todolist-item [type="checkbox"]:checked+span:not(.lever):before{border-top: 2px solid transparent;border-left: 2px solid transparent;border-right: 2px solid black; border-bottom: 2px solid black;}'
+    ],
 
     "=>": [
       Use({ div: { 
@@ -3423,7 +3497,9 @@ const appCalendarOrganizer = async ()=>{
 
         props: {
           todos_id: $=>[...($.le.lateral_menu_controller.selectedPlan !== undefined ? $.le.lateral_menu_controller.selectedPlan.tasks_id : [])],
-          todos: $=> $.le.lateral_menu_controller.selectedProject!==undefined && $.this.todos_id.length>0 ? $.le.lateral_menu_controller.selectedProject.tasks.filter(t=>$.ctx.todolist_container.todos_id.includes(t.todo_id)) : []
+          todos: $=> $.le.lateral_menu_controller.selectedProject!==undefined && $.this.todos_id.length>0 ? $.le.lateral_menu_controller.selectedProject.tasks.filter(t=>$.ctx.todolist_container.todos_id.includes(t.todo_id)).sort((a,b)=>(a.done?1:0)-(b.done?1:0)) : [],
+          full_todos: $=> $.le.lateral_menu_controller.selectedProject!==undefined ? $.le.lateral_menu_controller.selectedProject.tasks : [],
+          not_in_this_plan_todos: $=> $.le.lateral_menu_controller.selectedProject!==undefined ? $.le.lateral_menu_controller.selectedProject.tasks.filter(t=>!$.ctx.todolist_container.todos_id.includes(t.todo_id)).sort((a,b)=>(a.done?1:0)-(b.done?1:0)) : []
         },
 
         def: {
@@ -3443,6 +3519,7 @@ const appCalendarOrganizer = async ()=>{
 
             $.le.lateral_menu_controller.selectedPlan.tasks_id = $.le.lateral_menu_controller.selectedPlan.tasks_id.filter(t=>t!==todo_id)
             $.le.lateral_menu_controller.selectedProject.tasks = $.le.lateral_menu_controller.selectedProject.tasks.filter(t=>t.todo_id !== todo_id)
+            $.le.model.plans.forEach(p=>p.tasks_id = p.tasks_id.filter(t=>t !== todo_id)) // rimuovo anche da qualsiasi altro plan!
 
             $.le.model._mark_plans_as_changed()
             $.le.model._mark_projects_as_changed()
@@ -3456,6 +3533,26 @@ const appCalendarOrganizer = async ()=>{
             $.le.model._mark_projects_as_changed()
             $.le.model._mark_plans_as_changed()
 
+          },
+
+          addToPlan: ($, todo_id)=>{
+
+            if (!$.le.lateral_menu_controller.selectedPlan.tasks_id.includes(todo_id)){
+
+              $.le.lateral_menu_controller.selectedPlan.tasks_id.push(todo_id) 
+              $.le.model._mark_plans_as_changed()
+              $.le.model._mark_projects_as_changed()
+            }
+
+          },
+
+          removeFromPlan: ($, todo_id)=>{
+
+            $.le.lateral_menu_controller.selectedPlan.tasks_id = $.le.lateral_menu_controller.selectedPlan.tasks_id.filter(t=>t!==todo_id)
+
+            $.le.model._mark_plans_as_changed()
+            $.le.model._mark_projects_as_changed()
+
           }
         },
 
@@ -3466,13 +3563,15 @@ const appCalendarOrganizer = async ()=>{
 
         }},
 
+
         "=>": [ // gen new meta..
+
 
           Extended(TodoInput, {attrs: {style: "width: calc(100% - 165px)"}}),
 
           { button: { 
 
-            text: "Add Todo", 
+            text: "Add Task", 
 
             attrs: {style: "margin-left: 15px; width: 150px; color: #565656; background-color: #ecf0f1", class: "btn"}, 
 
@@ -3480,7 +3579,22 @@ const appCalendarOrganizer = async ()=>{
 
           }},
 
-          Extended(TodoListItem,  { meta: { forEach: "todo", of: $ => $.parent.todos } } )
+          { h4: {text: "Slot Activites", meta: {if: $=>$.parent.todos?.length>0} }},
+
+          Extended(TodoListItem,  { meta: { forEach: "todo", of: $ => $.parent.todos }, props: {isPlanSpecific: true} } ),
+
+
+          { hr: {meta: {if: $=>$.parent.todos?.length>0}, attrs: {style: {marginTop:"15px"}}} },
+
+          { h4: {text: "Project Activites", meta: {if: $=>$.parent.full_todos?.length>0} }},
+          { h4: {text: "No Project Activites", meta: {if: $=>$.parent.full_todos?.length===0} }},
+
+          Extended(TodoListItem,  { meta: { forEach: "todo", of: $ => $.parent.not_in_this_plan_todos }, props: {isPlanSpecific: false} }),
+
+          // { h5: {text: "Assigned To Slot", meta: {if: $=>$.parent.todos?.length>0} }},
+          { hr: {meta: {if: $=>$.parent.todos?.length>0}, attrs: {style: {marginTop:"15px"}}} },
+
+          Extended(TodoListItem,  { meta: { forEach: "todo", of: $ => $.parent.todos }, props: {isPlanSpecific: false} })
 
         ]
       }})
@@ -3513,18 +3627,21 @@ const appCalendarOrganizer = async ()=>{
       style: $=>({
         // visibility: $.le.lateral_menu_controller.isOpened ? null : "hidden",
         opacity: $.le.lateral_menu_controller.isOpened ? 1 : 0.75,
-        position: "absolute",
+        // position: "absolute",
         backgroundColor: $.le.lateral_menu_controller.selectedProject?.color || "white",
         borderRadius: "25px",
         top: "25px",
         // right: "25px",
-        bottom: "25px",
+        // bottom: "25px",
         // left: $.le.lateral_menu_controller.isOpened ? "65%" : "calc(100% - 25px)",
         left: $.le.lateral_menu_controller.isOpened ? "65%" : "100%",
         width: $.le.lateral_menu_controller.isOpened ? "calc(35% - 25px)" : 0,
+        position: "fixed", 
+        height: "calc(100vh - 50px)",
 
         zIndex: "2",
         overflow: "hidden",
+        overflowY: "auto",
         padding: $.le.lateral_menu_controller.isOpened ? "25px" : "0",
         transition: "left 0.3s, width " + ($.le.lateral_menu_controller.isOpened ? 0.3 : 0.6) + "s, padding 0.3s, opacity 0.3s, background-color 0.3s ease-in-out"
       }),
@@ -3550,7 +3667,7 @@ const appCalendarOrganizer = async ()=>{
         }},
 
         { h4: {
-        text: $=> $.le.lateral_menu_controller.selectedPlan?.date,
+        text: $=> $.le.lateral_menu_controller.selectedPlan!==undefined ? $.le.lateral_menu_controller.selectedPlan.date.split("-")[1] +" "+ $.le.model.monthLabelMapping[$.le.lateral_menu_controller.selectedPlan.date.split("-")[0]] : "-",
         }},
 
         { button: {
@@ -3617,7 +3734,7 @@ const appCalendarOrganizer = async ()=>{
         Use(Model),
 
         { h1: {
-          props: { monthLabel: {"1":"Gennaio","2":"Febbraio", "3":"Marzo", "4":"Aprile", "5":"Maggio", "6":"Giugno", "7":"Luglio", "8":"Agosto", "9":"Settembre", "10":"Ottobre", "11":"Novembre", "12":"Dicembre"} },
+          props: { monthLabel: $=>$.le.model.monthLabelMapping },
           attrs: {style: {width:"100%", margin: "10px 0 ",  display: "flex", justifyContent: "center"}},
           text: $=>($.this.monthLabel[$.le.model.today.getMonth()+1] + " " + $.le.model.today.getFullYear())
         }},
