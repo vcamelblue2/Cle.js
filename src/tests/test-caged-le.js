@@ -1286,6 +1286,10 @@ const appTestSuperCtxProblem = ()=>{
     div: {
       id: "ctx0",
 
+      props: {
+        elements: [[1,10],[2,20],[3,30]]
+      },
+
       "=>": [
         Use({ div: {
           ctx_id: "ctx1",
@@ -1308,6 +1312,47 @@ const appTestSuperCtxProblem = ()=>{
               text: $ => "counter: " + $.parent.counter // non posso usare $.ctx.ctx1.counter...
             }})
           ]
+        }}),
+
+        smart({span: $=>"elements: "+JSON.stringify($.parent.elements)}),
+
+        // testing del problema di accesso al "super-meta", superato con una clone del meta as props(ovviamente qui bastava un parent al posto di scope, ma nei sotto elementi si)
+        Use({ div: { meta: {forEach: "tuple", of: $=>$.parent.elements},
+
+          props: {
+            meta_tuple: $=>$.meta.tuple
+          },
+
+          "=>":[
+            smart({h6: $=>"il meta vale: "+$.meta.tuple}),
+            smart({h6: $=>"il this vale: "+$.parent.meta_tuple}),
+            smart({h6: $=>"il scope vale: "+$.scope.meta_tuple}),
+
+            Use({ div: { meta: {forEach: "element", of: $=>$.scope.meta_tuple},
+
+              props: {
+                meta_element: $=>$.meta.element
+              },
+
+              "=>":[
+                smart({h6: $=>"-il meta vale: "+$.meta.element}),
+                smart({h6: $=>"-il this vale: "+$.parent.meta_element}),
+                smart({h6: $=>"-il scope vale: "+$.scope.meta_element}),
+
+                smart({h6: $=>"-via meta vale: "+$.meta.meta_tuple}, {ha:{"style.color":"red"}}),
+                smart({h6: $=>"-via scope vale: "+$.scope.meta_tuple}, {ha:{"style.color":"green"}}),
+                
+                smart({ p: $=>"--element:"+$.meta.element}),
+                smart({ p: $=>"--element:"+$.scope.meta_element}),
+                smart({ p: $=>"--element:"+$.parent.meta_element})
+              ]
+
+            }}),
+
+            {hr:{}}
+
+          ]
+
         }})
       ]
     }
@@ -3786,10 +3831,10 @@ const appCalendarOrganizer = async ()=>{
 // appNestedData()
 // appPrantToChildComm()
 // appTestCssAndPassThis()
-// appTestSuperCtxProblem()
+appTestSuperCtxProblem()
 // appTestAnchors()
 // appTestBetterAnchors()
 // appSimpleCalendarOrganizer()
-appCalendarOrganizer()
+// appCalendarOrganizer()
 
 // appDemoStockApi()

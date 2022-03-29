@@ -1004,7 +1004,7 @@ const ComponentScopeProxy = (context)=>{
     if (component === undefined || component.$this === undefined){
       return {}
     }
-    if (prop in component.$this.this){
+    if (prop in (component.$this?.this || {})){ // fix IterableViewComponent, cannot habe $this..
       return component.$this.this
     }
     else {
@@ -1266,7 +1266,7 @@ class Component {
 
   get$ScopedPropsOwner(prop){
 
-    if (this.parent === undefined || !(this.parent instanceof Component)){
+    if (this.parent === undefined || !(this.parent instanceof Component)){ // || this.parent instanceof IterableViewComponent)){
       return this
     }
     if (prop in this.properties){
@@ -2809,6 +2809,20 @@ class IterableViewComponent{
     this.real_iterable_definition = (definition instanceof UseComponentDeclaration ? definition.cloneWithoutMeta() : cloneDefinitionWithoutMeta(definition))
   }
 
+  get$ScopedPropsOwner(prop){
+
+    if (this.parent === undefined || !(this.parent instanceof Component)){ // || this.parent instanceof IterableViewComponent)){
+      return this
+    }
+    if (prop in this.properties){
+      return this
+    }
+    else {
+      return this.parent.get$ScopedPropsOwner(prop)
+    }
+
+  }
+
   // generate the comment/anchor for the real conditional element (that will be create "after" the first or "before" the last "anchor")
   buildHtmlPointerElementAnchor(){
     
@@ -2853,7 +2867,7 @@ class IterableViewComponent{
 
     this.$parent = (this.parent instanceof Component) ? ComponentProxy(this.parent.properties) : undefined
     this.$scope = ComponentScopeProxy(this)
-    this.$this = ComponentProxy({parent: this.$parent, le: this.$le.proxy, ctx: this.parent.$ctx.proxy, meta: this.parent.$meta})
+    this.$this = ComponentProxy({parent: this.$parent, le: this.$le.proxy, scope: this.$scope, ctx: this.parent.$ctx.proxy, meta: this.parent.$meta})
   }
 
 
@@ -3196,7 +3210,7 @@ export { pass, none, smart, Use, Extended, Placeholder, Bind, Switch, Case, Rend
 
   // todo??: nuova idea su come bindare il this con qualunque funzione (anche => ) (che però annulla la possibilità di avere cose extra framework..): basta fare il toString della func, e poi ricostruirla con new Function assegnando il this..però si perdono tutti gli extra ref!
   
-  
+
   // todo: relative name componenti: questa è da ragionare..l’effetto che vorrei è poter fare: .parent.MyObj.SubObj2 .. in this, parent, le e ctx. In pratica è come se i componenti dovessere stare dentro i $.X attraverso gli id (se definito) come delle props speciali, e poterle usare nelle deps..
 
   // todo: Nuova classe helper per le func in cui non voglio usare dollaro ma non ho voglia di modificare il retriver delle deps:
