@@ -182,9 +182,13 @@ const app0 = ()=>{
       div: { 
           data: { counter: 10 },
 
+          signals: { 
+            "counterIs20": "stream => (void)"
+          },
+
           def: {
             incCounter: $ => $.this.counter = $.this.counter+2,
-            beautifyCounterStatus: $ => "the counter is: " + $.this.counter + " (testing def deps)"
+            beautifyCounterStatus: $ => "the counter is: " + $.this.counter + " (testing def deps in text [for now])"
           },
 
           handle: { 
@@ -192,7 +196,10 @@ const app0 = ()=>{
           },
 
           on: { this: { 
-            counterChanged: ($, v)=> console.log("il counter è cambiato!! ora è:", v) 
+            counterChanged: ($, v)=> {
+              console.log("il counter è cambiato!! ora è:", v);
+              if ($.this.counter === 20){$.this.counterIs20.emit()}
+            }
           } },
 
           on_s: { le: { myInput: {
@@ -219,7 +226,7 @@ const app0 = ()=>{
                 },
 
                 ["=>"]: { 
-                  div: { text: $ => $.parent.futureCounter }
+                  div: { text: $ => $.parent.futureCounter, onInit:$=>console.log("ecco la visibilità dello scope:", $.scope, $.scope.futureCounter, $.scope.counter) }
                 }
               }},
 
@@ -324,7 +331,15 @@ const app0 = ()=>{
               ),
               
               // demo visible parent chain
-              { div: { "=>": { div: { "=>": { div: { "=>": {div: { afterInit: $ => console.log("ooooooooooooooooo", $.this, $.this.parent.parent.parent.parent.counter, $.this, $.parent.parent.parent.parent.counter)}}}}}}}},
+              { div: { "=>": { div: { "=>": { div: { "=>": {div: { 
+                on: {
+                  scope: {
+                    counterIs20: $ => console.log("sono una ON_S via scope, il counter è 20!! => ", $.scope.counter),
+                    counterChanged: $ => console.log("sono una ON via scope, il counter è: ", $.scope.counter)
+                  }
+                },
+                afterInit: $ => { console.log($); console.log("ooooooooooooooooo", $.this, $.this.parent.parent.parent.parent.counter, $.this, $.parent.parent.parent.parent.counter)} 
+              }}}}}}}},
 
 
               { div: {
@@ -350,9 +365,12 @@ const app0 = ()=>{
                 "=>": [ 
                   $ => $.meta.num, ")", 
                   { span: { meta: { if: $ => $.meta.num % 2 !== 0 },
+                    data: {myVar: 123},
                     "=>":[ 
-                      Placeholder("select_button"), Placeholder("deselect_button") ]}
-                  }
+                      Placeholder("select_button"), Placeholder("deselect_button") 
+                    ],
+                    onInit:$=>console.log("ecco la visibilità dello scope da un le-for con use! ", $.scope, $.scope.myVar, $.scope.counter)
+                  }}
                 ]
               }}, pass, { inject: {
                 "select_button": { button: { text: "select", attrs: {style: "color: red; margin-left: 15px"}, handle: {onclick: $=>$.parent.el.style.backgroundColor = "gray"}}},
