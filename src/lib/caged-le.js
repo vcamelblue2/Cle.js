@@ -83,11 +83,12 @@ const component = {
         counterChanged: ($, newCounter, oldCounter) => console.log($.this.counter),
       }, 
       parent: ...
+      scope: ... any prop in self or any parent anchestor
       le: ..byname.. : {props | alias changed},
       ctx: ...qui mettiamo solo i nomi dei sub_componenti + this di questo componente! 
       // ci vorrebbe anche un $.subel, (un array, non obj con in le) in cui è possibile filtrare by type: es $.subel.get("div")[0]..oppure il concetto di tref di le..o magari questa in realtà con ctx si risolve.. vedi sotto che ho descritto bene
       
-      direct_child: ... // in alternativa alle menate di sopra. conscio del fatto che è una "multicast", e in congiunzione con l'inserimento in properties di una ".childs" in grado quindi di poter fare $.this.childs[0].doSomething
+      TODO: direct_child: ... // in alternativa alle menate di sopra. conscio del fatto che è una "multicast", e in congiunzione con l'inserimento in properties di una ".childs" in grado quindi di poter fare $.this.childs[0].doSomething
       // todo: reserved keyword for property signal etc naming
     },
 
@@ -96,6 +97,7 @@ const component = {
         counterReset: $ => console.log("counter reset!")
       }, 
       parent: ...
+      scope: ... any prop in self or any parent anchestor
       le: .component byname.. : { signal},
       ctx: ...qui mettiamo solo i nomi dei sub_componenti + this di questo componente! 
       dbus: ...qui mettiamo i signals globali che ascolto
@@ -105,7 +107,7 @@ const component = {
       // è anche possibile "autopropagare" i segnali che elaboro, senza ridefinirli (per favorire sub child to parent flow, o evitare inutili remap), come?  con una classe/costante che instanziamo e dunque definire: ctx: {subchildSignal: Autopropagate}
     },
 
-    on_a { /////// AL MOMENTO NON PREVISITO!!!
+    TODO: on_a { /////// AL MOMENTO NON PREVISITO!!!
       this: {
         "class" | "style.width" : $ => ... 
       }
@@ -164,7 +166,7 @@ const component = {
 
     css: [ ".class { bla:bli ... }", $=>".r0 { .."+$.this.somedeps +"}" ] | {rule1: ".class { bla:bli ... }", rule2: $=>".r0 { .."+$.this.somedeps +"}"} // todo..magari qualcosa di più complesso..come hoisting (via replacer, o anche per i subel), or namaed definition (tipo le)..oppure per automatizzare l'hoisting =>  css: [ ".class { bla:bli ... }", ".class2 { foo:bar; ...", NoHoisting("sostanzialmente ::ng-dep..")]
 
-    states: {
+    TODO: states: {
       // "default": "this", // implicit, always chang
 
       "bigger": { // 
@@ -179,10 +181,10 @@ const component = {
 
     },
 
-    state: "default" // optional different starting state
-    stateChangeStrategy: "merge XXXstatenameXXX" | "replace" | "remove" // magari questa cosa va dentro i singoli state..
+    TODO: state: "default" // optional different starting state
+    TODO: stateChangeStrategy: "merge XXXstatenameXXX" | "replace" | "remove" // magari questa cosa va dentro i singoli state..
 
-    onState: ($, newState, oldState)=> {
+    TODO: onState: ($, newState, oldState)=> {
 
     }
 
