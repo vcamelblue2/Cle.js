@@ -226,7 +226,7 @@ const component = {
           { Model: { // sub model/obj
             data: {prop2: 25},
             afterInit: $ => console.log($.this.prop2),
-            text: $ => $.parent.prop1,
+            text: $ => $.parent.prop1, // but also: $.scope.prop1, because $scope use dynamic binding (and shadowing) and compact all the props and signal from me and my parents
           }
         },
         ]
@@ -3140,6 +3140,8 @@ export { pass, none, smart, Use, Extended, Placeholder, Bind, Switch, Case, Rend
   // todo: possibilità di definire la "struct" di una Property, in modo da provare a seguire i cambiamenti di valore nested..es se ho un dict o un array..deve essere un cosa persistente anche a successive set di valore..nonchè trasparente, in modo da dare problemi agli sviluppatori
   //       una cosa carina sarebbe definire una classe che eredita da una nostra classe base, per cui definiamo delle cose e che fa la magia automaticmante!
 
+  // todo: $scope deve contenere anche meta..in modo da superare il problema del meta bloccato con Use in se stesso e poter usare il meta del parent anche negli use. in alternativa fixare la Use per vedere anche sopra..
+
 
 // IMPROVEMENTS:
 
@@ -3193,6 +3195,19 @@ export { pass, none, smart, Use, Extended, Placeholder, Bind, Switch, Case, Rend
   // todo: deduplicare le deps prima della subscribe..anche e soprattutto per via delle deps dell func, ma probabilemnte lo abbiamo già adesso questo problema! a meno della "buona gestione" in Property per cui non riaggiungiamo se siamo già subscribed (visto che passo this come who), ancdrebbe però comunque migliorato, per evitre aggiornamenti multipli! qui si capisce l'importanza di angular e del change detector..ovvero un loop per "ridurre" i repaint "accorpandoli". come? al posto di iposta al change l'azione diretta, basta segnalarla in un array con "esecuzione a scadenza" ovvero timeout ad es 2 ms dell'esecuzione delle azioni, con autodelete delle azioni "replicate" all'esecuzione, e auto reset del timeout con l'avanzare del codice. questo garantisce la separazione tra rendering e prop, ma potrebbe incasinare il codice che faceva affidamento su di essa.
 
   // todo??: nuova idea su come bindare il this con qualunque funzione (anche => ) (che però annulla la possibilità di avere cose extra framework..): basta fare il toString della func, e poi ricostruirla con new Function assegnando il this..però si perdono tutti gli extra ref!
+  
+  
+  // todo: relative name componenti: questa è da ragionare..l’effetto che vorrei è poter fare: .parent.MyObj.SubObj2 .. in this, parent, le e ctx. In pratica è come se i componenti dovessere stare dentro i $.X attraverso gli id (se definito) come delle props speciali, e poterle usare nelle deps..
+
+  // todo: Nuova classe helper per le func in cui non voglio usare dollaro ma non ho voglia di modificare il retriver delle deps:
+  // todo: Nuova classe che accetta una func e una explain o un retriver diverso. L’explain accetta (con “;” come separatore) una stringa di deps nel formato senza dollaro, es: “parent.x;this.y”
+
+  // todo: per aiutare il sistema a identificare i changes anche per obj mutabili: il type system, ovvero nelle props posso wrappare i dati in CLE.List(func.., description), in modo che per queste cose specifiche possiamo andare a wrappare con un nostro modo l’array etc i metodi base, al fine di pushare i changes automaticamente)
+
+  // todo: Funzione per disabilitare temporaneamente il mark for changes, per evitare troppi ricolcoli inutili e abilitarlo manualmente dopo
+
+  // todo: classe Exetrnal, che mi permette di definire delle property esterne e bindarmi ovunque (props, attr, view etc)
+  
 
 
 
@@ -3213,3 +3228,5 @@ export { pass, none, smart, Use, Extended, Placeholder, Bind, Switch, Case, Rend
   // in alternativa: devo agire a livello di factory..creando un qualcosa che wrappa ma solo per l'ng for..visto che switch e if sono già ok..ma a quel punto il controllo della situazione chi ce l'ha??
 
   // todo/done?: iniziare a strutturare come funziona "meta" lato dev, nel senso che il mio meta è in realtà l'insieme di tutti i meta dei miei parent (nello stesso componente? in teoria si, perchè il il compoente è entità "atomica", non dividibile, quindi dentro e fuori non si "conoscono") compreso il mio..a questo punto tutto deve andare con retry incrementale?
+
+  // done: $scope, un meccanismo che permette di superare molti problemi di cle, tra cui la parent chain. il suo obbiettivo è vedere i componenti come codice js, per cui posso vedere tutte le variabili, segnali etc, che sono definiti nel mio blocco e nei blocchi sopra di me. è dynamic (leggermente più lento), funziona su props e signal, (posso bindarmi ovunque con $.scope.xxx) e ha il concetto di shadowing. di fatto è una vista al nome più vicino a me per quella cosa
