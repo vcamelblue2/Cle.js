@@ -2783,6 +2783,35 @@ class IterableViewComponent{
 }
 
 
+// export 
+const Case = (clausole, el)=>{ 
+
+  let componentType = getComponentType(definition)
+    
+  let {meta, ...oj_definition_no_meta} = definition[componentType]
+  return {[componentType]: { meta: {if: clausole}, ...oj_definition_no_meta }}
+
+}
+// export 
+/*
+const x = { div: {
+  "=>":[
+    { h6: { text: "hello" }},
+
+    ...Switch(
+      Case( $=>$.parent.var1===0,
+        { span: { text: "i'm var 1!!"}}
+      ),
+      Case( $=>$.parent.var1!==0,
+        { span: { text: "i'm var 1 not 0!!"}}
+      )
+    )
+  ]
+}}*/
+const Switch = (conditions)=>{
+  return conditions
+}
+
 
 
 // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // 
@@ -2866,7 +2895,7 @@ const LE_InitWebApp = (appDef)=>{ document.addEventListener("DOMContentLoaded", 
 // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // 
 
 
-export { pass, none, smart, Use, Extended, Placeholder, Bind, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp }
+export { pass, none, smart, Use, Extended, Placeholder, Bind, Switch, Case, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp }
 // full import: {pass, none, smart, Use, Bind, RenderApp, LE_LoadScript, LE_LoadCss, LE_InitWebApp}
 
 
