@@ -755,7 +755,7 @@ class UseComponentDeclaration{
             console.log("WARNING!!!", k, "cannot be redefined!!")
           }
           else {
-            console.log("WARNING!!! ACTUALLY", k, "is not supported in merge strategy! i simply override it!! assuming you can control the amount of override..")
+            console.log("WARNING!!! ACTUALLY", k, "is not supported in merge strategy! i simply FULL override it!! assuming you can control the amount of override..")
             resolved[k] = v
           }
 
@@ -1242,12 +1242,9 @@ class Component {
 
     this.buildHtmlPointerElement()
 
+    this.buildPropertiesRef() // bugfix: devo creare ogni $xxx prima di andare in basso nei children..altrimenti il processo di discesa inverte l'esecuzione
 
     this.buildChildsSkeleton()
-
-    
-    this.buildPropertiesRef()
-
   }
 
   buildHtmlPointerElement(){
@@ -2061,7 +2058,9 @@ class Component {
     this.hooks.onInit !== undefined && this.hooks.onInit()
 
     // create childs
-    this.childs.forEach(child=>child.create())
+    for (let _child of this.childs){
+      _child.create()
+    }
 
     // afterChildsInit (non lazy!)
     this.hooks.afterChildsInit !== undefined && this.hooks.afterChildsInit()
@@ -2136,14 +2135,14 @@ class Component {
     unifiedDef.id = id || ComponentRUUIDGen.generate()
     unifiedDef._id = _id || unifiedDef.id
 
-    def && (unifiedDef.def = def)
-    _def && (unifiedDef._def = _def)
+    if (def !== undefined) { unifiedDef.def = def }
+    if (_def !== undefined) { unifiedDef._def = _def }
     
-    attrs && (unifiedDef.attrs = attrs || a)
-    _attrs && (unifiedDef._attrs = _attrs || _a)
+    if (attrs !== undefined || a !== undefined) { unifiedDef.attrs = attrs || a }
+    if (_attrs !== undefined || _a !== undefined) { unifiedDef._attrs = _attrs || _a }
 
-    hattrs && (unifiedDef.hattrs = hattrs || ha)
-    _hattrs && (unifiedDef._hattrs = _hattrs || _ha)
+    if (hattrs !== undefined || ha !== undefined) { unifiedDef.hattrs = hattrs || ha }
+    if (_hattrs !== undefined || _ha !== undefined) { unifiedDef._hattrs = _hattrs || _ha }
 
 
     
