@@ -910,22 +910,22 @@ const analizeDepsStatically = (f)=>{
 
   // replace va perchè fa la replace solo della prima roba..alternativa un bel cut al numero di caratteri che sappiamo già
   let $this_deps = to_inspect.match(/\$.this\.([_$a-zA-Z]+[0-9]*[.]?)+/g)
-  $this_deps = $this_deps?.map(d=>d.replace("$.this.", "").split("."))
+  $this_deps = $this_deps?.map(d=>d.replace("$.this.", "").split(".")[0]) // fix sub access!
   
   let $parent_deps = to_inspect.match(/\$.parent\.([_$a-zA-Z]+[0-9]*[.]?)+/g)
-  $parent_deps = $parent_deps?.map(d=>d.replace("$.parent.", "").split("."))
+  $parent_deps = $parent_deps?.map(d=>d.replace("$.parent.", "").split(".")[0]) // fix sub access!
 
   let $scope_deps = to_inspect.match(/\$.scope\.([_$a-zA-Z]+[0-9]*[.]?)+/g)
-  $scope_deps = $scope_deps?.map(d=>d.replace("$.scope.", "").split("."))
+  $scope_deps = $scope_deps?.map(d=>d.replace("$.scope.", "").split(".")[0]) // fix sub access!
 
   let $le_deps = to_inspect.match(/\$.le\.([_$a-zA-Z]+[0-9]*[.]?)+/g)
-  $le_deps = $le_deps?.map(d=>d.replace("$.le.", "").split(".")) 
+  $le_deps = $le_deps?.map(d=>d.replace("$.le.", "").split(".").slice(0,2)) 
 
   let $ctx_deps = to_inspect.match(/\$.ctx\.([_$a-zA-Z]+[0-9]*[.]?)+/g)
-  $ctx_deps = $ctx_deps?.map(d=>d.replace("$.ctx.", "").split(".")) 
+  $ctx_deps = $ctx_deps?.map(d=>d.replace("$.ctx.", "").split(".").slice(0,2)) 
 
   let $meta_deps = to_inspect.match(/\$.meta\.([_$a-zA-Z]+[0-9]*[.]?)+/g)
-  $meta_deps = $meta_deps?.map(d=>d.replace("$.meta.", "").split(".")) 
+  $meta_deps = $meta_deps?.map(d=>d.replace("$.meta.", "").split(".")[0]) // fix sub access!
 
   return {
     // todo: vedere se hanno senso
@@ -3092,6 +3092,8 @@ export { pass, none, smart, Use, Extended, Placeholder, Bind, Switch, Case, Rend
 
 
 // BUGFIX:
+
+  // todo: in css non devo reinserire se ho già inserito..specie per le-for
 
   // todo: MEGA->al momento è imposibile registrarsi a proprità di elementi che sono dopo di me..perchè l'elemento è vero che esiste, ma non esistono sncora le sue prop! quindi fallirà sempre, e con il "?" non esplode e non trovi il bu facilmente. la soluzione è la retry, da implementare alla riga 1327 e ovunque ci sia questa logica! alternativa semplice: spostare (e testare!) la creazione delle Property nella fase 2 (build skeleton) e non nella 3 (create). nella fase 2 all'ultimo, dopo la creazione dei contesti..perchè tanto definiamo solo le prop, senza dargli val ne deps ne nulla, ma esistendo tutte non avremo problemi ad agganciarle dopo..aka codice da riga 1300 a 1288
   //       --> ancora meglio fare un componente che gestisce queste cose a lungo termine..ovvero quando provo a fare lu sub e non riesco mando la richiesta un gestore che la completerà per me dopo. qundo? quand un componente viene creato (le sue prop etc) chiede prima della fine al rgistro se qualcuno lo ha cercato, e il registro completa le op pending. l'importanza del registro (oltre a dover implementare sta roba anche nei signal al posto della retry) è quella dei componenti dinamici: dovrà anche essere avvisato delle destroy, in modo che possa ricreare i binding quando il componente viene eventualmente ricreato.
