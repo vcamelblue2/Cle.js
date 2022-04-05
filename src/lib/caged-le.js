@@ -1005,7 +1005,7 @@ const ComponentScopeProxy = (context)=>{
       return {}
     }
     if (prop in (component.$this?.this || {})){ // fix IterableViewComponent, cannot habe $this..
-      return component.$this.this
+      return component.properties
     }
     else {
       return findComponentPropHolder(component.parent, prop)
@@ -1026,6 +1026,8 @@ const ComponentScopeProxy = (context)=>{
       set: function(_target, prop, value) {
 
         let target = findComponentPropHolder(context, prop)
+        // console.log("setting:", target, prop, value)
+        // console.log("type:", target[prop], target[prop] instanceof Property)
 
         let prop_or_value_target = target[prop];
         if (prop_or_value_target instanceof Property){
@@ -2463,6 +2465,64 @@ class TextNodeComponent {
           // todo: recoursive def deps!
         })
 
+        staticDeps.$scope_deps?.forEach(_d=>{
+          let _propName = Array.isArray(_d) ? _d[0] : _d
+          let _pointedProp = pointedComponentEl.get$ScopedPropsOwner(d).properties[_propName]
+          if ("addOnChangedHandler" in _pointedProp){
+            this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+          }
+          // todo: recoursive def deps!
+        })
+
+        staticDeps.$le_deps?.forEach(_d=>{
+          let _propName = _d[1]
+          let _pointedProp = pointedComponentEl.$le[_d[0]].properties[_propName]
+          if ("addOnChangedHandler" in _pointedProp){
+            this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+          }
+          // todo: recoursive def deps!
+        })
+
+        staticDeps.$ctx_deps?.forEach(_d=>{
+          let _propName = _d[1]
+          let _pointedProp = pointedComponentEl.$ctx[_d[0]].properties[_propName]
+          if ("addOnChangedHandler" in _pointedProp){
+            this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+          }
+          // todo: recoursive def deps!
+        })
+      }
+    })    
+    
+    this.staticAnDeps.$scope_deps?.forEach(d=>{
+      let propName = Array.isArray(d) ? d[0] : d
+      let pointedScope = this.parent.get$ScopedPropsOwner(propName)
+      let pointedProp = pointedScope.properties[propName]
+      if ("addOnChangedHandler" in pointedProp){
+        this.depsRemover.push(pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+      }
+      else if (propName in pointedScope.defDeps){ // is a function!
+        let staticDeps = pointedScope.defDeps[propName]
+        let pointedComponentEl = pointedScope
+        
+        staticDeps.$this_deps?.forEach(_d=>{
+          let _propName = Array.isArray(_d) ? _d[0] : _d
+          let _pointedProp = pointedComponentEl.properties[_propName]
+          if ("addOnChangedHandler" in _pointedProp){
+            this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+          }
+          // todo: recoursive def deps!
+        })
+
+        staticDeps.$parent_deps?.forEach(_d=>{
+          let _propName = Array.isArray(_d) ? _d[0] : _d
+          let _pointedProp = pointedComponentEl.parent.properties[_propName]
+          if ("addOnChangedHandler" in _pointedProp){
+            this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+          }
+          // todo: recoursive def deps!
+        })
+        
         staticDeps.$scope_deps?.forEach(_d=>{
           let _propName = Array.isArray(_d) ? _d[0] : _d
           let _pointedProp = pointedComponentEl.get$ScopedPropsOwner(d).properties[_propName]
