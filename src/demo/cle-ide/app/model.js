@@ -24,6 +24,7 @@ export const Model = {
     id: "model",
 
     props: {
+      globalDef: 'console.log("init preview..")',
       appDef: initialAppDef,
       actualPointer: [],
 
@@ -148,11 +149,13 @@ export const Model = {
       storage: {
         saveDef: $=>{
           console.log("saving..")
+          localStorage.setItem("cle-demo.cle-creator.global-def", JSON.stringify($.this.globalDef))
           localStorage.setItem("cle-demo.cle-creator.app-def", JSON.stringify($.this.appDef))
         },
         loadDef: $=>{
             console.log("loading..")
             $.this.actualPointer = []
+            $.this.globalDef = JSON.parse(localStorage.getItem("cle-demo.cle-creator.global-def"))  || " "
             $.this.appDef = JSON.parse(localStorage.getItem("cle-demo.cle-creator.app-def"))
         }
       }
