@@ -3142,7 +3142,55 @@ const LE_InitWebApp = (appDef)=>{ document.addEventListener("DOMContentLoaded", 
 // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // 
 
 
-export { pass, none, smart, Use, Extended, Placeholder, Bind, Switch, Case, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp }
+/*
+class TodoModelApiMock extends LE_BackendApiMock{
+  constructor(apiSpeed=100){
+    super(apiSpeed)
+    this.model = { todos: [ { id: 0, todo:"hi", done: false } ] }
+    this.services = {
+      "/num-todos": ()=>{return {len: this.mode.todos.length} }
+    }
+  }
+  getTodo(args){
+    let {id} = this.request(args)
+    return this.response(this.model.todos.find(t=>t.id === id))
+  }
+}
+let todoModelApi = new TodoModelMockApi()
+setTimeout(async ()=>{
+  console.log("calling..")
+  let res = await todoModelApi.getTodo({id: 0})
+  console.log(typeof res, res)
+}, 10)
+*/
+// export 
+class LE_BackendApiMock{ // base class for backend api mock -> purpose is to have a "model" and some api call (wrapped), with some jsonization, to avoid "refernece" effect
+  
+  constructor(apiSpeed=100){
+    this.services = {}
+    this.apiSpeed = apiSpeed
+  }
+  
+  response(value){
+    return new Promise((resolve, reject)=>{setTimeout(()=>resolve(JSON.parse(JSON.stringify(value))), this.apiSpeed) })
+  }
+  failResponse(error){
+    return new Promise((resolve, reject)=>{setTimeout(()=>reject(JSON.parse(JSON.stringify(error))), this.apiSpeed) })
+  }
+  request(value){
+    if (value !== undefined)
+      return JSON.parse(JSON.stringify(value))
+    return undefined
+  }
+
+  // only json..
+  get(route, params){ return this.response(this.services[route](this.request(params))) }
+  post(route, data){ return this.response(this.services[route](this.request(data))) }
+  put(route, data){ return this.response(this.services[route](this.request(data))) }
+}
+
+
+export { pass, none, smart, Use, Extended, Placeholder, Bind, Switch, Case, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock }
 // full import: {pass, none, smart, Use, Bind, RenderApp, LE_LoadScript, LE_LoadCss, LE_InitWebApp}
 
 
@@ -3283,6 +3331,12 @@ export { pass, none, smart, Use, Extended, Placeholder, Bind, Switch, Case, Rend
   // todo: Funzione per disabilitare temporaneamente il mark for changes, per evitare troppi ricolcoli inutili e abilitarlo manualmente dopo
 
   // todo: classe Exetrnal, che mi permette di definire delle property esterne e bindarmi ovunque (props, attr, view etc)
+
+  // todo: validation rules, qualcosa che posso definire nella mia definizione (solo this) di proprietà, per cui definisco delle regole di validazione per le assegnazioni alle Props. in pratica poi prima di assegnare esweguo le validazioni e nel caso lancio errore. così quando assegno mi basta fare try catch e centralizzo le regole
+  // todo: in realtà questa cosa può diventare più figa e complessa: con anche le pre/post action, in pratica così ho anche gli alias, perchè posso per esempio andare a dire che come post action ho la possibilità di settare indietro una var (e riagganciare l'hook, senza essere nel loop della on changed..)
+  // todo: sicuramente questa cosa è semi-ridondante, ma non è "inutile"
+
+  // todo: lazy negli on e on_s..da capire ancora come, se con keyword lazy o come..a quel punto anche un bel "throttle"
   
 
 
