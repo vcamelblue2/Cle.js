@@ -3823,6 +3823,79 @@ const appCalendarOrganizer = async ()=>{
   
 }
 
+const appCachedProperties = async ()=>{
+  // spiegazione, la funzione iniziale autoeseguite serve solo per incastonare la ctx in un contesto a se :D 
+  // quello che si ottiene in realtà è poter usare .value in un oggetto definito as copy per avere il valore coipato, e aggiornarlo a mano in una on tramite .updateVal ..
+  // con .liveValue posso invece accedere al valore sempre aggiornato (ovvio, a patto che non punti a un altro valore copy :D)
+  // ovviamente funziona perchè al posto di eseguire ogni volta la prop lambda in realtà mi copio il valore solo quando chiesto con la update ref o all'inizio..
+  let CopyValueOnce = (()=>{ 
+    let ctx = {}
+
+    return (propLambda)=>{
+      let key = String(propLambda)
+
+      let update = ()=>{
+        ctx[key] = propLambda()
+      }
+
+      if (!(key in ctx)){
+        update()
+      }
+
+      return {value: ctx[key], updateVal: update, get liveValue (){return propLambda()}}
+    }
+  })()
+
+  await LE_LoadCss("https://cdnjs.cloudflare.com/ajax/libs/skeleton/2.0.4/skeleton.min.css")
+  
+  RenderApp(document.body, { div: {
+    id: "app",
+
+    props: { 
+      array: [1,2,3],
+    },
+
+    "=>": [
+
+      "dovresti clickare 3 volte per aggiornare..",
+
+      { div: {
+        props: {
+          filteredData: $=>CopyValueOnce(()=>$.scope.array.filter(x=>x>1))
+        },
+
+        on: {
+          scope: {
+            arrayChanged: $=>{ 
+              console.log("arr changed", $.scope.array)
+              // if condition ..
+              if ($.scope.array.length % 3 === 0){
+                $.this.filteredData.updateVal()
+              }
+            }
+          },
+          this: {
+            filteredDataChanged: $=>{
+              console.log("filterd data changed!")
+
+              // $.this.filteredData.updateVal()  // potresti anche auto aggiornarti quando cambi..cosa significa sta cosa? semplicemente che non ricalcoli il valore ad ogni get! ma solo quando cambia!
+            }
+          }
+        },
+
+        text: $=>$.this.filteredData.value
+      }},
+
+      { button: {
+        text: "randomize",
+        handle: { onclick: $=>{
+          $.scope.array.push(10)
+          $.scope.array = [...$.scope.array]
+        }}
+      }}
+    ]
+  }})
+}
 
 // app0()
 // test2way()
@@ -3831,10 +3904,11 @@ const appCalendarOrganizer = async ()=>{
 // appNestedData()
 // appPrantToChildComm()
 // appTestCssAndPassThis()
-appTestSuperCtxProblem()
+// appTestSuperCtxProblem()
 // appTestAnchors()
 // appTestBetterAnchors()
 // appSimpleCalendarOrganizer()
 // appCalendarOrganizer()
+appCachedProperties()
 
 // appDemoStockApi()
