@@ -79,7 +79,7 @@ export const AceEditor = { div: {
   },
 
   onDestroy: $ => {
-    $.this._editor?.destroy();
+    try{$.this._editor?.destroy();}catch{}
   }
 
 }}

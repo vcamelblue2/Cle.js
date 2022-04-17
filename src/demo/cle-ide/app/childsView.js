@@ -113,7 +113,7 @@ export const ChildsView = {
                 });
               },
               onDestroy: $ => {
-                $.this.editor?.destroy();
+                try{$.this.editor?.destroy();}catch{}
               },
             }},
             

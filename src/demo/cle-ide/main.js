@@ -53,7 +53,7 @@ LE_InitWebApp(async ()=>{
         handle: { onclick: $=>{
           let recomposed = $.le.model.recompose()
           // console.log(recomposed)
-          $.le.preview.code = `setTimeout(async ()=>{window.renderized_app && window.renderized_app.destroy(); ${$.le.model.globalDef}; window.renderized_app = RenderApp(document.getElementById('app-preview'), ${recomposed});}, 1)`
+          $.le.preview.code = `setTimeout(async ()=>{try{window.renderized_app.destroy()}catch{}; ${$.le.model.globalDef}; window.renderized_app = RenderApp(document.getElementById('app-preview'), ${recomposed});}, 1)`
           $.le.preview.visible = true
         }} 
       }},
@@ -84,7 +84,7 @@ LE_InitWebApp(async ()=>{
             text: "x", 
             props: { ...UseAnchors(), left: 0, top: -35, width: 30, height: 30}, 
             attrs: { style: $ => ({ ...$.this.Anchors, zIndex: "1000" }) }, 
-            handle: {onclick: $=>{$.le.preview.visible = false; $.le.preview.code = ""} } 
+            handle: {onclick: $=>{try{window.renderized_app.destroy()}catch{}; $.le.preview.visible = false; $.le.preview.code = ""} } 
           }},
 
           { div: {

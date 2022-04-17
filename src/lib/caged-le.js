@@ -2201,6 +2201,9 @@ class Component {
   // regenerate(){}
   destroy(){
     this.childs?.forEach(child=>child.destroy())
+
+    this.hooks.onDestroy !== undefined && this.hooks.onDestroy()
+    
     this.html_pointer_element?.remove()
     this.css_html_pointer_element?.remove()
     this.css_html_pointer_element=undefined

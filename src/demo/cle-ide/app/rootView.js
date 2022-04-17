@@ -217,7 +217,7 @@ export const RootView = { div: {
             },
 
             onDestroy: $ => {
-              $.this.editor?.destroy();
+              try{$.this.editor?.destroy();}catch{}
             },
           }}
         ]
