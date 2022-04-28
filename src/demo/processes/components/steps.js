@@ -36,7 +36,7 @@ export const Steps = {
 
       Placeholder("percentage", { default_component: { span: { meta: {if: $=>$.scope.show_percentage},
         attrs: { style: "margin-left: 10px" },
-        text: $=>$.scope.step_idx / $.scope.num_steps + "%" 
+        text: $=>Math.round($.scope.step_idx / $.scope.num_steps * 100) + "%" 
       }} })
     ]
   }
