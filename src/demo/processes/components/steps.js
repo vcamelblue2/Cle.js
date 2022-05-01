@@ -24,7 +24,7 @@ export const Steps = {
           is_completed: $=>$.meta.step < $.scope.step_idx
         },
         
-        a: { style: $=>({
+        attrs: { style: $=>({
           width: ($.scope.size/$.scope.num_steps)+"px", 
           height: "10px", 
           backgroundColor: $.this.is_completed ? $.scope.completed_color : $.scope.to_be_completed_color,

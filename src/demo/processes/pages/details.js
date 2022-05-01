@@ -60,28 +60,34 @@ export const DetailsPage = async (state={})=>{ return {
           }},
 
           { div: { meta: { forEach: "process", of: $=>$.scope.instance?.process || [], define: { index:"process_idx" } },
-    
-            a: {style: $=>({
-              width: "60px", height: "60px", display: "inline-block", 
-              borderRadius: "10px", marginRight: "10px",
-              color: "white",
-              backgroundColor: $.meta.process_idx <= $.scope.instance.process_pointer ? "#27ae60" : "#c0392b"
-            })},
-            
-            handle: { onclick: $=>{ 
-              let pointer = $.scope.instance.process_pointer
-              if (pointer === $.meta.process_idx){
-                pointer = $.meta.process_idx-1
-              }
-              else {
-                pointer = $.meta.process_idx
-              }
-              $.scope.api.setProcessPointer(pointer)
-            }},
-            
-            text: { div: { a:{style:"width: 100%; height: 100%; display:flex; justify-content: center; align-items: center"}, text: $ => $.meta.process}},
-            
-          }}
+            "=>":[
+              { div: { 
+        
+                a: {style: $=>({
+                  width: "60px", height: "60px", display: "inline-block", 
+                  borderRadius: "10px", marginTop: "10px",
+                  color: "white",
+                  backgroundColor: $.meta.process_idx <= $.scope.instance.process_pointer ? "#27ae60" : "#c0392b"
+                })},
+                
+                handle: { onclick: $=>{ 
+                  let pointer = $.scope.instance.process_pointer
+                  if (pointer === $.meta.process_idx){
+                    pointer = $.meta.process_idx-1
+                  }
+                  else {
+                    pointer = $.meta.process_idx
+                  }
+                  $.scope.api.setProcessPointer(pointer)
+                }},
+                
+                text: { div: { a:{style:"width: 100%; height: 100%; display:flex; justify-content: center; align-items: center"}, text: $ => $.meta.process}},
+                
+              }},
+
+              { input: {a:{style:"margin-left: 15px; border-top: none; border-left:none; border-right:none; width: 200px", value: "an example of some note!"}}}
+            ]
+          }},
         ]
         
       }},
