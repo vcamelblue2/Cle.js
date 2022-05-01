@@ -1,12 +1,11 @@
 import {RenderApp} from "../../../lib/caged-le.js"
 
-  // ROUTING
-export const RoutingTable = {
-  pages: {},
-  defaultPage: "/",
-
-  activeApp: undefined
+export const DEBUG_SETTINGS = {
+  DEBUG_ENABLED: false
 }
+
+const _debug = { log: (...args)=> DEBUG_SETTINGS.DEBUG_ENABLED && console.log(...args) }
+
 
 export const HistoryApi = {
   pushState: (url, state, fullRefresh=false)=>{
@@ -25,40 +24,56 @@ export const HistoryApi = {
   }
 }
 
+// rename
 export const Router = {
-  navigate: (url, state, fullRefresh=false)=>HistoryApi.pushState(url, state, fullRefresh)
+  navigate: HistoryApi.pushState
 }
 
 
-const onPageChanged = async (location, state)=>{
-  console.log("page changed")
-  RoutingTable.activeApp && RoutingTable.activeApp?.destroy()
 
-  // or maybe use href search only
-  let page = location.search.split("?")[1]
-  
-  if(!(page in RoutingTable.pages)){
-    console.log("to default page", page)
-    Router.navigate(RoutingTable.defaultPage)
-  }
-  else {
-    console.log("to page", page)
-    RoutingTable.activeApp = RenderApp(document.body, (await RoutingTable.pages[page](state ? state : undefined)))
+export const InitRouter = async (config=undefined, {scrollRestoration="auto"}={})=>{
+
+
+  const RoutingTable = {
+    pages: {},
+    defaultRoute: "/",
+
+    activeApp: undefined
   }
 
-}
+  const onPageChanged = async (location, state)=>{
+    
+    _debug.log("page changed")
 
-history.scrollRestoration = "auto"
+    RoutingTable.activeApp && RoutingTable.activeApp?.destroy()
 
-window.onpopstate = window.onpushstate = async function(event) {
-  console.log(`location: ${document.location}, state: ${JSON.stringify(event.state)}`)
-  await onPageChanged(document.location, event.state)
-}
+    // or maybe use href search only
+    let page = location.search.split("?")[1]
+    
+    if(!(page in RoutingTable.pages)){
+      _debug.log("to default page", page)
+      Router.navigate(RoutingTable.defaultRoute)
+    }
+    else {
+      _debug.log("to page", page)
+      RoutingTable.activeApp = RenderApp(document.body, (await RoutingTable.pages[page](state ? state : undefined)))
+    }
 
-export const InitRouter = async (config=undefined)=>{
+  }
+
+
+  history.scrollRestoration = scrollRestoration
+
+  window.onpopstate = window.onpushstate = async function(event) {
+    
+    _debug.log(`location: ${document.location}, state: `, event.state)
+
+    await onPageChanged(document.location, event.state)
+  }
+
   if (config){
     RoutingTable.pages = config.pages
-    RoutingTable.defaultPage = config.defaultPage
+    if (config.defaultRoute !== undefined) { RoutingTable.defaultRoute = config.defaultRoute }
   }
 
   await onPageChanged(document.location)
