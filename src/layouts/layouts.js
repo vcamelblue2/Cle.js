@@ -1,6 +1,6 @@
 import {pass, none, smart, Use, Extended, Placeholder, Bind} from "../lib/caged-le.js"
 
-export const NavSidebarLayout = ({navbar, sidebar, main_content, footer, testing=false}={})=>{ return { div: {
+export const NavSidebarLayout = ({navbar, sidebar, main_content, testing=false}={})=>{ return { div: {
     id: "grid_layout",
     attrs: { class: "grid-layout"},
     
@@ -8,28 +8,27 @@ export const NavSidebarLayout = ({navbar, sidebar, main_content, footer, testing
         .grid-layout {
             display: grid;
             grid-template-areas:
-            'header header header header header header'
-            'menu main main main main main'
-            'menu footer footer footer footer footer';
+                'menu header header header header header'
+                'menu main main main main main';
+
+            grid-template-columns: calc(100% / 6) auto auto auto auto auto;
+            grid-template-rows: 60px auto;
 
             ${testing ? 'gap: 10px; padding: 10px; background-color: #2196F3;' : ''}
         }
 
         .navbar {
-            grid-area: header
+            grid-area: header;
         }
 
         .sidebar {
-            grid-area: menu
+            grid-area: menu;
         }
 
         .main-content {
-            grid-area: main
+            grid-area: main;
         }
 
-        .footer {
-            grid-area: footer
-        }
     `,
 
     testing ? `
@@ -73,17 +72,6 @@ export const NavSidebarLayout = ({navbar, sidebar, main_content, footer, testing
                     text: "Main Content"
                   }}
             ]
-        }},
-
-        // footer
-        { div: {
-            id: "footer",
-            attrs: { class: "footer grid-layout-item"},
-            "=>": [
-                // Placeholder("footer", {default_component: "Footer"})
-                footer || "Footer"
-            ]
         }}
-
     ]
 }}}

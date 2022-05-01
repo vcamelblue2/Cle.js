@@ -3923,22 +3923,98 @@ const appTestAttrsShortcuts = ()=>{
 }
 
 const appTestLayouts = async ()=>{
+  let test = false
+
+  if (test){
+    RenderApp(document.body, { div: {
+      id: "app",
+
+      a: {style: "padding: 0px; margin: 0px"},
+      css: ['body {padding: 0px; margin: 0px}'],
+
+      "=>": Extended(NavSidebarLayout({testing: true,
+        main_content: 
+          { div: {
+            a: {style: "height: 500px"},
+            text: "Main Content"
+          }}
+      }))
+    }})
+  }
+
+  
+  else {
+    
+    await LE_LoadCss("https://cdnjs.cloudflare.com/ajax/libs/skeleton/2.0.4/skeleton.min.css") 
+
+    const Navbar = { div: {
+
+      'a.style': {
+        backgroundColor: "white", //"#2d3436",
+        // color: "#dddddd",
+        color: "rgb(97, 97, 97)",
+        height: "60px",
+        padding: "10px 2rem",
+
+      },
+
+      text: [
+        { div: { text: "Nav", 'ha.style.fontSize': "3rem" }}
+      ]
+    }}
+
+    const Sidebar = { div: {
+
+      'a.style': {
+        backgroundColor: "white",
+        // color: "#dddddd",
+        color: "rgb(97, 97, 97)",
+        minHeight: "100%",
+        borderRight: "0.25px solid #aaaaaa",
+        padding: "10px 2rem"
+      },
+      
+      "=>": [
+        {div: { 'a.style': {fontWeight: "500", fontSize: "3rem", border: "0.25px solid #dddddd", paddingBottom: "0px", marginBottom: '50px'}, text: "Logo"}},
+        ...[1,2,3,4,5].map(n=>smart({h6:[ "Content "+n, smart({li:"Item "+(n*2)}) ]}, {'ha.style.fontWeight': "500"}))
+      ]
+    }}
+
+    const MainContent = { div: {
+      'a.style': {
+        minHeight: "calc(100vh - 60px)",
+        backgroundColor: '#b2bec3',
+        padding: "10px"
+      },
+
+      "=>": { div: {
+        'ha.style.margin': "50px",
+        'ha.style.backgroundColor': "white",
+        'ha.style.width': "calc(100% - 100px)",
+        'ha.style.height': "calc(100vh - 180px)",
+        'ha.style.border': " 1px dashed #bbbbbb",
+
+        text: "Main Content"
+      }}
+    }}
 
 
-  RenderApp(document.body, { div: {
-    id: "app",
+    RenderApp(document.body, { div: {
+      id: "app",
 
-    a: {style: "padding: 0px; margin: 0px"},
-    css: ['body {padding: 0px; margin: 0px}'],
+      a: {style: "padding: 0px; margin: 0px"},
+      css: [
+        'body {padding: 0px; margin: 0px} * { box-sizing: border-box !important;}'
+      ],
 
-    "=>": Extended(NavSidebarLayout({testing: true,
-      main_content: 
-        { div: {
-          a: {style: "height: 500px"},
-          text: "Main Content"
-        }}
-    }))
-  }})
+      "=>": Extended(NavSidebarLayout({
+        navbar: Navbar,
+        sidebar: Sidebar,
+        main_content: MainContent
+      }))
+    }})
+
+  }
 
 }
 
