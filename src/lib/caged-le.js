@@ -160,6 +160,8 @@ const component = {
       "@lazy:scrollTop": Bind($ => $.this.counter) // per lazy binding!
     }
 
+    // novità: ora è anche possibile usare le shortcuts: "ha.style.color": "red"  oppure "a.style": {color: "red"}
+
     handle: { // html event
       onclick: ($, e) => $.this.count++
     },
@@ -2273,6 +2275,31 @@ class Component {
     if (hattrs !== undefined || ha !== undefined) { unifiedDef.hattrs = hattrs || ha }
     if (_hattrs !== undefined || _ha !== undefined) { unifiedDef._hattrs = _hattrs || _ha }
 
+    // a/ha & attrs/hattrs 1st lvl shortcuts: (eg: a.style or attrs.style) -> only public for nuw!
+    let attrs_shortcuts_key = Object.keys(definition).filter(k=>k.startsWith("a.") || k.startsWith("attrs."))
+
+    if (attrs_shortcuts_key.length > 0){
+      let attrs_shortcuts_definition = {}
+      attrs_shortcuts_key.forEach(sk=>{ attrs_shortcuts_definition[sk.split(".")[1]] = definition[sk] })
+      if (unifiedDef.attrs !== undefined){
+        unifiedDef.attrs = { ...unifiedDef.attrs, ...attrs_shortcuts_definition }
+      }
+      else {
+        unifiedDef.attrs = attrs_shortcuts_definition
+      }
+    }
+
+    let hattrs_shortcuts_key = Object.keys(definition).filter(k=>k.startsWith("ha.") || k.startsWith("hattrs."))
+    if (hattrs_shortcuts_key.length > 0){
+      let hattrs_shortcuts_definition = {}
+      hattrs_shortcuts_key.forEach(sk=>{let new_sk = sk.split("."); new_sk.shift(); new_sk=new_sk.join("."); hattrs_shortcuts_definition[new_sk] = definition[sk] })
+      if (unifiedDef.hattrs !== undefined){
+        unifiedDef.hattrs = { ...unifiedDef.hattrs, ...hattrs_shortcuts_definition }
+      }
+      else {
+        unifiedDef.hattrs = hattrs_shortcuts_definition
+      }
+    }
 
     
     // maybe private def and multichoice
