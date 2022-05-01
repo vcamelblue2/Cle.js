@@ -1,5 +1,6 @@
 
 import {pass, none, smart, Use, Extended, Placeholder, Bind, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock} from "../lib/caged-le.js"
+import { NavSidebarLayout } from "../layouts/layouts.js"
 
 const app0 = ()=>{
 
@@ -3921,6 +3922,26 @@ const appTestAttrsShortcuts = ()=>{
 
 }
 
+const appTestLayouts = async ()=>{
+
+
+  RenderApp(document.body, { div: {
+    id: "app",
+
+    a: {style: "padding: 0px; margin: 0px"},
+    css: ['body {padding: 0px; margin: 0px}'],
+
+    "=>": Extended(NavSidebarLayout({testing: true,
+      main_content: 
+        { div: {
+          a: {style: "height: 500px"},
+          text: "Main Content"
+        }}
+    }))
+  }})
+
+}
+
 // app0()
 // test2way()
 // appTodolist()
@@ -3935,5 +3956,6 @@ const appTestAttrsShortcuts = ()=>{
 // appCalendarOrganizer()
 // appCachedProperties()
 // appTestAttrsShortcuts
+appTestLayouts()
 
 // appDemoStockApi()
