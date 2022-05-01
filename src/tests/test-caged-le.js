@@ -3897,6 +3897,30 @@ const appCachedProperties = async ()=>{
   }})
 }
 
+const appTestAttrsShortcuts = ()=>{
+  
+  const MyElement = {div: {
+
+    attrs: { style: { width: "33%"} },
+    "a.class": "my-class", // occhio che se provo a fare a.style sostituisco in blocco!!
+
+    hattrs: {"style.fontSize": "25px"},
+    "ha.style.color": "green",
+    "ha.style.backgroundColor": "black",
+
+    text: "helllo"
+  }}
+
+  RenderApp(document.body, { div: {
+    
+    text: Use(MyElement, { // ora posso sostituire..in ha anche in profondità! (visto che tanto non uso obj ma dot notation)
+      "a.class": "my-new-class",
+      "ha.style.color": "yellow",
+    })
+  }})
+
+}
+
 // app0()
 // test2way()
 // appTodolist()
@@ -3909,6 +3933,7 @@ const appCachedProperties = async ()=>{
 // appTestBetterAnchors()
 // appSimpleCalendarOrganizer()
 // appCalendarOrganizer()
-appCachedProperties()
+// appCachedProperties()
+// appTestAttrsShortcuts
 
 // appDemoStockApi()
