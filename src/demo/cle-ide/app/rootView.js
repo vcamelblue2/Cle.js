@@ -20,7 +20,7 @@ export const RootView = { div: {
 
         props: {
         ...UseAnchors(),
-        width: $ => $.parent.Width / 2,
+        width: $ => 2*$.parent.Width / 3,
         height: $ => $.parent.Height / 1.2,
         top: $ => $.parent.VerticalCenter - $.this.height / 2,
         left: $ => $.parent.HorizontalCenter - $.this.width / 2,
