@@ -4029,9 +4029,9 @@ const appTestLayouts = async ()=>{
 // appTestAnchors()
 // appTestBetterAnchors()
 // appSimpleCalendarOrganizer()
-// appCalendarOrganizer()
+appCalendarOrganizer()
 // appCachedProperties()
 // appTestAttrsShortcuts
-appTestLayouts()
+// appTestLayouts()
 
 // appDemoStockApi()
