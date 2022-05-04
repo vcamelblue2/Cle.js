@@ -347,7 +347,7 @@ const Day = { div: { meta: {forEach: "day", of: $=>$.scope.days, define: {index:
 
   "=>": [
 
-    smart({ div: $=>$.meta.day}, {'ha.style.marginLeft': '5px', 'ha.style.paddingLeft': '5px', 'ha.style.marginBottom': '5px', 'ha.style.fontSize': '14px'}),
+    smart({ div: $=>$.meta.day.split("-").slice(1,3).reverse().map(s=>s.padStart("2", '0')).join("/")}, {'ha.style.marginLeft': '5px', 'ha.style.paddingLeft': '5px', 'ha.style.marginBottom': '5px', 'ha.style.fontSize': '14px'}),
 
     { div: {
       a: { style: {position: "relative", width: "100%", paddingLeft: "5px", paddingRight: "5px",  marginLeft: "5px", fontSize:"11px"}},
@@ -371,7 +371,26 @@ const Calendar = { div: {
 
     a: {style: {marginTop: "25px", display: "grid", gridTemplateColumns: "auto auto auto auto auto auto auto", gridTemplateRows: "auto auto auto auto auto auto", gap: "10px" }},
 
-    "=>": Day 
+    "=>": [
+
+      { div: { meta: { forEach: "weekDay", of: $ => ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"] },
+        
+        attrs: { 
+          style: $=>({ 
+            display: "inline-block", 
+            padding:"5px", 
+            border: ["Sabato", "Domenica"].includes($.meta.weekDay) ? "0.75px solid #ecf0f1" : "0.75px solid #eeeeee", 
+            backgroundColor: ["Sabato", "Domenica"].includes($.meta.weekDay)?"#ecf0f1":"white", 
+            overflow: "hidden", 
+            borderRadius:"7px",
+            textAlign: "center"
+          })
+        }, 
+        "=>": $=>$.meta.weekDay
+      }},
+
+      Day 
+    ]
   }}
   
 }}
