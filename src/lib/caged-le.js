@@ -332,7 +332,7 @@ const TodoList = { // automatic root div!
     { hr: {} },
 
 
-    { div: { meta: [{ forEach:"todo",  of: $ => $.parent.todolist,  define:{ index:"idx", first:"isFirst", last:"isLast", length:"len", iterable:"arr" }, define_alias:{ // my_var_extracted_with_meta_identifier..easy alias! //, todo_label: $ => $.this.todo_label_mapping[$.meta.todo]},  key,comparer: el=>... extractor/converter: $=> // opzionale, per fare es Obj.keys --> extractor:($, blabla)=>Object.keys(blabla) e i comparer per identificare i changes // }], 
+    { div: { meta: [{ forEach:"todo",  of: $ => $.parent.todolist,  define:{ index:"idx", first:"isFirst", last:"isLast", length:"len", iterable:"arr",    ...CUSTOM_PROP_NAME: value | ($: "parent" $this (same as meta), $child: real $this of the child)=> ... }, define_alias:{ // my_var_extracted_with_meta_identifier..easy alias! //, todo_label: $ => $.this.todo_label_mapping[$.meta.todo]},  key,comparer: el=>... extractor/converter: $=> // opzionale, per fare es Obj.keys --> extractor:($, blabla)=>Object.keys(blabla) e i comparer per identificare i changes // }], 
       
       "=>": [
 
@@ -2849,7 +2849,15 @@ class IterableComponent extends Component{
     if (this.meta_config.define !== undefined){
       // define:{ index:"idx", first:"isFirst", last:"isLast", length:"len", iterable:"arr" }
       Object.entries(this.meta_config.define).forEach(([define_var, dev_var_name])=>{
-        this.meta[dev_var_name] = new Property(this.meta_config.define_helper[define_var], none, none, none, ()=>this.$this, none, true)
+        if (define_var in this.meta_config.define_helper){
+          this.meta[dev_var_name] = new Property(this.meta_config.define_helper[define_var], none, none, none, ()=>this.$this, none, true)
+        }
+        // altre var custom!
+        else {
+          const custom_definition = dev_var_name
+          this.meta[define_var] = new Property(custom_definition, none, ()=>{ throw Error("meta define variable cannot be setted") }, none, [()=>this.parent.$this, ()=>this.$this], none, true)
+          // todo: on destroy
+        }
         _info.log("ho delle define nel meta!!", this.meta, define_var, dev_var_name, this.meta_config.define)
       })
     }

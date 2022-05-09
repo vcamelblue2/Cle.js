@@ -4018,6 +4018,192 @@ const appTestLayouts = async ()=>{
 
 }
 
+const appRecursiveTodo = async ()=>{
+
+  let counter = 0
+
+  const BaseComponent = (extra_buttons_before=[], extra_buttons_after=[])=>({ span: { 
+    // handle: {
+    //   onclick: ($, evt)=>{
+    //     evt.stopPropagation(); 
+    // }}, 
+    props: { inEdit: false},
+
+    "a.style": "display: flex; justify-content: space-between;",
+
+    "=>": [
+
+      // todo
+      { input: { meta: { if: $=>$.scope.inEdit}, 
+        props: { text: $=>$.meta.task.name },
+        on: { this: {textChanged: $=>{ $.meta.task.name = $.this.text;}}},
+        handle: { onkeypress: ($, evt)=>{ if (evt.key==='Enter') { $.scope.inEdit=!$.scope.inEdit } }},
+        'ha.value': Bind($=>$.this.text),
+        'ha.style.width': "60px",
+        onInit: $=>{$.this.el.focus()}
+      }},
+
+      { span: { meta: { if: $=>!$.scope.inEdit}, 
+        text: $=>$.meta.task.name,
+        'ha.style.width': "60px",
+        handle: {
+          onclick: ($, evt)=>{
+            evt.stopPropagation(); 
+            $.scope.inEdit=!$.scope.inEdit
+          }
+        }, 
+      }},
+
+      // toolbar
+      { div: {
+
+        "=>": [
+          ...extra_buttons_before,
+
+          { button: {
+            text: "e", 
+            handle: {
+              onclick: ($, evt)=>{
+                evt.stopPropagation(); 
+                $.scope.inEdit=!$.scope.inEdit
+              }
+            }, 
+          }},
+          { button: {
+            text: "+", 
+            handle: {
+              onclick: ($, evt)=>{
+                evt.stopPropagation(); 
+                $.scope.childsVisible=true
+                $.meta.task.subtasks.push({name: "todo.."+counter++, subtasks: []}); 
+                $.scope.activity = [...$.scope.activity]
+            }}, 
+          }},
+          { button: {
+            text: "x", 
+            handle: {
+              onclick: ($, evt)=>{
+                evt.stopPropagation(); 
+                $.scope.removeChilds($.meta.task)
+            }}, 
+          }},
+          
+          ...extra_buttons_after
+        ]
+      }}
+
+    ]
+  }})
+
+  const RecursiveComponent = (i=0, maxLen=7)=> ({ 
+    div: { meta: {forEach: "task", of: $=>$.meta.task.subtasks, define: {index: "idx", iterable: "tasks", parentTask: $=>$.meta.task, parentPath: ($, $child)=>[...($.meta.parentPath || []), $child.meta.idx] }},
+
+      def: {
+        removeChilds: ($, task)=>{
+          // $.meta.tasks.splice([].indexOf(task), 1)
+          console.log($.meta.parentTask, $.meta.task, task)
+          $.meta.parentTask.subtasks = $.meta.parentTask.subtasks.filter(t=>t!==task)
+          $.scope.activity = [...$.scope.activity]
+        }
+      },
+
+      onInit: $=>console.log($.meta.parentPath, $.meta.task),
+
+      "=>": [
+
+        { div: {
+          props: { childsVisible:  $=>$.scope.actualVisibilities.get($.meta.task) || $.scope.myParentIsVisible }, 
+          on: { this: {childsVisibleChanged: ($, v, _oldv)=>{
+            if (v!==_oldv){
+              $.scope.actualVisibilities.set($.meta.task, $.this.childsVisible)
+              $.scope._mark_actualVisibilities_as_changed()
+              // nella remove va eliminata la entry..
+            }
+          }}},
+          
+          'ha.style.marginLeft': "15px",
+
+          "=>": [
+            
+            BaseComponent([
+              { button: { meta: {if: $=>$.meta.task.subtasks.length > 0},  
+                text: "v", 
+                handle: { onclick: ($, evt)=>{ evt.stopPropagation(); $.scope.childsVisible = !$.scope.childsVisible}}
+              }}
+            ]),  
+
+            { div: { meta: { if: $=>$.scope.childsVisible },
+              "=>": i >= maxLen ? 
+                //{ div: { meta: {forEach: "task", of: $=>$.meta.task.subtasks}, "=>": BaseComponent() }} : 
+                "max activity reached" : 
+                RecursiveComponent(i+1, maxLen)
+            }}
+          ]
+        }},
+
+      ]
+    }
+  })
+
+
+  const RecursiveTodoList = {div: {
+    props: {
+      activity: [
+        {name: "todo1", subtasks: []},
+        {name: "todo2", subtasks: [
+          {name: "subtodo2.1", subtasks: []},
+          {name: "subtodo2.2", subtasks: []},
+        ]},
+        {name: "todo3", subtasks: [
+          {name: "subtodo3.1", subtasks: [
+            {name: "subsubtodo3.1", subtasks: []},
+            {name: "subsubtodo3.2", subtasks: []},
+            {name: "subsubtodo3.3", subtasks: []},
+          ]},
+        ]},
+      ],
+      myParentIsVisible: false,
+      actualVisibilities: new Map()
+    },
+
+    "=>": Extended(RecursiveComponent(0, 7), {meta: {forEach: "task", of: $=>$.scope.activity, 
+      // define: {index: "idx"},
+      define: {index: "idx", parentTask: $=>$.scope.activity, parentPath: ($, $child)=>[$child.meta.idx]}
+    }})
+
+  }}
+
+
+  await Promise.all([
+    LE_LoadCss("https://fonts.googleapis.com/css?family=Inconsolata"),
+    LE_LoadCss("https://fonts.googleapis.com/icon?family=Material+Icons"),
+    LE_LoadCss("https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css"),
+  ])
+
+  await Promise.all([
+    LE_LoadScript("https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"),
+  ])
+
+
+  let app = RenderApp(document.body, { 
+    div: {
+      id: "app",
+
+      attrs: { style: "width: 100%; height: 100%; padding: 0px; margin: 0px;" },
+      css: [ `* { box-sizing: border-box !important;} body { padding: 0px; margin: 0px; }` ],
+
+      "=>": [
+        { div: {
+          'a.style': "border: 1px solid black; width: 67%; margin-left: 15.5%; padding: 25px",
+          "=>": RecursiveTodoList
+        }}
+        
+      ]
+
+  }})
+
+}
+
 // app0()
 // test2way()
 // appTodolist()
@@ -4029,9 +4215,10 @@ const appTestLayouts = async ()=>{
 // appTestAnchors()
 // appTestBetterAnchors()
 // appSimpleCalendarOrganizer()
-appCalendarOrganizer()
+// appCalendarOrganizer()
 // appCachedProperties()
 // appTestAttrsShortcuts
 // appTestLayouts()
+appRecursiveTodo()
 
 // appDemoStockApi()
