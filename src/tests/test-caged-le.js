@@ -4204,6 +4204,121 @@ const appRecursiveTodo = async ()=>{
 
 }
 
+const appScopeOptions = async ()=>{
+
+  RenderApp(document.body, { div: {
+    id: "app",
+
+    props: {
+      prop1: "Parent: 123"
+    },
+
+    "=>": [
+
+      { div: {
+        text: $=>$.scope.prop1
+      }},
+      
+      { hr: {}},
+
+      { div: { meta: {forEach:"num", of: [9,8,7]},
+        text: $=>$.scope.prop1
+      }},
+
+      { hr: {}},
+
+      { div: {
+        props: {
+          prop1: "Child: 456"
+        },
+
+        text: $=>$.scope.prop1 + " - dovrebbe essere 456"
+      }},
+
+      { hr: {}},
+
+      { div: { meta: {noThisInScope: true},
+        props: {
+          prop1: "Child: 456"
+        },
+
+        text: $=>$.scope.prop1 + " - dovrebbe essere 123"
+      }},
+
+      { hr: {}},
+
+      { div: { meta: {noThisInScope: true},
+        props: {
+          prop1: "Child: 456"
+        },
+
+        text: [
+          { div: { meta: {noThisInScope: true},
+            props: {
+              prop1: "Child Child: 321"
+            },
+
+            text: $=>$.scope.prop1 + " - dovrebbe essere 456"
+          }},
+        ]
+      }},
+
+      { hr: {}},
+    ]
+
+  }})
+
+  try{
+    RenderApp(document.body, { div: {
+      id: "app",
+
+      props: {
+        prop1: 123
+      },
+
+      "=>": [
+
+        { div: { meta: {newScope: true},
+          text: $=>$.scope.prop1
+        }},
+
+        { hr: {}},
+      ]
+
+    }})
+  }
+  catch (e){
+    console.log("ok! error as expected! :)")
+  }
+
+
+  try{
+    RenderApp(document.body, { div: {
+      id: "app",
+
+      props: {
+        prop1: 123
+      },
+
+      "=>": [
+
+        { div: { meta: {forEach:"num", of: [9,8,7], newScope: true},
+          text: $=>$.scope.prop1
+        }},
+
+        { hr: {}},
+
+      ]
+
+    }})
+  }
+  catch (e){
+    console.log("ok! error as expected! :)")
+  }
+  
+
+}
+
 // app0()
 // test2way()
 // appTodolist()
@@ -4219,6 +4334,6 @@ const appRecursiveTodo = async ()=>{
 // appCachedProperties()
 // appTestAttrsShortcuts
 // appTestLayouts()
-appRecursiveTodo()
+appScopeOptions()
 
 // appDemoStockApi()

@@ -332,7 +332,8 @@ const TodoList = { // automatic root div!
     { hr: {} },
 
 
-    { div: { meta: [{ forEach:"todo",  of: $ => $.parent.todolist,  define:{ index:"idx", first:"isFirst", last:"isLast", length:"len", iterable:"arr",    ...CUSTOM_PROP_NAME: value | ($: "parent" $this (same as meta), $child: real $this of the child)=> ... }, define_alias:{ // my_var_extracted_with_meta_identifier..easy alias! //, todo_label: $ => $.this.todo_label_mapping[$.meta.todo]},  key,comparer: el=>... extractor/converter: $=> // opzionale, per fare es Obj.keys --> extractor:($, blabla)=>Object.keys(blabla) e i comparer per identificare i changes // }], 
+    { div: { meta: [{ forEach:"todo",  of: $ => $.parent.todolist,  define:{ index:"idx", first:"isFirst", last:"isLast", length:"len", iterable:"arr",    ...CUSTOM_PROP_NAME: value | ($: "parent" $this (same as meta), $child: real $this of the child)=> ... }, define_alias:{ // my_var_extracted_with_meta_identifier..easy alias! //, todo_label: $ => $.this.todo_label_mapping[$.meta.todo]},  key,comparer: el=>... extractor/converter: $=> // opzionale, per fare es Obj.keys --> extractor:($, blabla)=>Object.keys(blabla) e i comparer per identificare i changes // 
+                     ,newScope: bool ,noThisInScope: bool}], (le ultime sono le "scope options") 
       
       "=>": [
 
@@ -1002,15 +1003,23 @@ const ComponentProxy = (context, lvl=0)=>{
 // $scope proxy..dynamically resolve 
 const ComponentScopeProxy = (context)=>{
 
-  const findComponentPropHolder = (component, prop)=>{
+  const findComponentPropHolder = (component, prop, search_depth=0)=>{
     if (component === undefined || component.$this === undefined){
       return {}
     }
+
+    if (search_depth === 0 && component.meta_options.noThisInScope){ // salta il this e vai a parent..
+      return findComponentPropHolder(component.parent, prop, search_depth+1)
+    }
+
     if (prop in (component.$this?.this || {})){ // fix IterableViewComponent, cannot habe $this..
       return component.properties
     }
+    else if(component.meta_options.isNewScope){
+      throw Error("Properties cannot be found in this scope..blocked scope?")
+    }
     else {
-      return findComponentPropHolder(component.parent, prop)
+      return findComponentPropHolder(component.parent, prop, search_depth+1)
     }
   }
 
@@ -1217,6 +1226,10 @@ class Component {
     this.htmlElementType = getComponentType(definition)
     this.isObjComponent = ["Model", "Controller", "Connector", "Signals", "Style", "Css"].includes(this.htmlElementType)
     this.convertedDefinition = Component.parseComponentDefinition( (definition instanceof UseComponentDeclaration ? definition.computedTemplate : definition) [this.htmlElementType])
+    this.meta_options = {
+      isNewScope: this.convertedDefinition.meta?.newScope,
+      noThisInScope: this.convertedDefinition.meta?.noThisInScope,
+    } 
 
     this.defineAndRegisterId()
 
@@ -1268,16 +1281,24 @@ class Component {
   }
 
 
-  get$ScopedPropsOwner(prop){
+  get$ScopedPropsOwner(prop, search_depth=0){
 
     if (this.parent === undefined || !(this.parent instanceof Component)){ // || this.parent instanceof IterableViewComponent)){
       return this
     }
+
+    if (search_depth === 0 && this.meta_options.noThisInScope){ // salta il this e vai a parent..
+      return this.parent.get$ScopedPropsOwner(prop, search_depth+1)
+    }
+
     if (prop in this.properties){
       return this
     }
+    else if (this.meta_options.isNewScope){
+      throw Error("Properties cannot be found in this scope..blocked scope?")
+    }
     else {
-      return this.parent.get$ScopedPropsOwner(prop)
+      return this.parent.get$ScopedPropsOwner(prop, search_depth+1)
     }
 
   }
@@ -2838,12 +2859,13 @@ class SwitchConditionalComponent extends Component{
 
 class IterableComponent extends Component{
   
-  constructor(parent, definition, $le, parentIterableView, iterableIndex, meta_config){
+  constructor(parent, definition, $le, parentIterableView, iterableIndex, meta_config, meta_options){
     super(parent, definition, $le)
 
     this.parentIterableView = parentIterableView
     this.iterableIndex = iterableIndex
     this.meta_config = meta_config
+    this.meta_options = meta_options
 
     this.meta[this.meta_config.iterablePropertyIdentifier] = new Property(this.meta_config.value, none, none, none, ()=>this.$this, none, true)
     if (this.meta_config.define !== undefined){
@@ -2905,18 +2927,30 @@ class IterableViewComponent{
     this.oj_definition = definition
     this.meta_def = ((definition instanceof UseComponentDeclaration ? definition.computedTemplate : definition)[getComponentType(definition)]).meta
     this.real_iterable_definition = (definition instanceof UseComponentDeclaration ? definition.cloneWithoutMeta() : cloneDefinitionWithoutMeta(definition))
+    this.meta_options = {
+      isNewScope: this.meta_def?.newScope,
+      noThisInScope: this.meta_def?.noThisInScope,
+    }
   }
 
-  get$ScopedPropsOwner(prop){
+  get$ScopedPropsOwner(prop, search_depth=0){
 
     if (this.parent === undefined || !(this.parent instanceof Component)){ // || this.parent instanceof IterableViewComponent)){
       return this
     }
+
+    if (search_depth === 0 && this.meta_options.noThisInScope){ // salta il this e vai a parent..
+      return this.parent.get$ScopedPropsOwner(prop, search_depth+1)
+    }
+
     if (prop in this.properties){
       return this
     }
+    else if (this.meta_options.isNewScope){
+      throw Error("Properties cannot be found in this scope..blocked scope?")
+    }
     else {
-      return this.parent.get$ScopedPropsOwner(prop)
+      return this.parent.get$ScopedPropsOwner(prop, search_depth+1)
     }
 
   }
@@ -2975,7 +3009,7 @@ class IterableViewComponent{
     this._destroyChilds()
 
     // todo, algoritmo reale euristico, che confronta itmet per item (via this.iterableProperty.value._latestResolvedValue[idx] !== arrValue)
-    this.childs = (this.iterableProperty.value?.map((arrValue, idx, arr)=>new IterableComponent(this.parent, this.real_iterable_definition, this.$le, this, idx, {iterablePropertyIdentifier: this.iterablePropertyIdentifier, value: arrValue, define: this.meta_def.define, define_helper: {index: idx, first: idx === 0, last: idx === arr.length-1, length: arr.length, iterable: arr}})) || [] )
+    this.childs = (this.iterableProperty.value?.map((arrValue, idx, arr)=>new IterableComponent(this.parent, this.real_iterable_definition, this.$le, this, idx, {iterablePropertyIdentifier: this.iterablePropertyIdentifier, value: arrValue, define: this.meta_def.define, define_helper: {index: idx, first: idx === 0, last: idx === arr.length-1, length: arr.length, iterable: arr}}, this.meta_options)) || [] )
 
     // devo sicuramente fare una roba come per il conditional..un componente che estende component, perchè devo per forza gestire meglio la parte di append all'html pointer..
 
@@ -3273,7 +3307,6 @@ export { pass, none, smart, Use, Extended, Placeholder, Bind, Switch, Case, Rend
   // todo: questa cosa come molte altre in realtà mette in luce il fatto che ogni componente e sottocomponete dovrebbe subire una prima "trasformazione" in una sintassi migliori per il framework, che ha diverse opzioni e modi di scrivere..come più o meno avvine già, ma dovrebbe essere la "first of all"
 
   // todo: concetto di "re_emit_as" -> combina in automatico la possibilità di gestire un segnale e rialnciarlo con un altro nome..per propagare i sengali! ovviamente devo inserire il nome di un mio segnale e non di altri.. potrebbe avere senso avere una sentinel del tipo "NewSignal("xxx") per indicare un nuovo segnale ? eìsenza stare a dichiaraare 2 volte..per easy propagation.. vedere bene su..di fatto questa cosa è da realizzare nella on_s lato dev
-  // todo: se non risolviamo il problema del seguire proprietà "parent.parent..." potremmo dhicarare un "rexpose_parent_props"..in cui selezionare chi riesporre oppure un bool per riesporre tutto. utile per il problema del parent.parent senza nome..
 
   // todo: "SelfStyle" o altro meccanismo per esplicitare hoisting del css..vedi su..alternativa andare di replace e tutto è "pubblico" (aka ng-deep) di default..in questo caso è compito dello sviluppatore inserire un "replacer" che indica all'engine che quella classe è "locale"
   // todo: tutti gli elementi devono avere un attributo che mappa un identificativo univoco dell'elemento (stabile nel tempo, anche per gli ng-if e ng-for) per poter aiutare l'hoisting..
@@ -3398,3 +3431,5 @@ export { pass, none, smart, Use, Extended, Placeholder, Bind, Switch, Case, Rend
   // todo/done?: iniziare a strutturare come funziona "meta" lato dev, nel senso che il mio meta è in realtà l'insieme di tutti i meta dei miei parent (nello stesso componente? in teoria si, perchè il il compoente è entità "atomica", non dividibile, quindi dentro e fuori non si "conoscono") compreso il mio..a questo punto tutto deve andare con retry incrementale?
 
   // done: $scope, un meccanismo che permette di superare molti problemi di cle, tra cui la parent chain. il suo obbiettivo è vedere i componenti come codice js, per cui posso vedere tutte le variabili, segnali etc, che sono definiti nel mio blocco e nei blocchi sopra di me. è dynamic (leggermente più lento), funziona su props e signal, (posso bindarmi ovunque con $.scope.xxx) e ha il concetto di shadowing. di fatto è una vista al nome più vicino a me per quella cosa
+  // done: possibile usare meta per bloccare lo scope, taggando in meta: {newScope: true}
+  // done: {noThisInScope: true} per indicare che non voglio il this nello scope

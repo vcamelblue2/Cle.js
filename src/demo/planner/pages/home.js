@@ -400,7 +400,7 @@ const ProjectsToolbar = { div: { meta: {forEach: "project", of: $=>$.scope.proje
   a: { 
     style: $=>({
       display: "inline-block",
-      width: "206px", height: "40px",
+      width: "100%", height: "40px",
       backgroundColor: $.meta.project.color,
       color: "white"
     }),
