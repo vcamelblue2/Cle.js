@@ -68,7 +68,6 @@ const component = {
       counterReset: "stream => (void)" // definiamo il tipo di segnale (es: stream [per indicare chi c'è c'è], observable [per indicare che chi non c'è riceverà tutti i next e poi stream]) "=>" una descrizione dei params (es il tipo dei parametry, la signature etc etc..è solo testo che documenta!)
     },
 
-    // ne abbiamo davvero bisogno?? alla fin fine basterebbe definire un componente/constroller global che definisce i global signal..
     dbus_signals: { // qui definiamo i segnali globali..un modo per creare uno stream su un canale comune con un compagno che non riesco a raggiungere facilmente "by name", e che entrambi conosciamo
       iEmitThisGlobalSignal_UniqueName: "stream => (int: counter status)"
     }
@@ -634,6 +633,56 @@ class SignalSubSystem {
 
 }
 
+class DBus {
+  // signals = {
+  //   s1: new Signal("s1", "stream => void")
+  // }
+  // handlersToRegister = { // waiting for signal creation..then will be attached!
+  //   s1: [{who: 0, handler: 0}]
+  // }
+
+  constructor(){
+    this.signals = {}
+    this.handlersToRegister = {}
+    this.proxy = {}
+  }
+
+  hasSignal(name){
+    return this.signals[name] !== undefined
+  }
+
+  addSignal(name, definition){
+    if (!this.hasSignal(name)){
+      this.signals[name] = new Signal(name, definition)
+      this.proxy[name] = Signal.getSignalProxy(this.signals[name])
+      if (this.handlersToRegister[name]){
+        Object.values(this.handlersToRegister[name]).forEach(({who, handler})=>{
+          this.addSignalHandler(name, who, handler)
+        })
+        this.handlersToRegister[name] = undefined
+      }
+    }
+    return this.signals[name]
+  }
+  addSignalHandler(name, who, handler){
+
+    if(!this.hasSignal(name)){
+      if (this.handlersToRegister[name] === undefined){ this.handlersToRegister[name] = [] }
+      this.handlersToRegister[name].push({who: who, handler: handler})
+    } 
+    else {
+      this.signals[name].addHandler(who, handler)
+    }
+    return ()=>this.signals[name].removeHandler(who)
+  }
+
+  getProxy(){
+    return this.proxy
+  }
+
+}
+
+
 // smart component: convert {div: "hello"} as {div: {text: "hello"}}
 // export 
 const smart = (component, otherDefs={}) => {
@@ -1123,7 +1172,7 @@ class ComponentsTreeRoot {
   components_root
 
   $le // ComponentsContainerProxy
-  $signalSubSystem
+  $dbus
   $cssEngine
 
   // step 1: build
@@ -1132,7 +1181,7 @@ class ComponentsTreeRoot {
     this.oj_definition = definition
 
     this.$le = new ComponentsContainerProxy()
-    this.$signalSubSystem = new SignalSubSystem()
+    this.$dbus = new DBus()
   }
 
   // step 2 & 3: build skeleton (html pointer & child) and renderize
@@ -1146,7 +1195,7 @@ class ComponentsTreeRoot {
 
   buildSkeleton(){
 
-    this.components_root = Component.componentFactory(this.html_root, this.oj_definition, this.$le)
+    this.components_root = Component.componentFactory(this.html_root, this.oj_definition, this.$le, this.$dbus)
     this.components_root.buildSkeleton()
 
   }
@@ -1184,6 +1233,8 @@ class Component {
   signals = {} // type {signalX: Signal}
   hooks = {}// hook alle onInit dei componenti etc..
   meta = {} // container of "local" meta variable (le-for)
+  
+  signalsHandlerRemover = []
 
   // todo: def dependency mechanism
   // typeOfPropertiesRegistry = { // todo: registry to identify the type of an exposed properties, for now only def will be here
@@ -1211,15 +1262,18 @@ class Component {
   css_html_pointer_element
 
   // step 1: build
-  constructor(parent, definition, $le){
+  constructor(parent, definition, $le, $dbus){
     this.isA$ctxComponent = ((definition instanceof UseComponentDeclaration) || !(parent instanceof Component))
     this.parent = parent
     this.isMyParentHtmlRoot = (parent instanceof HTMLElement) // && !((parent instanceof Component) || (parent instanceof UseComponentDeclaration)) // if false it is a parent HTML node
 
     this.$le = $le
+    this.$dbus = $dbus
     this.$ctx = this.getMy$ctx()
     this.$meta = this.getMy$meta()
     // this.$scope = this.getMy$meta()
+
+    this.signalsHandlerRemover = []
 
     this.oj_definition = definition
 
@@ -1361,7 +1415,7 @@ class Component {
 
   buildChildsSkeleton(){
 
-    this.childs = (this.convertedDefinition.childs?.map(childTemplate=>Component.componentFactory(this, childTemplate, this.$le)) || [] )
+    this.childs = (this.convertedDefinition.childs?.map(childTemplate=>Component.componentFactory(this, childTemplate, this.$le, this.$dbus)) || [] )
 
     this.childs.forEach(child=>child.buildSkeleton())
 
@@ -1379,7 +1433,7 @@ class Component {
     // todo: parent and le visible properties only..
     this.$parent = (this.parent instanceof Component) ? ComponentProxy(this.parent.properties) : undefined
     this.$scope = ComponentScopeProxy(this)
-    this.$this = ComponentProxy(/*new ComponentProxySentinel(*/{this: ComponentProxy(this.properties), parent: this.$parent, scope: this.$scope,  le: this.$le.proxy, ctx: this.$ctx.proxy /*, dbus: this.$dbus*/, meta: this.$meta} /*)*/ ) //tmp, removed ComponentProxySentinel (useless)
+    this.$this = ComponentProxy(/*new ComponentProxySentinel(*/{this: ComponentProxy(this.properties), parent: this.$parent, scope: this.$scope,  le: this.$le.proxy, ctx: this.$ctx.proxy, dbus: this.$dbus.proxy, meta: this.$meta} /*)*/ ) //tmp, removed ComponentProxySentinel (useless)
 
     // mettere private stuff in "private_properties" e "private_signal", a quel punto una strada potrebbe essere quella di avere un "private_this" qui su..ma in teoria dovrebbe essere qualcosa di context, e non solo in me stesso..
   }
@@ -1471,6 +1525,14 @@ class Component {
       _info.log(this, this.signals, this.properties)
     }
 
+    // dbus signals def
+    if (this.convertedDefinition.dbus_signals !== undefined){
+      Object.entries(this.convertedDefinition.dbus_signals).forEach(([s,s_def])=>{
+        const realSignal = this.$dbus.addSignal(s, s_def)
+        // this.properties[s] = Signal.getSignalProxy(realSignal)
+      })
+    }
+
     // function def // NO DEPS SCAN AT THIS TIME
     if (this.convertedDefinition.def !== undefined){
       Object.entries(this.convertedDefinition.def).forEach(([k,v])=>{
@@ -1504,16 +1566,25 @@ class Component {
           if (typologyNamespace === "this"){
             Object.entries(defs).forEach(([s, fun])=>{
               let remover = this.signals[s].addHandler(this, (...args)=>fun.bind(undefined, this.$this, ...args)())
+              this.signalsHandlerRemover.push(remover)
             })
           }
           if (typologyNamespace === "parent"){
             Object.entries(defs).forEach(([s, fun])=>{
               let remover = this.parent.signals[s].addHandler(this, (...args)=>fun.bind(undefined, this.$this, ...args)())
+              this.signalsHandlerRemover.push(remover)
             })
           }
           if (typologyNamespace === "scope"){
             Object.entries(defs).forEach(([s, fun])=>{
               let remover = this.get$ScopedPropsOwner(s).signals[s].addHandler(this, (...args)=>fun.bind(undefined, this.$this, ...args)())
+              this.signalsHandlerRemover.push(remover)
+            })
+          }
+          if (typologyNamespace === "dbus"){
+            Object.entries(defs).forEach(([s, fun])=>{
+              let remover = this.$dbus.addSignalHandler(s, this, (...args)=>fun.bind(undefined, this.$this, ...args)())
+              this.signalsHandlerRemover.push(remover)
             })
           }
           if (typologyNamespace === "le"){
@@ -1524,6 +1595,7 @@ class Component {
                   try{
                     // _info.log("provo ad agganciare signal", leItem, s)
                     let remover = this.$le[leItem].signals[s].addHandler(this, (...args)=>fun.bind(undefined, this.$this, ...args)())
+                    this.signalsHandlerRemover.push(remover)
                   }
                   catch{
                     if (num_retry < 5) {
@@ -1547,6 +1619,7 @@ class Component {
                   try{
                     // _info.log("provo ad agganciare signal", leItem, s)
                     let remover = this.$ctx[ctxItem].signals[s].addHandler(this, (...args)=>fun.bind(undefined, this.$this, ...args)())
+                    this.signalsHandlerRemover.push(remover)
                   }
                   catch{
                     if (num_retry < 5) {
@@ -1757,6 +1830,7 @@ class Component {
                   _info.log("scelgoooooooo", _binding.event ?? "input", k, this)
                   this.html_pointer_element.addEventListener(_binding.event ?? "input", handlerFor2WayDataBinding)
                   let remover = ()=>this.html_pointer_element.removeEventListener(_binding.event ?? "input", handlerFor2WayDataBinding) // per la destroy..
+                  this.signalsHandlerRemover.push(remover)
                 }
               }
               else if(this.htmlElementType === "textarea"){
@@ -1773,6 +1847,7 @@ class Component {
                 }
                 this.html_pointer_element.addEventListener(_binding.event ?? "change", handlerFor2WayDataBinding)
                 let remover = ()=>this.html_pointer_element.removeEventListener(_binding.event ?? "change", handlerFor2WayDataBinding) // per la destroy..
+                this.signalsHandlerRemover.push(remover)
               
               }
               else if(this.htmlElementType === "details" && k === "open"){
@@ -1971,6 +2046,7 @@ class Component {
               _info.log("scelgoooooooo", _binding.event ?? "input", k, this)
               this.html_pointer_element.addEventListener(_binding.event ?? "input", handlerFor2WayDataBinding)
               let remover = ()=>this.html_pointer_element.removeEventListener(_binding.event ?? "input", handlerFor2WayDataBinding) // per la destroy..
+              this.signalsHandlerRemover.push(remover)
 
               setupValue()
 
@@ -2080,6 +2156,7 @@ class Component {
             _info.log("scelgoooooooo", _binding.event ?? "input", k, this)
             this.html_pointer_element.addEventListener(_binding.event ?? "input", handlerFor2WayDataBinding)
             let remover = ()=>this.html_pointer_element.removeEventListener(_binding.event ?? "input", handlerFor2WayDataBinding) // per la destroy..
+            this.signalsHandlerRemover.push(remover)
           
 
 
@@ -2239,6 +2316,9 @@ class Component {
     Object.values(this.signals).forEach(s=>{
       try{s.destroy()} catch{}
     })
+    Object.values(this.signalsHandlerRemover).forEach(remover=>{
+      try{remover()} catch{}
+    })
     Object.values(this.properties).forEach(p=>{
       try{p.destroy(true)} catch{}
     })
@@ -2343,7 +2423,7 @@ class Component {
   }
 
   // step 0: Analyze, convert and Create
-  static componentFactory = (parent, template, $le) => {
+  static componentFactory = (parent, template, $le, $dbus) => {
 
     let component;
 
@@ -2359,21 +2439,21 @@ class Component {
 
     if("meta" in componentDef){
       if ("if" in componentDef.meta){ // is a conditionalComponet
-        component = new ConditionalComponent(parent, template, $le)
+        component = new ConditionalComponent(parent, template, $le, $dbus)
       }
       else if ("swich" in componentDef.meta){ // is a switchConditionalComponent
-        component = new SwitchConditionalComponent(parent, template, $le)
+        component = new SwitchConditionalComponent(parent, template, $le, $dbus)
       }
       else if ("forEach" in componentDef.meta) { // is a foreach component (IterableViewComponent)
-        component = new IterableViewComponent(parent, template, $le)
+        component = new IterableViewComponent(parent, template, $le, $dbus)
 
       }
       else {
-        component = new Component(parent, template, $le)
+        component = new Component(parent, template, $le, $dbus)
       }
     }
     else {
-      component = new Component(parent, template, $le)
+      component = new Component(parent, template, $le, $dbus)
     }
   
     return component
@@ -2859,8 +2939,8 @@ class SwitchConditionalComponent extends Component{
 
 class IterableComponent extends Component{
   
-  constructor(parent, definition, $le, parentIterableView, iterableIndex, meta_config, meta_options){
-    super(parent, definition, $le)
+  constructor(parent, definition, $le, $dbus, parentIterableView, iterableIndex, meta_config, meta_options){
+    super(parent, definition, $le, $dbus)
 
     this.parentIterableView = parentIterableView
     this.iterableIndex = iterableIndex
@@ -2905,6 +2985,7 @@ class IterableViewComponent{
 
   parent
   $le
+  $dbus
 
   oj_definition
   real_iterable_definition
@@ -2920,9 +3001,10 @@ class IterableViewComponent{
   html_end_pointer_element_anchor
 
   // step 1: build
-  constructor(parent, definition, $le){
+  constructor(parent, definition, $le, $dbus){
     this.parent = parent
     this.$le = $le
+    this.$dbus = $dbus
 
     this.oj_definition = definition
     this.meta_def = ((definition instanceof UseComponentDeclaration ? definition.computedTemplate : definition)[getComponentType(definition)]).meta
@@ -3009,7 +3091,7 @@ class IterableViewComponent{
     this._destroyChilds()
 
     // todo, algoritmo reale euristico, che confronta itmet per item (via this.iterableProperty.value._latestResolvedValue[idx] !== arrValue)
-    this.childs = (this.iterableProperty.value?.map((arrValue, idx, arr)=>new IterableComponent(this.parent, this.real_iterable_definition, this.$le, this, idx, {iterablePropertyIdentifier: this.iterablePropertyIdentifier, value: arrValue, define: this.meta_def.define, define_helper: {index: idx, first: idx === 0, last: idx === arr.length-1, length: arr.length, iterable: arr}}, this.meta_options)) || [] )
+    this.childs = (this.iterableProperty.value?.map((arrValue, idx, arr)=>new IterableComponent(this.parent, this.real_iterable_definition, this.$le, this.$dbus, this, idx, {iterablePropertyIdentifier: this.iterablePropertyIdentifier, value: arrValue, define: this.meta_def.define, define_helper: {index: idx, first: idx === 0, last: idx === arr.length-1, length: arr.length, iterable: arr}}, this.meta_options)) || [] )
 
     // devo sicuramente fare una roba come per il conditional..un componente che estende component, perchè devo per forza gestire meglio la parte di append all'html pointer..
 
@@ -3408,6 +3490,8 @@ export { pass, none, smart, Use, Extended, Placeholder, Bind, Switch, Case, Rend
   // todo: sicuramente questa cosa è semi-ridondante, ma non è "inutile"
 
   // todo: lazy negli on e on_s..da capire ancora come, se con keyword lazy o come..a quel punto anche un bel "throttle"
+
+  // todo: oggetto Channel instanziabile che posso utilizzare in modo da mettere in contatto due o + elementi. creo il channel con new, lo passo a un param "cannels: {xxx: myChannel.onMessage($=>dosomething), ...}" e poi lo posso usare con this.xxx.send. easy
   
 
 

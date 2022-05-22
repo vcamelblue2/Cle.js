@@ -4319,6 +4319,51 @@ const appScopeOptions = async ()=>{
 
 }
 
+const appDemoDbus = async ()=>{
+
+  RenderApp(document.body, { div: {
+
+    dbus_signals: {
+      test_dbus_signal_1: "stream => void"
+    },
+
+    onInit: $=>{
+      setTimeout(() => {
+        $.dbus.test_dbus_signal_1.emit(1234, "abc")
+      }, 3000);
+    },
+
+    '=>': [
+
+      { div: {
+
+        dbus_signals: {
+          test_dbus_signal_1: "stream => void"
+        },
+    
+        onInit: $=>{
+          setTimeout(() => {
+            $.dbus.test_dbus_signal_1.emit("changed!")
+          }, 6000);
+        },
+
+      }},
+
+      { div: {
+        data: { recived: "..."},
+        on: { dbus: { 
+          test_dbus_signal_1: ($, ...args)=>{$.this.recived = "aaaa "+args} 
+        }},
+        onInit: $=>{
+          console.log($.dbus)
+        },
+        handle: {onclick: $=>$.dbus.test_dbus_signal_1.emit("...")},
+        text: $=>$.this.recived
+      }}
+    ]
+  }})
+}
+
 // app0()
 // test2way()
 // appTodolist()
@@ -4334,6 +4379,7 @@ const appScopeOptions = async ()=>{
 // appCachedProperties()
 // appTestAttrsShortcuts
 // appTestLayouts()
-appScopeOptions()
+// appScopeOptions()
+appDemoDbus()
 
 // appDemoStockApi()
