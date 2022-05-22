@@ -4020,7 +4020,11 @@ const appTestLayouts = async ()=>{
 
 const appRecursiveTodo = async ()=>{
 
-  let counter = 0
+  const TasksStatus = {
+    NotStarted: { label: "Not Started", description: "not-started", color: "red" },
+    InProgress: { label: "In Progress", description: "in-progrss", color: "yellow" },
+    Done: { label: "Done", description: "done", color: "green" },
+  }
 
   const BaseComponent = (extra_buttons_before=[], extra_buttons_after=[])=>({ span: { 
     // handle: {
@@ -4029,30 +4033,97 @@ const appRecursiveTodo = async ()=>{
     // }}, 
     props: { inEdit: false},
 
-    "a.style": "display: flex; justify-content: space-between;",
+    "a.style": "display: flex; justify-content: space-between; margin-bottom: 5px;",
 
     "=>": [
+      { span: {
+        "a.style": "display: flex; justify-content: left; align-items: center;",
 
-      // todo
-      { input: { meta: { if: $=>$.scope.inEdit}, 
-        props: { text: $=>$.meta.task.name },
-        on: { this: {textChanged: $=>{ $.meta.task.name = $.this.text;}}},
-        handle: { onkeypress: ($, evt)=>{ if (evt.key==='Enter') { $.scope.inEdit=!$.scope.inEdit } }},
-        'ha.value': Bind($=>$.this.text),
-        'ha.style.width': "60px",
-        onInit: $=>{$.this.el.focus()}
+        "=>":[
+
+          // { span: { }},
+          // status
+          { div: {
+
+            props: { 
+              color: $=>$.meta.task.status.color
+            },
+
+            'a.style': $=>({
+              marginLeft: $.meta.parentPath.length > 1 ? "5px" : "", marginRight: "10px", width: "1rem", height: "1rem",  borderRadius: "5px", background: $.this.color,
+
+            }),
+            'a.class': $=> $.meta.parentPath.length > 1 ? "subrow" : "",
+
+            handle: { onclick: $=>{
+              if ($.meta.task.status === TasksStatus.NotStarted){
+                $.meta.task.status = TasksStatus.InProgress
+              }
+              else if ($.meta.task.status === TasksStatus.InProgress){
+                $.meta.task.status = TasksStatus.Done
+              }
+              else if ($.meta.task.status === TasksStatus.Done){
+                $.meta.task.status = TasksStatus.NotStarted
+              }
+
+              $.this._mark_color_as_changed()
+              
+            }},
+          }},
+
+          // todo - edit
+          { input: { meta: { if: $=>$.scope.inEdit || $.scope.toFocus === $.meta.task}, 
+
+            props: { text: $=>$.meta.task.name },
+
+            on: { this: { 
+              textChanged: $=>{ $.meta.task.name = $.this.text }
+            }},
+
+            handle: { 
+              onkeypress: ($, evt)=>{ 
+                if (evt.key==='Enter') { 
+                  if ($.scope.toFocus === $.meta.task){
+                    $.scope.toFocus = undefined
+                  }
+                  else {
+                    $.scope.inEdit=!$.scope.inEdit 
+                  }
+                }
+              },
+              onkeyup: ($, evt)=>{ 
+                if (evt.key === 'Escape' && $.this.text.length === 0){
+                  $.scope.toFocus = undefined
+                  $.scope.removeChilds($.meta.task)
+                }
+              },
+              onblur: $=>{
+                if ($.this.text.length === 0 && $.meta.task.subtasks.length <= 0){ 
+                  $.scope.toFocus = undefined
+                  $.scope.removeChilds($.meta.task)
+                }
+              }
+            },
+
+            'ha.value': Bind($=>$.this.text),
+            // 'ha.style.width': "60px",
+            onInit: $=>{$.this.el.focus(); $.this.el.select();}
+          }},
+
+          // todo - no edit view
+          { span: { meta: { if: $=>!$.scope.inEdit && $.scope.toFocus !== $.meta.task}, 
+            text: $=>$.meta.task.name,
+            // 'ha.style.width': "60px",
+            handle: {
+              onclick: ($, evt)=>{
+                evt.stopPropagation(); 
+                $.scope.inEdit=!$.scope.inEdit
+              }
+            }, 
+          }},
+        ]
       }},
 
-      { span: { meta: { if: $=>!$.scope.inEdit}, 
-        text: $=>$.meta.task.name,
-        'ha.style.width': "60px",
-        handle: {
-          onclick: ($, evt)=>{
-            evt.stopPropagation(); 
-            $.scope.inEdit=!$.scope.inEdit
-          }
-        }, 
-      }},
 
       // toolbar
       { div: {
@@ -4061,25 +4132,34 @@ const appRecursiveTodo = async ()=>{
           ...extra_buttons_before,
 
           { button: {
+            'a.class': "activity-button",
             text: "e", 
             handle: {
               onclick: ($, evt)=>{
                 evt.stopPropagation(); 
-                $.scope.inEdit=!$.scope.inEdit
+                if ($.scope.toFocus === $.meta.task){
+                  $.scope.toFocus = undefined
+                }
+                else {
+                  $.scope.inEdit=!$.scope.inEdit 
+                }
               }
             }, 
           }},
           { button: {
+            'a.class': "activity-button",
             text: "+", 
             handle: {
               onclick: ($, evt)=>{
                 evt.stopPropagation(); 
                 $.scope.childsVisible=true
-                $.meta.task.subtasks.push({name: "todo.."+counter++, subtasks: []}); 
+                $.scope.toFocus = {status: TasksStatus.NotStarted, name: "", subtasks: []}
+                $.meta.task.subtasks.push($.scope.toFocus); 
                 $.scope.activity = [...$.scope.activity]
             }}, 
           }},
           { button: {
+            'a.class': "activity-button",
             text: "x", 
             handle: {
               onclick: ($, evt)=>{
@@ -4087,14 +4167,14 @@ const appRecursiveTodo = async ()=>{
                 $.scope.removeChilds($.meta.task)
             }}, 
           }},
-          
+
           ...extra_buttons_after
         ]
       }}
 
     ]
   }})
-
+  
   const RecursiveComponent = (i=0, maxLen=7)=> ({ 
     div: { meta: {forEach: "task", of: $=>$.meta.task.subtasks, define: {index: "idx", iterable: "tasks", parentTask: $=>$.meta.task, parentPath: ($, $child)=>[...($.meta.parentPath || []), $child.meta.idx] }},
 
@@ -4106,6 +4186,8 @@ const appRecursiveTodo = async ()=>{
           $.scope.activity = [...$.scope.activity]
         }
       },
+
+      'a.style': "padding: 5px;  border-radius: 5px; ", // border: 0.25px dashed #dddddd;
 
       onInit: $=>console.log($.meta.parentPath, $.meta.task),
 
@@ -4124,9 +4206,9 @@ const appRecursiveTodo = async ()=>{
           'ha.style.marginLeft': "15px",
 
           "=>": [
-            
             BaseComponent([
               { button: { meta: {if: $=>$.meta.task.subtasks.length > 0},  
+                'a.class': "activity-button",
                 text: "v", 
                 handle: { onclick: ($, evt)=>{ evt.stopPropagation(); $.scope.childsVisible = !$.scope.childsVisible}}
               }}
@@ -4135,7 +4217,7 @@ const appRecursiveTodo = async ()=>{
             { div: { meta: { if: $=>$.scope.childsVisible },
               "=>": i >= maxLen ? 
                 //{ div: { meta: {forEach: "task", of: $=>$.meta.task.subtasks}, "=>": BaseComponent() }} : 
-                "max activity reached" : 
+                "Max activity reached" : 
                 RecursiveComponent(i+1, maxLen)
             }}
           ]
@@ -4145,26 +4227,48 @@ const appRecursiveTodo = async ()=>{
     }
   })
 
-
   const RecursiveTodoList = {div: {
     props: {
       activity: [
-        {name: "todo1", subtasks: []},
-        {name: "todo2", subtasks: [
-          {name: "subtodo2.1", subtasks: []},
-          {name: "subtodo2.2", subtasks: []},
+        {status: TasksStatus.NotStarted, name: "todo1", subtasks: []},
+        {status: TasksStatus.NotStarted, name: "todo2", subtasks: [
+          {status: TasksStatus.NotStarted, name: "subtodo2.1", subtasks: []},
+          {status: TasksStatus.NotStarted, name: "subtodo2.2", subtasks: []},
         ]},
-        {name: "todo3", subtasks: [
-          {name: "subtodo3.1", subtasks: [
-            {name: "subsubtodo3.1", subtasks: []},
-            {name: "subsubtodo3.2", subtasks: []},
-            {name: "subsubtodo3.3", subtasks: []},
+        {status: TasksStatus.NotStarted, name: "todo3", subtasks: [
+          {status: TasksStatus.InProgress, name: "subtodo3.1", subtasks: [
+            {status: TasksStatus.Done, name: "subsubtodo3.1", subtasks: []},
+            {status: TasksStatus.InProgress, name: "subsubtodo3.2", subtasks: []},
+            {status: TasksStatus.NotStarted, name: "subsubtodo3.3", subtasks: []},
           ]},
         ]},
       ],
       myParentIsVisible: false,
-      actualVisibilities: new Map()
+      actualVisibilities: new Map(),
+      toFocus: undefined
     },
+
+    css: [`
+      .subrow:before{
+        content: ""; 
+        display: flex;
+        width: 15px;
+        height: 13px;
+        border-bottom-left-radius: 6px;
+        border-left: 1px solid #e9ebf0;
+        border-bottom: 1px solid #e9ebf0;
+        margin-top: -5px;
+        margin-left: -20px;
+        pointer-events: none;
+        background: transparent;
+      }
+      .activity-button {
+        border: none;
+        color: #555555;
+        border-radius: 5px;
+        font-size: 0.8rem;
+      }
+    `],
 
     "=>": Extended(RecursiveComponent(0, 7), {meta: {forEach: "task", of: $=>$.scope.activity, 
       // define: {index: "idx"},
@@ -4319,6 +4423,195 @@ const appScopeOptions = async ()=>{
 
 }
 
+const appTestTreeComponent = async ()=>{
+
+  const TreeMenu = { div: {
+
+    props: {
+      default_tree_menu: [
+        { label: "Safilus", route: "", isActive: false, isOpened: false, isSection: true, isDone: true, childs: [
+          { label: "Competitors", route: "", isActive: false, isDone: true },
+          { label: "Survey", route: "", isActive: false, isDone: true }
+        ]},
+        { label: "Carrerum", route: "", isActive: false, isOpened: true, isSection: false, isDone: false, childs: [
+          { label: "Competitors", route: "", isActive: true, isDone: false },
+          { label: "Survey", route: "", isActive: false, isDone: false }
+        ]},
+        { label: "Clustering", route: "", isActive: false, isOpened: false, isSection: true, isDone: true, childs: []}
+      ],
+
+      tree_menu: $=>$.this.default_tree_menu, // DEFAULT
+
+      // VIEWFUNC
+      $rootHasActiveChild: $=>( root=>root.childs.filter(c=>c.isActive).length > 0 )
+    },
+
+    ['a.class']: "tree-component",
+    ['a.style']: "margin-left: 25px",
+
+    '=>': [
+
+      { div: { meta: {forEach: "root", of: $=>$.scope.tree_menu, define: {first:"first", last:"last"}},
+
+        ['a.class']: "tree-root",
+        ['a.style.marginBottom']: $=>$.meta.last ? "15px" : "20px",
+
+        '=>': [
+
+          { hr: { meta: { if: $=>$.meta.root.isSection && !$.meta.first } }},
+
+          { h4: {
+
+            ['a.style']: "margin-bottom: 12px",
+            ["ha.style.backgroundColor"]: $=>$.meta.root.isActive ? "#e4e8ed" : "unset",
+            ["ha.style.color"]: $=>$.scope.$rootHasActiveChild($.meta.root) ? "blue" : "unset",
+
+            handle: { 
+              onclick: $=>{ $.meta.root.isOpened=!$.meta.root.isOpened; $.scope.tree_menu = [...$.scope.tree_menu]; } 
+            },
+            
+            '=>': [
+              $=> $.meta.root.isDone ? 'V' : 'O', " - ", $=>$.meta.root.label
+            ]
+          }},
+
+          { div: { meta: { if: $=>$.meta.root.isOpened },
+
+            ['a.style']: "margin-left: 25px",
+            ["ha.style.marginBottom"]: $=>$.meta.last ? "20px" : "15px",
+
+            '=>': 
+
+              { div: { meta: { forEach: "child", of: $=>$.meta.root.childs },
+
+                ['a.class']: "tree-root",
+
+                '=>': 
+                
+                  { div: {
+                    ['a.style']: "border-radius: 25px; padding: 5px 10px",
+                    ["ha.style.backgroundColor"]: $=>$.meta.child.isActive ? "#e4e8ed" : "unset",
+                    ["ha.style.color"]: $=>$.meta.child.isActive ? "blue" : "unset",
+
+                    '=>': [
+                      $=> $.meta.child.isDone ? 'V' : 'O', " - ", $=>$.meta.child.label
+                    ]
+                  }}
+                
+              }}
+
+          }}
+
+        ]
+
+      }}
+
+    ]
+  }}
+
+  RenderApp(document.body, { div: {
+    id: "app",
+
+    "=>": [
+      TreeMenu
+    ]
+
+  }})
+}
+
+const appLowCodeTest = async ()=>{
+
+  const f1 = (code)=>{
+    code=code.replaceAll("@m ", "$.meta.").replaceAll("@s ", "$.scope.").replaceAll("@p ", "$.parent.").replaceAll("@t ", "$.this.").replaceAll("@le ", "$.le.").replaceAll("@ctx ", "$.ctx.").replaceAll("@ ", "$.scope.")
+    code=code.replaceAll(":m:", "$.meta.").replaceAll(":s:", "$.scope.").replaceAll(":p:", "$.parent.").replaceAll(":t:", "$.this.").replaceAll(":l:", "$.le.").replaceAll(":c:", "$.ctx.").replaceAll("::", "$.scope.")
+    if (code.includes("return ")){
+      return new Function("$", code)
+    } else {
+      return new Function("$", "return "+code)
+    }
+  }
+
+  const f2 = (code)=>{
+    code=code.replaceAll("meta.", "$.meta.").replaceAll("scope.", "$.scope.").replaceAll("parent.", "$.parent.").replaceAll("this.", "$.this.").replaceAll("le.", "$.le.").replaceAll("ctx.", "$.ctx.").replaceAll("::", "$.scope.")
+    if (code.includes("return ")){
+      return new Function("$", code)
+    } else {
+      return new Function("$", "return "+code)
+    }
+  }
+
+  const f3 = (code)=>{
+    code=code.replaceAll("@m.", "$.meta.").replaceAll("@s.", "$.scope.").replaceAll("@p.", "$.parent.").replaceAll("@t.", "$.this.").replaceAll("@l.", "$.le.").replaceAll("@c.", "$.ctx.").replaceAll("@", "$.scope.")
+    code=code.replaceAll(":m:", "$.meta.").replaceAll(":s:", "$.scope.").replaceAll(":p:", "$.parent.").replaceAll(":t:", "$.this.").replaceAll(":l:", "$.le.").replaceAll(":c:", "$.ctx.").replaceAll(":::", "$.meta.").replaceAll("::", "$.scope.")
+    if (code.includes("return ")){
+      return new Function("$", code)
+    } else {
+      return new Function("$", "return "+code)
+    }
+  }
+
+  const f = (strings)=>{
+    return f3(strings[0])
+  }
+
+
+  RenderApp(document.body, { div: { 
+    id: "app",
+
+    props: {
+      mytodo: {
+        text: "chiamare xyz", done: false
+      },
+
+      todos: [
+        { text: "chiamare thl", done: false },
+        { text: "chiamare fhc", done: true },
+      ]
+    },
+
+    "=>": 
+    [
+      f1('@ mytodo.text'), " - ", f1('@ mytodo.done'),
+      { br: {}},
+
+      f1('::mytodo.text + " - " + ::mytodo.done'),
+      { br: {}},
+
+      { div: { "meta": { forEach: "todo", of: f1('::todos') },
+
+        text: f1(':m:todo.text + " - " + :m:todo.done'),
+      }},
+
+
+      // ---------------------- //
+      { hr: {}},
+
+      f`@mytodo.text`, ' - ', f`@mytodo.done`,
+      { br: {}},
+
+
+      { div: { "meta": { forEach: "todo", of: f`@todos` },
+
+        text: [
+          f`@m.todo.text + " - " + @m.todo.done`,
+        ]
+      }},
+
+      f`::mytodo.text + " - " + ::mytodo.done`,
+      { br: {}},
+
+      { div: { "meta": { forEach: "todo", of: f`::todos` },
+
+        text: [
+          f`:::todo.text + " - " + :::todo.done`,
+        ]
+      }},
+    ]
+
+  }})
+
+}
+
 const appDemoDbus = async ()=>{
 
   RenderApp(document.body, { div: {
@@ -4379,7 +4672,10 @@ const appDemoDbus = async ()=>{
 // appCachedProperties()
 // appTestAttrsShortcuts
 // appTestLayouts()
+// appRecursiveTodo()
 // appScopeOptions()
+// appTestTreeComponent()
+// appLowCodeTest()
 appDemoDbus()
 
 // appDemoStockApi()
