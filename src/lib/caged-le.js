@@ -1483,8 +1483,8 @@ class Component {
 
           deps.$scope_deps?.forEach(d=>{
             _debug.log("pushooooo")
-            let [propsOwner, isPropertiesProp] = this.get$ScopedPropsOwner(d)
-            let depRemover = (isPropertiesProp ? propsOwner.properties[d] : propsOwner.meta[d])?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() ) // qui il ? server affinche si ci registri solo alle props (e non alle func etc!)
+            let [propsOwner, isPropertiesProp] = this.get$ScopedPropsOwner(d);
+            let depRemover = (isPropertiesProp ? propsOwner.properties[d] : propsOwner.meta[d])?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() ); // qui il ? server affinche si ci registri solo alle props (e non alle func etc!)
             depRemover && depsRemover.push(depRemover)
           }) // supporting multiple deps, but only of first order..
 
@@ -1713,8 +1713,8 @@ class Component {
                 
                 staticDeps.$scope_deps?.forEach(d=>{
                   _debug.log("pushooooo")
-                  let [propsOwner, isPropertiesProp] = this.get$ScopedPropsOwner(d)
-                  (isPropertiesProp ? propsOwner.properties[d] : propsOwner.meta[d])?.addOnChangedHandler([this, "attr", k], ()=>setupStyle(v) )
+                  let [propsOwner, isPropertiesProp] = this.get$ScopedPropsOwner(d);
+                  (isPropertiesProp ? propsOwner.properties[d] : propsOwner.meta[d])?.addOnChangedHandler([this, "attr", k], ()=>setupStyle(v) );
                 })
 
                 staticDeps.$le_deps?.forEach(d=>{ // [le_id, property]
@@ -1762,8 +1762,8 @@ class Component {
                 
                 staticDeps.$scope_deps?.forEach(d=>{
                   _debug.log("pushooooo")
-                  let [propsOwner, isPropertiesProp] = this.get$ScopedPropsOwner(d)
-                  (isPropertiesProp ? propsOwner.properties[d] : propsOwner.meta[d])?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
+                  let [propsOwner, isPropertiesProp] = this.get$ScopedPropsOwner(d);
+                  (isPropertiesProp ? propsOwner.properties[d] : propsOwner.meta[d])?.addOnChangedHandler([this, "attr", k], ()=>setupValue() );
                 })
 
                 staticDeps.$le_deps?.forEach(d=>{ // [le_id, property]
@@ -1810,7 +1810,7 @@ class Component {
               
               staticDeps.$scope_deps?.forEach(d=>{
                 _debug.log("pushooooo")
-                let [propsOwner, isPropertiesProp] = this.get$ScopedPropsOwner(d)
+                let [propsOwner, isPropertiesProp] = this.get$ScopedPropsOwner(d);
                 if (isPropertiesProp){
                   propsOwner.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
                   _2WayPropertyBindingToHandle[k] = ()=>propsOwner.properties[d]
@@ -1983,8 +1983,8 @@ class Component {
 
               staticDeps.$scope_deps?.forEach(d=>{
                 _debug.log("pushooooo")
-                let [propsOwner, isPropertiesProp] = this.get$ScopedPropsOwner(d)
-                (isPropertiesProp ? propsOwner.properties[d] : propsOwner.meta[d])?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
+                let [propsOwner, isPropertiesProp] = this.get$ScopedPropsOwner(d);
+                (isPropertiesProp ? propsOwner.properties[d] : propsOwner.meta[d])?.addOnChangedHandler([this, "attr", k], ()=>setupValue() );
               })
 
               staticDeps.$le_deps?.forEach(d=>{ // [le_id, property]
@@ -2031,7 +2031,7 @@ class Component {
 
               staticDeps.$scope_deps?.forEach(d=>{
                 _debug.log("pushooooo")
-                let [propsOwner, isPropertiesProp] = this.get$ScopedPropsOwner(d)
+                let [propsOwner, isPropertiesProp] = this.get$ScopedPropsOwner(d);
                 if (isPropertiesProp){
                   propsOwner.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
                   _2WayPropertyBindingToHandle[k] = ()=>propsOwner.properties[d]
@@ -2103,8 +2103,8 @@ class Component {
 
               staticDeps.$scope_deps?.forEach(d=>{
                 _debug.log("pushooooo")
-                let [propsOwner, isPropertiesProp] = this.get$ScopedPropsOwner(d)
-                (isPropertiesProp ? propsOwner.properties[d] : propsOwner.meta[d])?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
+                let [propsOwner, isPropertiesProp] = this.get$ScopedPropsOwner(d);
+                (isPropertiesProp ? propsOwner.properties[d] : propsOwner.meta[d])?.addOnChangedHandler([this, "attr", k], ()=>setupValue() );
               })
 
               staticDeps.$le_deps?.forEach(d=>{ // [le_id, property]
@@ -2151,7 +2151,7 @@ class Component {
 
             staticDeps.$scope_deps?.forEach(d=>{
               _debug.log("pushooooo")
-              let [propsOwner, isPropertiesProp] = this.get$ScopedPropsOwner(d)
+              let [propsOwner, isPropertiesProp] = this.get$ScopedPropsOwner(d);
               if (isPropertiesProp){
                 propsOwner.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
                 _2WayPropertyBindingToHandle[k] = ()=>propsOwner.properties[d]
@@ -2249,8 +2249,8 @@ class Component {
             })
 
             deps.$scope_deps?.forEach(d=>{
-              let [propsOwner, isPropertiesProp] = this.get$ScopedPropsOwner(d)
-              let depRemover = (isPropertiesProp ? propsOwner.properties[d] : propsOwner.meta[d])?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+              let [propsOwner, isPropertiesProp] = this.get$ScopedPropsOwner(d);
+              let depRemover = (isPropertiesProp ? propsOwner.properties[d] : propsOwner.meta[d])?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() );
               depRemover && depsRemover.push(depRemover)
             })
 
@@ -2576,8 +2576,8 @@ class TextNodeComponent {
         staticDeps.$scope_deps?.forEach(_d=>{
           let _propName = Array.isArray(_d) ? _d[0] : _d
 
-          let [propsOwner, isPropertiesProp] = pointedComponentEl.get$ScopedPropsOwner(d)
-          let _pointedProp  = (isPropertiesProp ? propsOwner.properties[_propName] : propsOwner.meta[_propName])
+          let [propsOwner, isPropertiesProp] = pointedComponentEl.get$ScopedPropsOwner(d);
+          let _pointedProp  = isPropertiesProp ? propsOwner.properties[_propName] : propsOwner.meta[_propName];
 
           if ("addOnChangedHandler" in _pointedProp){
             this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
@@ -2636,8 +2636,8 @@ class TextNodeComponent {
         staticDeps.$scope_deps?.forEach(_d=>{
           let _propName = Array.isArray(_d) ? _d[0] : _d
 
-          let [propsOwner, isPropertiesProp] = pointedComponentEl.get$ScopedPropsOwner(d)
-          let _pointedProp  = (isPropertiesProp ? propsOwner.properties[_propName] : propsOwner.meta[_propName])
+          let [propsOwner, isPropertiesProp] = pointedComponentEl.get$ScopedPropsOwner(d);
+          let _pointedProp  = isPropertiesProp ? propsOwner.properties[_propName] : propsOwner.meta[_propName];
 
           if ("addOnChangedHandler" in _pointedProp){
             this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
@@ -2667,8 +2667,8 @@ class TextNodeComponent {
     
     this.staticAnDeps.$scope_deps?.forEach(d=>{
       let propName = Array.isArray(d) ? d[0] : d
-      let [pointedScope, isPropertiesProp] = this.parent.get$ScopedPropsOwner(propName)
-      let pointedProp  = (isPropertiesProp ? pointedScope.properties[propName] : pointedScope.meta[propName])
+      let [pointedScope, isPropertiesProp] = this.parent.get$ScopedPropsOwner(propName);
+      let pointedProp  = isPropertiesProp ? pointedScope.properties[propName] : pointedScope.meta[propName];
       if ("addOnChangedHandler" in pointedProp){
         this.depsRemover.push(pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
       }
@@ -2697,8 +2697,8 @@ class TextNodeComponent {
         staticDeps.$scope_deps?.forEach(_d=>{
           let _propName = Array.isArray(_d) ? _d[0] : _d
 
-          let [propsOwner, isPropertiesProp] = pointedComponentEl.get$ScopedPropsOwner(d)
-          let _pointedProp  = (isPropertiesProp ? propsOwner.properties[_propName] : propsOwner.meta[_propName])
+          let [propsOwner, isPropertiesProp] = pointedComponentEl.get$ScopedPropsOwner(d);
+          let _pointedProp  = isPropertiesProp ? propsOwner.properties[_propName] : propsOwner.meta[_propName];
 
           if ("addOnChangedHandler" in _pointedProp){
             this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
@@ -2757,8 +2757,8 @@ class TextNodeComponent {
         staticDeps.$scope_deps?.forEach(_d=>{
           let _propName = Array.isArray(_d) ? _d[0] : _d
 
-          let [propsOwner, isPropertiesProp] = pointedComponentEl.get$ScopedPropsOwner(d)
-          let _pointedProp  = (isPropertiesProp ? propsOwner.properties[_propName] : propsOwner.meta[_propName])
+          let [propsOwner, isPropertiesProp] = pointedComponentEl.get$ScopedPropsOwner(d);
+          let _pointedProp  = isPropertiesProp ? propsOwner.properties[_propName] : propsOwner.meta[_propName];
 
           if ("addOnChangedHandler" in _pointedProp){
             this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
@@ -2817,8 +2817,8 @@ class TextNodeComponent {
         staticDeps.$scope_deps?.forEach(_d=>{
           let _propName = Array.isArray(_d) ? _d[0] : _d
 
-          let [propsOwner, isPropertiesProp] = pointedComponentEl.get$ScopedPropsOwner(d)
-          let _pointedProp  = (isPropertiesProp ? propsOwner.properties[_propName] : propsOwner.meta[_propName])
+          let [propsOwner, isPropertiesProp] = pointedComponentEl.get$ScopedPropsOwner(d);
+          let _pointedProp  = isPropertiesProp ? propsOwner.properties[_propName] : propsOwner.meta[_propName];
           
           if ("addOnChangedHandler" in _pointedProp){
             this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
@@ -2941,8 +2941,8 @@ class ConditionalComponent extends Component{
 
       deps.$scope_deps?.forEach(d=>{
         _debug.log("pushooooo")
-        let [propsOwner, isPropertiesProp] = this.get$ScopedPropsOwner(d)
-        let depRemover = (isPropertiesProp ? propsOwner.properties[d] : propsOwner.meta[d])?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() ) // qui il ? server affinche si ci registri solo alle props (e non alle func etc!)
+        let [propsOwner, isPropertiesProp] = this.get$ScopedPropsOwner(d);
+        let depRemover = (isPropertiesProp ? propsOwner.properties[d] : propsOwner.meta[d])?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() ); // qui il ? server affinche si ci registri solo alle props (e non alle func etc!)
         depRemover && depsRemover.push(depRemover)
       })
 
@@ -3196,8 +3196,8 @@ class IterableViewComponent{
 
         deps.$scope_deps?.forEach(d=>{
           _debug.log("pushooooo")
-          let [propsOwner, isPropertiesProp] = this.get$ScopedPropsOwner(d)
-          let depRemover = (isPropertiesProp ? propsOwner.properties[d] : propsOwner.meta[d])?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() ) // qui il ? server affinche si ci registri solo alle props (e non alle func etc!)
+          let [propsOwner, isPropertiesProp] = this.get$ScopedPropsOwner(d);
+          let depRemover = (isPropertiesProp ? propsOwner.properties[d] : propsOwner.meta[d])?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() ); // qui il ? server affinche si ci registri solo alle props (e non alle func etc!)
           depRemover && depsRemover.push(depRemover)
         }) // supporting multiple deps, but only of first order..
 
