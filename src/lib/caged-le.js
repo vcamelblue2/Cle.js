@@ -3353,6 +3353,27 @@ const LE_LoadCss = (url, {do_microwait=undefined, attr={}, debug=false}={})=>{
 const LE_InitWebApp = (appDef)=>{ document.addEventListener("DOMContentLoaded", appDef ) }
 // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // 
 
+// export
+/**
+ * @returns {($)=>any}
+ * */
+const smartFunc = (code, funcCall=false, ...oterArgs)=>{
+  if (!funcCall) { code = code[0] }
+  code=code.replaceAll("@m.", "$.meta.").replaceAll("@s.", "$.scope.").replaceAll("@p.", "$.parent.").replaceAll("@t.", "$.this.").replaceAll("@l.", "$.le.").replaceAll("@c.", "$.ctx.").replaceAll("@d", "$.dbus.").replaceAll("@", "$.scope.")
+  code=code.replaceAll(":m:", "$.meta.").replaceAll(":s:", "$.scope.").replaceAll(":p:", "$.parent.").replaceAll(":t:", "$.this.").replaceAll(":l:", "$.le.").replaceAll(":c:", "$.ctx.").replaceAll(":d:", "$.dbus.").replaceAll(":::", "$.meta.").replaceAll("::", "$.scope.")
+  if (code.includes("return") || code.startsWith("{")){
+    return new Function("$", ...oterArgs, code)
+  } else {
+    return new Function("$", ...oterArgs, "return "+code)
+  }
+}
+
+const smartFuncWithCustomArgs = (...oterArgs)=>{
+  return (code, funcCall=false)=>smartFunc(code, funcCall, ...oterArgs)
+}
+
+// // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // 
+
 
 /*
 class TodoModelApiMock extends LE_BackendApiMock{
@@ -3402,7 +3423,7 @@ class LE_BackendApiMock{ // base class for backend api mock -> purpose is to hav
 }
 
 
-export { pass, none, smart, Use, Extended, Placeholder, Bind, Switch, Case, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock }
+export { pass, none, smart, smartFunc as f, smartFuncWithCustomArgs as fArgs, Use, Extended, Placeholder, Bind, Switch, Case, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock }
 // full import: {pass, none, smart, Use, Bind, RenderApp, LE_LoadScript, LE_LoadCss, LE_InitWebApp}
 
 

@@ -1,5 +1,5 @@
 
-import {pass, none, smart, Use, Extended, Placeholder, Bind, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock} from "../lib/caged-le.js"
+import {pass, none, smart, f, fArgs, Use, Extended, Placeholder, Bind, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock} from "../lib/caged-le.js"
 import { NavSidebarLayout } from "../layouts/layouts.js"
 
 const app0 = ()=>{
@@ -4446,19 +4446,23 @@ const appTestTreeComponent = async ()=>{
       $rootHasActiveChild: $=>( root=>root.childs.filter(c=>c.isActive).length > 0 )
     },
 
+    def: {
+      closeRoot: fArgs("root", "mark_root_as_changed")`{ root.isOpened = !root.isOpened; mark_root_as_changed() }` // @tree_menu = [...@tree_menu]
+    },
+
     ['a.class']: "tree-component",
     ['a.style']: "margin-left: 25px",
 
     '=>': [
 
-      { div: { meta: {forEach: "root", of: $=>$.scope.tree_menu, define: {first:"first", last:"last"}},
+      { div: { meta: {forEach: "root", of: f`@tree_menu`, define: {first:"first", last:"last"}}, // $=>$.scope.tree_menu
 
         ['a.class']: "tree-root",
         ['a.style.marginBottom']: $=>$.meta.last ? "15px" : "20px",
 
         '=>': [
 
-          { hr: { meta: { if: $=>$.meta.root.isSection && !$.meta.first } }},
+          { hr: { meta: { if: f`@root.isSection && @first` } }}, // $=>$.meta.root.isSection && !$.meta.first
 
           { h4: {
 
@@ -4467,7 +4471,8 @@ const appTestTreeComponent = async ()=>{
             ["ha.style.color"]: $=>$.scope.$rootHasActiveChild($.meta.root) ? "blue" : "unset",
 
             handle: { 
-              onclick: $=>{ $.meta.root.isOpened=!$.meta.root.isOpened; $.scope.tree_menu = [...$.scope.tree_menu]; } 
+              // onclick: $=>{ $.meta.root.isOpened=!$.meta.root.isOpened; $.scope.tree_menu = [...$.scope.tree_menu]; } 
+              onclick: $=>{ $.scope.closeRoot($.meta.root, $.meta._mark_root_as_changed); } 
             },
             
             '=>': [
@@ -4475,14 +4480,14 @@ const appTestTreeComponent = async ()=>{
             ]
           }},
 
-          { div: { meta: { if: $=>$.meta.root.isOpened },
+          { div: { meta: { if: f`@root.isOpened`  }, // $=>$.meta.root.isOpened
 
             ['a.style']: "margin-left: 25px",
             ["ha.style.marginBottom"]: $=>$.meta.last ? "20px" : "15px",
 
             '=>': 
 
-              { div: { meta: { forEach: "child", of: $=>$.meta.root.childs },
+              { div: { meta: { forEach: "child", of: f`@root.childs` }, //$=>$.meta.root.childs
 
                 ['a.class']: "tree-root",
 
