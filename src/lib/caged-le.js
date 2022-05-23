@@ -3013,6 +3013,9 @@ class IterableComponent extends Component{
         _info.log("ho delle define nel meta!!", this.meta, define_var, dev_var_name, this.meta_config.define)
       })
     }
+    let manualMarkSignalName = "_mark_"+this.meta_config.iterablePropertyIdentifier+"_as_changed"
+    this.meta[manualMarkSignalName] = ()=>this.meta[this.meta_config.iterablePropertyIdentifier].markAsChanged()
+
     _info.log("prima del meta", this.$meta, this.parent.$meta, this.meta, this.parent.meta, this.parent)
     this.$meta = this.getMy$meta() // rebuild
     _info.log("dopo del meta", this.$meta, this.parent.$meta, this.meta, this.parent.meta, this.parent)
