@@ -4601,7 +4601,7 @@ const appMetaInScopeAndLowCodeTest = async ()=>{
           smart({ span: f`JSON.stringify(@todo)`}),
           " --- ",
           { span: { meta: {noMetaInScope: true} ,
-            text: f`JSON.stringify(@todo) + ('todo' in $.scope)`
+            text: f`JSON.stringify(@todo)`
           }}
         ]
       }},
