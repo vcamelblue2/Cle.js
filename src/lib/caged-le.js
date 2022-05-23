@@ -331,8 +331,8 @@ const TodoList = { // automatic root div!
     { hr: {} },
 
 
-    { div: { meta: [{ forEach:"todo",  of: $ => $.parent.todolist,  define:{ index:"idx", first:"isFirst", last:"isLast", length:"len", iterable:"arr",    ...CUSTOM_PROP_NAME: value | ($: "parent" $this (same as meta), $child: real $this of the child)=> ... }, define_alias:{ // my_var_extracted_with_meta_identifier..easy alias! //, todo_label: $ => $.this.todo_label_mapping[$.meta.todo]},  key,comparer: el=>... extractor/converter: $=> // opzionale, per fare es Obj.keys --> extractor:($, blabla)=>Object.keys(blabla) e i comparer per identificare i changes // 
-                     ,newScope: bool ,noThisInScope: bool}], (le ultime sono le "scope options") 
+    { div: { meta: { forEach:"todo",  of: $ => $.parent.todolist,  define:{ index:"idx", first:"isFirst", last:"isLast", length:"len", iterable:"arr",    ...CUSTOM_PROP_NAME: value | ($: "parent" $this (same as meta), $child: real $this of the child)=> ... }, define_alias:{ // my_var_extracted_with_meta_identifier..easy alias! //, todo_label: $ => $.this.todo_label_mapping[$.meta.todo]},  key,comparer: el=>... extractor/converter: $=> // opzionale, per fare es Obj.keys --> extractor:($, blabla)=>Object.keys(blabla) e i comparer per identificare i changes // 
+                     ,newScope: bool, noThisInScope: bool, noMetaInScope: bool}], (le ultime sono le "scope options") 
       
       "=>": [
 
@@ -1052,23 +1052,29 @@ const ComponentProxy = (context, lvl=0)=>{
 // $scope proxy..dynamically resolve 
 const ComponentScopeProxy = (context)=>{
 
-  const findComponentPropHolder = (component, prop, search_depth=0)=>{
+  const findComponentPropHolder = (component, prop, search_depth=0, noMetaInScope=false)=>{
+    if(search_depth === 0){
+      noMetaInScope = component.meta_options.noMetaInScope
+    }
     if (component === undefined || component.$this === undefined){
       return {}
     }
 
     if (search_depth === 0 && component.meta_options.noThisInScope){ // salta il this e vai a parent..
-      return findComponentPropHolder(component.parent, prop, search_depth+1)
+      return findComponentPropHolder(component.parent, prop, search_depth+1, noMetaInScope)
     }
 
     if (prop in (component.$this?.this || {})){ // fix IterableViewComponent, cannot habe $this..
       return component.properties
     }
+    if (!noMetaInScope && prop in (component.meta || {})){ // fix IterableViewComponent, cannot habe $this..
+      return component.meta
+    }
     else if(component.meta_options.isNewScope){
       throw Error("Properties cannot be found in this scope..blocked scope?")
     }
     else {
-      return findComponentPropHolder(component.parent, prop, search_depth+1)
+      return findComponentPropHolder(component.parent, prop, search_depth+1, noMetaInScope)
     }
   }
 
@@ -1271,9 +1277,6 @@ class Component {
     this.$dbus = $dbus
     this.$ctx = this.getMy$ctx()
     this.$meta = this.getMy$meta()
-    // this.$scope = this.getMy$meta()
-
-    this.signalsHandlerRemover = []
 
     this.oj_definition = definition
 
@@ -1283,6 +1286,7 @@ class Component {
     this.meta_options = {
       isNewScope: this.convertedDefinition.meta?.newScope,
       noThisInScope: this.convertedDefinition.meta?.noThisInScope,
+      noMetaInScope: this.convertedDefinition.meta?.noMetaInScope
     } 
 
     this.defineAndRegisterId()
@@ -1335,24 +1339,30 @@ class Component {
   }
 
 
-  get$ScopedPropsOwner(prop, search_depth=0){
+  get$ScopedPropsOwner(prop, search_depth=0, noMetaInScope=false){
+    if(search_depth === 0){
+      noMetaInScope = this.meta_options.noMetaInScope
+    }
 
     if (this.parent === undefined || !(this.parent instanceof Component)){ // || this.parent instanceof IterableViewComponent)){
-      return this
+      return [this, /*isPropertiesProp = */ true]
     }
 
     if (search_depth === 0 && this.meta_options.noThisInScope){ // salta il this e vai a parent..
-      return this.parent.get$ScopedPropsOwner(prop, search_depth+1)
+      return this.parent.get$ScopedPropsOwner(prop, search_depth+1, noMetaInScope)
     }
 
     if (prop in this.properties){
-      return this
+      return [this, true]
+    }
+    else if (!noMetaInScope && prop in this.meta){
+      return [this, false]
     }
     else if (this.meta_options.isNewScope){
       throw Error("Properties cannot be found in this scope..blocked scope?")
     }
     else {
-      return this.parent.get$ScopedPropsOwner(prop, search_depth+1)
+      return this.parent.get$ScopedPropsOwner(prop, search_depth+1, noMetaInScope)
     }
 
   }
@@ -1473,7 +1483,8 @@ class Component {
 
           deps.$scope_deps?.forEach(d=>{
             _debug.log("pushooooo")
-            let depRemover = this.get$ScopedPropsOwner(d).properties[d]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() ) // qui il ? server affinche si ci registri solo alle props (e non alle func etc!)
+            let [propsOwner, isPropertiesProp] = this.get$ScopedPropsOwner(d)
+            let depRemover = (isPropertiesProp ? propsOwner.properties[d] : propsOwner.meta[d])?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() ) // qui il ? server affinche si ci registri solo alle props (e non alle func etc!)
             depRemover && depsRemover.push(depRemover)
           }) // supporting multiple deps, but only of first order..
 
@@ -1577,7 +1588,7 @@ class Component {
           }
           if (typologyNamespace === "scope"){
             Object.entries(defs).forEach(([s, fun])=>{
-              let remover = this.get$ScopedPropsOwner(s).signals[s].addHandler(this, (...args)=>fun.bind(undefined, this.$this, ...args)())
+              let remover = this.get$ScopedPropsOwner(s)[0].signals[s].addHandler(this, (...args)=>fun.bind(undefined, this.$this, ...args)())
               this.signalsHandlerRemover.push(remover)
             })
           }
@@ -1702,7 +1713,8 @@ class Component {
                 
                 staticDeps.$scope_deps?.forEach(d=>{
                   _debug.log("pushooooo")
-                  this.get$ScopedPropsOwner(d).properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupStyle(v) )
+                  let [propsOwner, isPropertiesProp] = this.get$ScopedPropsOwner(d)
+                  (isPropertiesProp ? propsOwner.properties[d] : propsOwner.meta[d])?.addOnChangedHandler([this, "attr", k], ()=>setupStyle(v) )
                 })
 
                 staticDeps.$le_deps?.forEach(d=>{ // [le_id, property]
@@ -1750,7 +1762,8 @@ class Component {
                 
                 staticDeps.$scope_deps?.forEach(d=>{
                   _debug.log("pushooooo")
-                  this.get$ScopedPropsOwner(d).properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
+                  let [propsOwner, isPropertiesProp] = this.get$ScopedPropsOwner(d)
+                  (isPropertiesProp ? propsOwner.properties[d] : propsOwner.meta[d])?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
                 })
 
                 staticDeps.$le_deps?.forEach(d=>{ // [le_id, property]
@@ -1797,9 +1810,15 @@ class Component {
               
               staticDeps.$scope_deps?.forEach(d=>{
                 _debug.log("pushooooo")
-                let owner = this.get$ScopedPropsOwner(d)
-                owner.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
-                _2WayPropertyBindingToHandle[k] = ()=>owner.properties[d]
+                let [propsOwner, isPropertiesProp] = this.get$ScopedPropsOwner(d)
+                if (isPropertiesProp){
+                  propsOwner.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
+                  _2WayPropertyBindingToHandle[k] = ()=>propsOwner.properties[d]
+                }
+                else {
+                  propsOwner.meta[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
+                  _2WayPropertyBindingToHandle[k] = ()=>propsOwner.meta[d]
+                }
               })
 
               staticDeps.$le_deps?.forEach(d=>{ // [le_id, property]
@@ -1964,7 +1983,8 @@ class Component {
 
               staticDeps.$scope_deps?.forEach(d=>{
                 _debug.log("pushooooo")
-                this.get$ScopedPropsOwner(d).properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
+                let [propsOwner, isPropertiesProp] = this.get$ScopedPropsOwner(d)
+                (isPropertiesProp ? propsOwner.properties[d] : propsOwner.meta[d])?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
               })
 
               staticDeps.$le_deps?.forEach(d=>{ // [le_id, property]
@@ -2011,9 +2031,15 @@ class Component {
 
               staticDeps.$scope_deps?.forEach(d=>{
                 _debug.log("pushooooo")
-                let owner = this.get$ScopedPropsOwner(d)
-                owner.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
-                _2WayPropertyBindingToHandle[k] = ()=>owner.properties[d]
+                let [propsOwner, isPropertiesProp] = this.get$ScopedPropsOwner(d)
+                if (isPropertiesProp){
+                  propsOwner.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
+                  _2WayPropertyBindingToHandle[k] = ()=>propsOwner.properties[d]
+                }
+                else {
+                  propsOwner.meta[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
+                  _2WayPropertyBindingToHandle[k] = ()=>propsOwner.meta[d]
+                }
               })
 
               staticDeps.$le_deps?.forEach(d=>{ // [le_id, property]
@@ -2077,7 +2103,8 @@ class Component {
 
               staticDeps.$scope_deps?.forEach(d=>{
                 _debug.log("pushooooo")
-                this.get$ScopedPropsOwner(d).properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
+                let [propsOwner, isPropertiesProp] = this.get$ScopedPropsOwner(d)
+                (isPropertiesProp ? propsOwner.properties[d] : propsOwner.meta[d])?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
               })
 
               staticDeps.$le_deps?.forEach(d=>{ // [le_id, property]
@@ -2124,9 +2151,15 @@ class Component {
 
             staticDeps.$scope_deps?.forEach(d=>{
               _debug.log("pushooooo")
-              let owner = this.get$ScopedPropsOwner(d)
-              owner.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
-              _2WayPropertyBindingToHandle[k] = ()=>owner.properties[d]
+              let [propsOwner, isPropertiesProp] = this.get$ScopedPropsOwner(d)
+              if (isPropertiesProp){
+                propsOwner.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
+                _2WayPropertyBindingToHandle[k] = ()=>propsOwner.properties[d]
+              }
+              else {
+                propsOwner.meta[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
+                _2WayPropertyBindingToHandle[k] = ()=>propsOwner.meta[d]
+              }
             })
             
             staticDeps.$le_deps?.forEach(d=>{ // [le_id, property]
@@ -2216,7 +2249,8 @@ class Component {
             })
 
             deps.$scope_deps?.forEach(d=>{
-              let depRemover = this.get$ScopedPropsOwner(d).properties[d]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+              let [propsOwner, isPropertiesProp] = this.get$ScopedPropsOwner(d)
+              let depRemover = (isPropertiesProp ? propsOwner.properties[d] : propsOwner.meta[d])?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
               depRemover && depsRemover.push(depRemover)
             })
 
@@ -2541,7 +2575,10 @@ class TextNodeComponent {
         
         staticDeps.$scope_deps?.forEach(_d=>{
           let _propName = Array.isArray(_d) ? _d[0] : _d
-          let _pointedProp = pointedComponentEl.get$ScopedPropsOwner(d).properties[_propName]
+
+          let [propsOwner, isPropertiesProp] = pointedComponentEl.get$ScopedPropsOwner(d)
+          let _pointedProp  = (isPropertiesProp ? propsOwner.properties[_propName] : propsOwner.meta[_propName])
+
           if ("addOnChangedHandler" in _pointedProp){
             this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
           }
@@ -2598,7 +2635,10 @@ class TextNodeComponent {
 
         staticDeps.$scope_deps?.forEach(_d=>{
           let _propName = Array.isArray(_d) ? _d[0] : _d
-          let _pointedProp = pointedComponentEl.get$ScopedPropsOwner(d).properties[_propName]
+
+          let [propsOwner, isPropertiesProp] = pointedComponentEl.get$ScopedPropsOwner(d)
+          let _pointedProp  = (isPropertiesProp ? propsOwner.properties[_propName] : propsOwner.meta[_propName])
+
           if ("addOnChangedHandler" in _pointedProp){
             this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
           }
@@ -2627,8 +2667,8 @@ class TextNodeComponent {
     
     this.staticAnDeps.$scope_deps?.forEach(d=>{
       let propName = Array.isArray(d) ? d[0] : d
-      let pointedScope = this.parent.get$ScopedPropsOwner(propName)
-      let pointedProp = pointedScope.properties[propName]
+      let [pointedScope, isPropertiesProp] = this.parent.get$ScopedPropsOwner(propName)
+      let pointedProp  = (isPropertiesProp ? pointedScope.properties[propName] : pointedScope.meta[propName])
       if ("addOnChangedHandler" in pointedProp){
         this.depsRemover.push(pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
       }
@@ -2656,7 +2696,10 @@ class TextNodeComponent {
         
         staticDeps.$scope_deps?.forEach(_d=>{
           let _propName = Array.isArray(_d) ? _d[0] : _d
-          let _pointedProp = pointedComponentEl.get$ScopedPropsOwner(d).properties[_propName]
+
+          let [propsOwner, isPropertiesProp] = pointedComponentEl.get$ScopedPropsOwner(d)
+          let _pointedProp  = (isPropertiesProp ? propsOwner.properties[_propName] : propsOwner.meta[_propName])
+
           if ("addOnChangedHandler" in _pointedProp){
             this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
           }
@@ -2713,7 +2756,10 @@ class TextNodeComponent {
 
         staticDeps.$scope_deps?.forEach(_d=>{
           let _propName = Array.isArray(_d) ? _d[0] : _d
-          let _pointedProp = pointedComponentEl.get$ScopedPropsOwner(d).properties[_propName]
+
+          let [propsOwner, isPropertiesProp] = pointedComponentEl.get$ScopedPropsOwner(d)
+          let _pointedProp  = (isPropertiesProp ? propsOwner.properties[_propName] : propsOwner.meta[_propName])
+
           if ("addOnChangedHandler" in _pointedProp){
             this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
           }
@@ -2770,7 +2816,10 @@ class TextNodeComponent {
 
         staticDeps.$scope_deps?.forEach(_d=>{
           let _propName = Array.isArray(_d) ? _d[0] : _d
-          let _pointedProp = pointedComponentEl.get$ScopedPropsOwner(d).properties[_propName]
+
+          let [propsOwner, isPropertiesProp] = pointedComponentEl.get$ScopedPropsOwner(d)
+          let _pointedProp  = (isPropertiesProp ? propsOwner.properties[_propName] : propsOwner.meta[_propName])
+          
           if ("addOnChangedHandler" in _pointedProp){
             this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
           }
@@ -2892,7 +2941,8 @@ class ConditionalComponent extends Component{
 
       deps.$scope_deps?.forEach(d=>{
         _debug.log("pushooooo")
-        let depRemover = this.get$ScopedPropsOwner(d).properties[d]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() ) // qui il ? server affinche si ci registri solo alle props (e non alle func etc!)
+        let [propsOwner, isPropertiesProp] = this.get$ScopedPropsOwner(d)
+        let depRemover = (isPropertiesProp ? propsOwner.properties[d] : propsOwner.meta[d])?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() ) // qui il ? server affinche si ci registri solo alle props (e non alle func etc!)
         depRemover && depsRemover.push(depRemover)
       })
 
@@ -3012,27 +3062,31 @@ class IterableViewComponent{
     this.meta_options = {
       isNewScope: this.meta_def?.newScope,
       noThisInScope: this.meta_def?.noThisInScope,
+      noMetaInScope: this.meta_def?.noMetaInScope
     }
   }
 
-  get$ScopedPropsOwner(prop, search_depth=0){
+  get$ScopedPropsOwner(prop, search_depth=0, noMetaInScope=false){
+    if(search_depth === 0){
+      noMetaInScope = this.meta_options.noMetaInScope
+    }
 
     if (this.parent === undefined || !(this.parent instanceof Component)){ // || this.parent instanceof IterableViewComponent)){
-      return this
+      return [this, true]
     }
 
     if (search_depth === 0 && this.meta_options.noThisInScope){ // salta il this e vai a parent..
-      return this.parent.get$ScopedPropsOwner(prop, search_depth+1)
+      return this.parent.get$ScopedPropsOwner(prop, search_depth+1, noMetaInScope)
     }
 
     if (prop in this.properties){
-      return this
+      return [this, true]
     }
     else if (this.meta_options.isNewScope){
       throw Error("Properties cannot be found in this scope..blocked scope?")
     }
     else {
-      return this.parent.get$ScopedPropsOwner(prop, search_depth+1)
+      return this.parent.get$ScopedPropsOwner(prop, search_depth+1, noMetaInScope)
     }
 
   }
@@ -3142,7 +3196,8 @@ class IterableViewComponent{
 
         deps.$scope_deps?.forEach(d=>{
           _debug.log("pushooooo")
-          let depRemover = this.get$ScopedPropsOwner(d).properties[d]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() ) // qui il ? server affinche si ci registri solo alle props (e non alle func etc!)
+          let [propsOwner, isPropertiesProp] = this.get$ScopedPropsOwner(d)
+          let depRemover = (isPropertiesProp ? propsOwner.properties[d] : propsOwner.meta[d])?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() ) // qui il ? server affinche si ci registri solo alle props (e non alle func etc!)
           depRemover && depsRemover.push(depRemover)
         }) // supporting multiple deps, but only of first order..
 

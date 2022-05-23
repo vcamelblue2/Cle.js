@@ -4519,7 +4519,7 @@ const appTestTreeComponent = async ()=>{
   }})
 }
 
-const appLowCodeTest = async ()=>{
+const appMetaInScopeAndLowCodeTest = async ()=>{
 
   const f1 = (code)=>{
     code=code.replaceAll("@m ", "$.meta.").replaceAll("@s ", "$.scope.").replaceAll("@p ", "$.parent.").replaceAll("@t ", "$.this.").replaceAll("@le ", "$.le.").replaceAll("@ctx ", "$.ctx.").replaceAll("@ ", "$.scope.")
@@ -4541,8 +4541,8 @@ const appLowCodeTest = async ()=>{
   }
 
   const f3 = (code)=>{
-    code=code.replaceAll("@m.", "$.meta.").replaceAll("@s.", "$.scope.").replaceAll("@p.", "$.parent.").replaceAll("@t.", "$.this.").replaceAll("@l.", "$.le.").replaceAll("@c.", "$.ctx.").replaceAll("@", "$.scope.")
-    code=code.replaceAll(":m:", "$.meta.").replaceAll(":s:", "$.scope.").replaceAll(":p:", "$.parent.").replaceAll(":t:", "$.this.").replaceAll(":l:", "$.le.").replaceAll(":c:", "$.ctx.").replaceAll(":::", "$.meta.").replaceAll("::", "$.scope.")
+    code=code.replaceAll("@m.", "$.meta.").replaceAll("@s.", "$.scope.").replaceAll("@p.", "$.parent.").replaceAll("@t.", "$.this.").replaceAll("@l.", "$.le.").replaceAll("@c.", "$.ctx.").replaceAll("@d", "$.dbus.").replaceAll("@", "$.scope.")
+    code=code.replaceAll(":m:", "$.meta.").replaceAll(":s:", "$.scope.").replaceAll(":p:", "$.parent.").replaceAll(":t:", "$.this.").replaceAll(":l:", "$.le.").replaceAll(":c:", "$.ctx.").replaceAll(":d:", "$.dbus.").replaceAll(":::", "$.meta.").replaceAll("::", "$.scope.")
     if (code.includes("return ")){
       return new Function("$", code)
     } else {
@@ -4567,6 +4567,7 @@ const appLowCodeTest = async ()=>{
         { text: "chiamare thl", done: false },
         { text: "chiamare fhc", done: true },
       ]
+      ,todo: "this ha prevalso su meta nello scope!",
     },
 
     "=>": 
@@ -4592,8 +4593,16 @@ const appLowCodeTest = async ()=>{
 
       { div: { "meta": { forEach: "todo", of: f`@todos` },
 
+        onInit: f`console.log(@todo)`,
+        
         text: [
           f`@m.todo.text + " - " + @m.todo.done`,
+          " --- ",
+          smart({ span: f`JSON.stringify(@todo)`}),
+          " --- ",
+          { span: { meta: {noMetaInScope: true} ,
+            text: f`JSON.stringify(@todo) + ('todo' in $.scope)`
+          }}
         ]
       }},
 
@@ -4601,7 +4610,6 @@ const appLowCodeTest = async ()=>{
       { br: {}},
 
       { div: { "meta": { forEach: "todo", of: f`::todos` },
-
         text: [
           f`:::todo.text + " - " + :::todo.done`,
         ]
@@ -4675,7 +4683,7 @@ const appDemoDbus = async ()=>{
 // appRecursiveTodo()
 // appScopeOptions()
 // appTestTreeComponent()
-// appLowCodeTest()
-appDemoDbus()
+appMetaInScopeAndLowCodeTest()
+// appDemoDbus()
 
 // appDemoStockApi()
