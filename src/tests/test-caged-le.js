@@ -4744,6 +4744,96 @@ const appDemoAlias = async ()=>{
   }})
 }
 
+const appResolveMultiCssProblem = async ()=>{
+
+  const Css = { Model: {
+      id: "cssEngine",
+
+      props: {
+        cssRules: [{rule: " /*CssEngin*/ ", refCounter: 1}],
+      },
+
+      def: {
+        ruleGen: ($, rule)=>({rule: rule, refCounter: 1}),
+        getRule: ($, rule) => {
+          return $.this.cssRules.find(r=>r.rule === rule)
+        },
+        add: ($, rule)=>{
+          let found = $.this.getRule(rule)
+          if (found){
+            found.refCounter += 1
+          }
+          else {
+            $.this.cssRules.push($.this.ruleGen(rule))
+          }
+          $.this._mark_cssRules_as_changed()
+        },
+        remove: ($, rule)=>{
+          let found = $.this.getRule(rule)
+          if (found){
+            if (found.refCounter >= 2){
+              found.refCounter -= 1
+            }
+            else {
+              $.this.cssRules.splice($.this.cssRules.indexOf(found), 1)
+              $.this._mark_cssRules_as_changed()
+            }
+          } else {
+            console.log("hai provato ad eliminare una regola inesistente..")
+          }
+        }
+      },
+
+      css:  [
+        $=>{
+          let res = $.this.cssRules.map(r=>r.rule.replaceAll("\n", "").replaceAll("\t", " ").replaceAll("   ", "").replaceAll("  ", " ")).join(" ")
+          console.log("RULES:", res)
+          console.log("RULES:", $.this.cssRules)
+          return res
+        }
+      ]
+    }
+  }
+
+  const myDiv = { div: {
+    props: {
+      cssDef:`
+        .myDiv { background: red; width: 50px; height: 50px; border: 1px solid black}
+      `
+    },
+
+    'a.class': "myDiv",
+
+    onInit: $=>{
+      $.le.cssEngine.add($.this.cssDef)
+    },
+    onDestroy: $=>{
+      $.le.cssEngine.remove($.this.cssDef)
+    }
+  }}
+
+  RenderApp(document.body, { div: {
+
+    data: {
+      elements: [1,2,3]
+    },
+
+    '=>': [
+      Css,
+
+      myDiv,
+
+      { div: { meta: { forEach: "element", of: f`@elements`, define: {index: "index"}},
+        text: Extended( myDiv, {
+          handle: { onclick: f`{ @elements.splice(@index, 1); @elements = [...@elements]}`}
+        })
+      }},
+
+      { button: { handle: { onclick: f`@elements = [...@elements, 0]` }, text: "inc" }},
+    ]
+
+  }})
+}
 // app0()
 // test2way()
 // appTodolist()
@@ -4764,6 +4854,7 @@ const appDemoAlias = async ()=>{
 // appTestTreeComponent()
 // appMetaInScopeAndLowCodeTest()
 // appDemoDbus()
-appDemoAlias()
+// appDemoAlias()
+appResolveMultiCssProblem()
 
 // appDemoStockApi()
