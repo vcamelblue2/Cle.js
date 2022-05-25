@@ -75,6 +75,8 @@ const component = {
     "private:"? data | props: {
       name: "counter 1",
       counter: 0,
+      my_alias: Alias(getter $=>..., setter $,v=>..., ),
+      my_alias2: SmartAlias('@counter')
     },
 
     on: { // on props | alias changes
@@ -458,6 +460,23 @@ const cloneDefinitionWithoutMeta = (definition)=>{
 
 // Framework
 
+class PropAlias {
+  constructor(getter=()=>{}, setter=()=>{}, markAsChanged=()=>{}, onChangesRegisterFunc){
+    this.getter = getter
+    this.setter = setter
+    this.markAsChanged = markAsChanged
+  }
+}
+// export
+const Alias = (getter=()=>{}, setter=()=>{}, markAsChanged=()=>{}, onChangesRegisterFunc)=>new PropAlias(getter, setter, markAsChanged, onChangesRegisterFunc)
+// export
+const SmartAlias = (getterAndSetterStr)=>{
+  return new PropAlias(
+    smartFunc(getterAndSetterStr, true),
+    smartFuncWithCustomArgs("v")("("+getterAndSetterStr+" = v)", true)
+  )
+}
+
 class Property{
   constructor(valueFunc, onGet, onSet, onDestroy, executionContext, registerToDepsHelper, init=true){
     // execution context per fare la bind poco prima di chiamare (o per non bindare e chiamare direttamente..)
@@ -474,6 +493,9 @@ class Property{
   }
 
   init(valueFunc, onGet, onSet, onDestroy){
+    this.oj_valueFunc = valueFunc
+    this.isAlias = valueFunc instanceof PropAlias
+    if (this.isAlias) { valueFunc = valueFunc.getter }
     this.isFunc = isFunction(valueFunc)
 
     this._onGet = onGet
@@ -519,19 +541,27 @@ class Property{
   }
   set value(v){
     if(this._onSet === undefined){console.log("la onSet è undefined!!!!!", this);return} // todo: teeemp!! c'è un bug più subdolo da risolvere..riguarda gli le-for e le-if nested..
-    this.isFunc = isFunction(v)
-    this._valueFunc = v
-    this.__analyzeAndConnectDeps()
-    let _v = this.__getRealVaule()
-    this._onSet(_v, v, this)
-    this.fireOnChangedSignal()
-    this._latestResolvedValue = _v // in this way during the onSet we have the latest val in "_latestResolvedValue" fr caching strategy
+    if(this.isAlias){
+      this.oj_valueFunc.setter(...this.executionContext.map(ec=>ec()), v)
+    }
+    else {
+      this.isFunc = isFunction(v)
+      this._valueFunc = v
+      this.__analyzeAndConnectDeps()
+      let _v = this.__getRealVaule()
+      this._onSet(_v, v, this)
+      this.fireOnChangedSignal()
+      this._latestResolvedValue = _v // in this way during the onSet we have the latest val in "_latestResolvedValue" fr caching strategy
+    }
   }
 
   // manually, useful for deps
   markAsChanged(){
     _debug.log("marked as changed!", this)
     if(this._onSet === undefined){console.log("la onSet è undefined!!!!!", this);return} // todo: teeemp!! c'è un bug più subdolo da risolvere..riguarda gli le-for e le-if nested..
+    if (this.isAlias){
+      this.oj_valueFunc.markAsChanged(...this.executionContext.map(ec=>ec()))
+    } // always execute this to retrive myDeps changes
     let _v = this.__getRealVaule()
     this._onSet(_v, this._valueFunc, this)
     this.fireOnChangedSignal()
@@ -3423,7 +3453,7 @@ class LE_BackendApiMock{ // base class for backend api mock -> purpose is to hav
 }
 
 
-export { pass, none, smart, smartFunc as f, smartFuncWithCustomArgs as fArgs, Use, Extended, Placeholder, Bind, Switch, Case, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock }
+export { pass, none, smart, smartFunc as f, smartFuncWithCustomArgs as fArgs, Use, Extended, Placeholder, Bind, Alias, SmartAlias, Switch, Case, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock }
 // full import: {pass, none, smart, Use, Bind, RenderApp, LE_LoadScript, LE_LoadCss, LE_InitWebApp}
 
 

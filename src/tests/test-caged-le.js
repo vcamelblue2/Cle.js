@@ -1,5 +1,5 @@
 
-import {pass, none, smart, f, fArgs, Use, Extended, Placeholder, Bind, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock} from "../lib/caged-le.js"
+import {pass, none, smart, f, fArgs, Use, Extended, Placeholder, Bind, Alias, SmartAlias, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock} from "../lib/caged-le.js"
 import { NavSidebarLayout } from "../layouts/layouts.js"
 
 const app0 = ()=>{
@@ -4619,6 +4619,43 @@ const appMetaInScopeAndLowCodeTest = async ()=>{
           f`:::todo.text + " - " + :::todo.done`,
         ]
       }},
+
+      // DEMO ALIAS
+      { div: {
+
+        props: { 
+          todo_text: Alias($=>$.scope.todos[0].text, ($, v)=>{
+            console.log("sono stato chiamato..", $, v)
+            $.scope.todos[0].text=v; $.scope.todos = [...$.scope.todos] // qui colpa dei foreach e la mark as changed che non funge
+          })
+        },
+
+        text: f`'todo: ' + @todo_text`,
+
+        handle: { onclick: $=>{
+          console.log("aaaa")
+          $.this.todo_text = "oleeeee" + 1
+        }}
+      }},
+
+      { div: {
+
+        props: { 
+          todo_text: Alias($=>$.scope.mytodo.text, ($, v)=>{
+            console.log("sono stato chiamato..", $, v)
+            $.scope.mytodo.text=v;
+            $.scope._mark_mytodo_as_changed()
+          })
+        },
+
+        text: f`'todo: ' + @todo_text`,
+
+        handle: { onclick: $=>{
+          console.log("aaaa")
+          $.this.todo_text = "goooo" + 1
+        }}
+      }},
+
     ]
 
   }})
@@ -4670,6 +4707,43 @@ const appDemoDbus = async ()=>{
   }})
 }
 
+const appDemoAlias = async ()=>{
+  
+
+  const MyInput = { 
+    input: {
+
+      data: { 
+        text: "" 
+      },
+
+      hattrs: {
+        value: Bind($ => $.this.text)
+      }
+  }}
+
+  RenderApp(document.body, { div: {
+
+    data: {
+      rootText: "hellooo",
+      rootText2: "world",
+    },
+
+    on: {
+      this: {
+        rootTextChanged: $=>console.log("rt1, sono cambiato!!", $.this.rootText),
+        rootText2Changed: $=>console.log("rt2, sono cambiato!!", $.this.rootText2)
+      }
+    },
+
+    '=>': [
+      Extended(MyInput, { data: { text: Alias($=>$.scope.rootText, ($, v)=>$.scope.rootText=v) }} ),
+      Extended(MyInput, { data: { text: SmartAlias(`@rootText2`) }} ),
+    ]
+
+  }})
+}
+
 // app0()
 // test2way()
 // appTodolist()
@@ -4688,7 +4762,8 @@ const appDemoDbus = async ()=>{
 // appRecursiveTodo()
 // appScopeOptions()
 // appTestTreeComponent()
-appMetaInScopeAndLowCodeTest()
+// appMetaInScopeAndLowCodeTest()
 // appDemoDbus()
+appDemoAlias()
 
 // appDemoStockApi()
