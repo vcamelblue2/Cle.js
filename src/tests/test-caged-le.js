@@ -4617,8 +4617,24 @@ const appMetaInScopeAndLowCodeTest = async ()=>{
       { div: { "meta": { forEach: "todo", of: f`::todos` },
         text: [
           f`:::todo.text + " - " + :::todo.done`,
+
+          // super meta?
+          Use({ span: { // meta: {newScope: true},
+            props: { scoped_todo: $=>$.scope.todo},
+            text: $=>" -- testin super meta, ecco il todo: " + $.this.scoped_todo.text
+          }}),
+
+          Use({ span: { meta: {newScope: true},
+            constructor: ($, {scoped_todo})=>{
+              console.log("mi hanno passato: ", scoped_todo)
+              $.this.scoped_todo = scoped_todo
+            },
+            props: { scoped_todo: undefined },
+            text: $=>" -- testin super meta, ma con new scope ecco il todo: " + $.this.scoped_todo.text
+          }}, undefined, {init: {scoped_todo: $=>{  console.log("chiamato!!"); return $.scope.todo}}} ),
         ]
       }},
+
 
       // DEMO ALIAS
       { div: {

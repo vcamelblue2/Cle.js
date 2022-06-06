@@ -348,7 +348,7 @@ const TodoList = { // automatic root div!
             } 
           }, 
           {
-            init: { todoIndex: $ => $.meta.idx } // nella init il punto di vista del this E' SEMPRE IL MIO, qui meta è sempre quello del mio meta più vicino o l'insieme dei miei meta pià vicini..da capire..
+            init: { todoIndex: $ => $.meta.idx } // nella init il punto di vista del this E' SEMPRE IL MIO PARENT, qui meta è sempre quello DEL MIO PARENT
           }, 
           // todo: qui potrebbe starci una connect del signal con autopropagate, ovvero poter indicare che propago un certo segnale nel mio parent!
         )
@@ -726,7 +726,7 @@ const Use = (component, redefinitions=undefined, { strategy="merge", init=undefi
 // di fatto creiamo un nuovo segnale e lo connettiamo in modo semplice..nel parent chiamo "definePropagatedSignal"
 // perdo solo un po di descrittività, in favore di un meccanismo comodo e facile..
 
-// nella init il punto di vista del this E' SEMPRE IL MIO
+// nella init il punto di vista del this E' SEMPRE IL MIO PARENT
 
 class UseComponentDeclaration{
   constructor(component, redefinitions=undefined, { strategy="merge", init=undefined, passed_props=undefined, inject=undefined }={}){
@@ -2309,7 +2309,9 @@ class Component {
       let args = {}
       if (this.oj_definition.init !== undefined){
         Object.entries(this.oj_definition.init).forEach(([p, v])=>{
-          args[p] = isFunction(v) ? v.bind(undefined, this.$this) : v // todo: questo è un mezzo errore..perchè in questo modo non ruisciro a parsare le dipendenze nel caso di set di una prop..perchè è già bindata! d'altro canto a me potrebbero servire i valori..qui è da capire..
+          args[p] = isFunction(v) ? v.bind(undefined, this.parent.$this) : v // todo: questo è un mezzo errore..perchè in questo modo non ruisciro a parsare le dipendenze nel caso di set di una prop..perchè è già bindata! d'altro canto in realtà init nasce per passare valori, quindi è corretto!
+          // todo: forse la cosa migliore qui è abbandonare l'idea del constructor e andare con i passed args, ovvero lato declaration già indico a chi assegno cosa, mettendo una prop nel mezzo con punto di vista "parent" ma nel figlio, in modo da notifcare i changes!
+          // todo: o meglio, forse basta che creo una prop con exec context del parent in loop come questo (ma dedicato ai passed), e agganciarci alla onChange una semplicissima mark as changed della prop (this) che conterrà quella passata (del parent)
         })
       }
       this.hooks.constructor = this.convertedDefinition.constructor.bind(undefined, this.$this, args)
