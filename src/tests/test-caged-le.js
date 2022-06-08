@@ -4850,6 +4850,48 @@ const appResolveMultiCssProblem = async ()=>{
 
   }})
 }
+
+const appDemoNewShortcuts = async ()=>{
+  
+
+  RenderApp(document.body, { div: {
+
+    data: {
+      text: "hellooo",
+    },
+
+    '': [
+
+      { h5: { text: "Hello World Shortcuts!" }},
+
+      { div: {
+        '': { div: {
+          '': { div: {
+            text: "i'm a super nested div"
+          }}
+        }}
+      }},
+
+      { input: {
+
+        hattrs: {
+          value: Bind($ => $.scope.text)
+        }
+
+      }},
+      
+      { div: {
+        '': [
+          { p: {'': "I'm a P"}}, { b: { '': "I'm a B" }}, { span: {'': "I'm a SPAN"}}
+        ]
+      }}
+
+    ]
+
+  }})
+}
+
+
 // app0()
 // test2way()
 // appTodolist()
@@ -4871,6 +4913,7 @@ const appResolveMultiCssProblem = async ()=>{
 // appMetaInScopeAndLowCodeTest()
 // appDemoDbus()
 // appDemoAlias()
-appResolveMultiCssProblem()
+// appResolveMultiCssProblem()
+appDemoNewShortcuts()
 
 // appDemoStockApi()

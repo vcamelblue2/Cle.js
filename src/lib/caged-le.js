@@ -192,7 +192,7 @@ const component = {
     }
 
 
-    contains | childs | text | '>>' | '=>' | _ : [
+    contains | childs | text | '>>' | '=>' | '' | _ : [
 
       { 
         h1: { ctx_id: "counter_name", text: $ => $.parent.name }
@@ -248,7 +248,7 @@ first_lvl = ["signals", "dbus_signals", "data", "private:data", "props", "privat
 second_lvl = ["on", "on_s", "on_a"]
 first_or_second_lvl = ["def", "private:def"] // check for function (may exist "first lvl namespace")
 // TODO: actually merge unsupported
-"hattrs", "ha", "private:hattrs", "private:ha", "attrs", "private:attrs", "a", "private:a", css, states, state, stateChangeStrategy, onState, contains | childs | text | '>>' | '=>' | _???
+"hattrs", "ha", "private:hattrs", "private:ha", "attrs", "private:attrs", "a", "private:a", css, states, state, stateChangeStrategy, onState, contains | childs | text | '>>' | '=>' | '' | _???
 
 
 
@@ -851,7 +851,7 @@ class UseComponentDeclaration{
     
     // now check for injections!
     let injections = this.inject || {}
-    let childs_def_typology = ["childs", "contains", "text", ">>", "=>", "_"]
+    let childs_def_typology = ["childs", "contains", "text", ">>", "=>", "_", '']
     const recursive_check_injection = (resolved_component, lvl=0) =>{
 
       // _debug.log("livello: ", lvl, resolved_component)
@@ -959,8 +959,8 @@ class PlaceholderDeclaration{
 
 const extractChildsDef = (definition)=>{
   let extracted_childs = undefined
-  let { childs, contains: childs_contains, text: childs_text, ">>":childs_ff, "=>": childs_arrow, _: childs_underscore } = definition
-  extracted_childs = childs || childs_contains || childs_text || childs_ff || childs_arrow || childs_underscore
+  let { childs, contains: childs_contains, text: childs_text, ">>":childs_ff, "=>": childs_arrow, _: childs_underscore, '': childs_empty } = definition
+  extracted_childs = childs || childs_contains || childs_text || childs_ff || childs_arrow || childs_underscore || childs_empty
   if (extracted_childs !== undefined && !Array.isArray(unifiedDef.childs)) {extracted_childs = [extracted_childs]}
   return extracted_childs
 }
@@ -2399,8 +2399,8 @@ class Component {
 
     // multi choice def
 
-    let { childs, contains: childs_contains, text: childs_text, ">>":childs_ff, "=>": childs_arrow, _: childs_underscore } = definition
-    unifiedDef.childs = childs || childs_contains || childs_text || childs_ff || childs_arrow || childs_underscore
+    let { childs, contains: childs_contains, text: childs_text, ">>":childs_ff, "=>": childs_arrow, _: childs_underscore, '': childs_empty } = definition
+    unifiedDef.childs = childs || childs_contains || childs_text || childs_ff || childs_arrow || childs_underscore || childs_empty
     if (unifiedDef.childs !== undefined && !Array.isArray(unifiedDef.childs)) {unifiedDef.childs = [unifiedDef.childs]}
     // can be: template | string | $ => string | array<template | string | $ => string>
 
