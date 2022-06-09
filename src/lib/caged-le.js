@@ -756,7 +756,7 @@ class UseComponentDeclaration{
         // throw new Error("Not Implemented Yet!")
         const impossible_to_redefine = ["ctx_id"]
         const direct_lvl = ["id", "constructor", "beforeInit", "onInit", "afterChildsInit", "afterInit", "onUpdate", "onDestroy"] // direct copy
-        const first_lvl = ["signals", "dbus_signals", "data", "private:data", "props", "private:props", "alias", "handle"] // on first lvl direct
+        const first_lvl = ["signals", "dbus_signals", "data", "private:data", "props", "private:props", "let", "alias", "handle"] // on first lvl direct
         const second_lvl = ["on", "on_s", "on_a"]
         const first_or_second_lvl = ["def", "private:def"] // check for function (may exist "first lvl namespace")
  
@@ -2474,10 +2474,176 @@ class Component {
     let { 
       data, "private:data": _data, 
       props, "private:props": _props, 
+      "let": data_let, "private:let": _data_let, 
     } = definition
 
-    unifiedDef.data = data || props || {}
-    unifiedDef._data = _data || _props || {}
+    unifiedDef.data = data || props || data_let || {}
+    unifiedDef._data = _data || _props || _data_let || {}
+
+
+    const dash_shortucts_keys = {
+      attrs: {},
+      hattrs: {},
+      data: {},
+      def: {},
+      handle: {},
+      signals: {},
+      dbus_signals: {},
+      on_this: {},
+      on_parent: {},
+      on_scope: {},
+      on_dbus: {},
+      // on_le: {}, // TODO: support on le & ctx shortcuts!
+      // on_ctx: {},
+    }
+
+    // let has_dash_shortucts_keys = false // todo performance by skip next if series
+
+    Object.keys(definition).forEach(k=>{
+      if (k.includes("_")){
+
+        let val = definition[k]
+
+        if (k.startsWith('a_')){
+          dash_shortucts_keys.attrs[k.substring(2)] = val
+        }
+        else if (k.startsWith('attr_')){
+          dash_shortucts_keys.attrs[k.substring(5)] = val
+        }
+
+        else if (k.startsWith('ha_')){
+          dash_shortucts_keys.hattrs[k.substring(3)] = val
+        }
+        else if (k.startsWith('hattr_')){
+          dash_shortucts_keys.hattrs[k.substring(6)] = val
+        }
+        
+        else if (k.startsWith('p_')){
+          dash_shortucts_keys.data[k.substring(2)] = val
+        }
+        else if (k.startsWith('let_')){
+          dash_shortucts_keys.data[k.substring(4)] = val
+        }
+
+        else if (k.startsWith('d_')){
+          dash_shortucts_keys.def[k.substring(2)] = val
+        }
+        else if (k.startsWith('def_')){
+          dash_shortucts_keys.def[k.substring(4)] = val
+        }
+
+        else if (k.startsWith('h_')){
+          dash_shortucts_keys.handle[k.substring(2)] = val
+        }
+        else if (k.startsWith('handle_')){
+          dash_shortucts_keys.handle[k.substring(7)] = val
+        }
+        
+        else if (k.startsWith('s_')){
+          dash_shortucts_keys.signals[k.substring(2)] = val
+        }
+        else if (k.startsWith('signal_')){
+          dash_shortucts_keys.signals[k.substring(7)] = val
+        }
+        
+        else if (k.startsWith('dbs_')){
+          dash_shortucts_keys.dbus_signals[k.substring(4)] = val
+        }
+        else if (k.startsWith('dbus_signal_')){
+          dash_shortucts_keys.dbus_signals[k.substring(12)] = val
+        }
+
+        else if (k.startsWith('on_this_')){
+          dash_shortucts_keys.on_this[k.substring(8)] = val
+        }
+        else if (k.startsWith('on_parent_')){
+          dash_shortucts_keys.on_parent[k.substring(10)] = val
+        }
+        else if (k.startsWith('on_scope_')){
+          dash_shortucts_keys.on_scope[k.substring(9)] = val
+        }
+        else if (k.startsWith('on_dbus_')){
+          dash_shortucts_keys.on_dbus[k.substring(8)] = val
+        }
+      }
+    })
+
+    if (Object.keys(dash_shortucts_keys.attrs).length > 0){
+      if (unifiedDef.attrs !== undefined){ unifiedDef.attrs = { ...unifiedDef.attrs, ...dash_shortucts_keys.attrs } }
+      else { unifiedDef.attrs = dash_shortucts_keys.attrs }
+    }
+    if (Object.keys(dash_shortucts_keys.hattrs).length > 0){
+      if (unifiedDef.hattrs !== undefined){ unifiedDef.hattrs = { ...unifiedDef.hattrs, ...dash_shortucts_keys.hattrs } }
+      else { unifiedDef.hattrs = dash_shortucts_keys.hattrs }
+    }
+    if (Object.keys(dash_shortucts_keys.data).length > 0){
+      if (unifiedDef.data !== undefined){ unifiedDef.data = { ...unifiedDef.data, ...dash_shortucts_keys.data } }
+      else { unifiedDef.data = dash_shortucts_keys.data }
+    }
+    if (Object.keys(dash_shortucts_keys.def).length > 0){
+      if (unifiedDef.def !== undefined){ unifiedDef.def = { ...unifiedDef.def, ...dash_shortucts_keys.def } }
+      else { unifiedDef.def = dash_shortucts_keys.def }
+    }
+    if (Object.keys(dash_shortucts_keys.handle).length > 0){
+      if (unifiedDef.handle !== undefined){ unifiedDef.handle = { ...unifiedDef.handle, ...dash_shortucts_keys.handle } }
+      else { unifiedDef.handle = dash_shortucts_keys.handle }
+    }
+    if (Object.keys(dash_shortucts_keys.signals).length > 0){
+      if (unifiedDef.signals !== undefined){ unifiedDef.signals = { ...unifiedDef.signals, ...dash_shortucts_keys.signals } }
+      else { unifiedDef.signals = dash_shortucts_keys.signals }
+    }
+    if (Object.keys(dash_shortucts_keys.dbus_signals).length > 0){
+      if (unifiedDef.dbus_signals !== undefined){ unifiedDef.dbus_signals = { ...unifiedDef.dbus_signals, ...dash_shortucts_keys.dbus_signals } }
+      else { unifiedDef.dbus_signals = dash_shortucts_keys.dbus_signals }
+    }
+    if (Object.keys(dash_shortucts_keys.on_this).length > 0){
+      if (unifiedDef.on !== undefined){ 
+        if (unifiedDef.on.this !== undefined){
+          unifiedDef.on.this = { ...unifiedDef.on.this, ...dash_shortucts_keys.on_this } 
+        }
+        else {
+          unifiedDef.on.this = dash_shortucts_keys.on_this
+        }
+        
+      }
+      else { unifiedDef.on = { this: dash_shortucts_keys.on_this }}
+    }
+    if (Object.keys(dash_shortucts_keys.on_parent).length > 0){
+      if (unifiedDef.on !== undefined){ 
+        if (unifiedDef.on.parent !== undefined){
+          unifiedDef.on.parent = { ...unifiedDef.on.parent, ...dash_shortucts_keys.on_parent } 
+        }
+        else {
+          unifiedDef.on.parent = dash_shortucts_keys.on_parent
+        }
+        
+      }
+      else { unifiedDef.on = { parent: dash_shortucts_keys.on_parent }}
+    }
+    if (Object.keys(dash_shortucts_keys.on_scope).length > 0){
+      if (unifiedDef.on !== undefined){ 
+        if (unifiedDef.on.scope !== undefined){
+          unifiedDef.on.scope = { ...unifiedDef.on.scope, ...dash_shortucts_keys.on_scope } 
+        }
+        else {
+          unifiedDef.on.scope = dash_shortucts_keys.on_scope
+        }
+        
+      }
+      else { unifiedDef.on = { scope: dash_shortucts_keys.on_scope }}
+    }
+    if (Object.keys(dash_shortucts_keys.on_dbus).length > 0){
+      if (unifiedDef.on !== undefined){ 
+        if (unifiedDef.on.dbus !== undefined){
+          unifiedDef.on.dbus = { ...unifiedDef.on.dbus, ...dash_shortucts_keys.on_dbus } 
+        }
+        else {
+          unifiedDef.on.dbus = dash_shortucts_keys.on_dbus
+        }
+        
+      }
+      else { unifiedDef.on = { dbus: dash_shortucts_keys.on_dbus }}
+    }
 
     let {meta} = definition
 
@@ -2501,6 +2667,12 @@ class Component {
     _info.log(parent, template)
     let componentType = getComponentType(template)
     let componentDef = (template instanceof UseComponentDeclaration ? template.computedTemplate : template) [componentType]
+
+    // support smart component natively! must recreate template
+    if ((typeof componentDef === "string") || (typeof componentDef === "function")){
+      componentDef = {text: componentDef}
+      template = {[componentType]: componentDef}
+    }
 
 
     if("meta" in componentDef){

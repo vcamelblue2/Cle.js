@@ -4862,6 +4862,8 @@ const appDemoNewShortcuts = async ()=>{
 
     '': [
 
+      { h1: "Test!"},
+
       { h5: { text: "Hello World Shortcuts!" }},
 
       { div: {
@@ -4876,13 +4878,43 @@ const appDemoNewShortcuts = async ()=>{
 
         hattrs: {
           value: Bind($ => $.scope.text)
+        },
+
+        attrs: {
+          style: "color: red"
         }
 
+      }},
+
+      { input: {
+
+        ha_value: Bind( $ => $.scope.text),
+
+        a_style: "color: red",
+
+      }},
+
+      { input: {
+
+        let_myText: Alias($ => $.scope.text + "---", ($,v)=>$.scope.text=v),
+
+        ha_value: Bind( $ => $.scope.myText),
+
+        a_style: "color: red",
+
+        handle_onclick: $=> (console.log("clicked!"), $.dbus.iptClicked.emit()),
+
+        dbus_signal_iptClicked: "stream => void"
+
+      }},
+
+      { div: {
+        on_dbus_iptClicked: $=>console.log("sono dbus, ipt clicked!")
       }},
       
       { div: {
         '': [
-          { p: {'': "I'm a P"}}, { b: { '': "I'm a B" }}, { span: {'': "I'm a SPAN"}}
+          { i: {'': "I'm a I"}}, { b: { '': "I'm a B" }}, { span: {'': "I'm a SPAN"}}
         ]
       }}
 
