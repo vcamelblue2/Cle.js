@@ -221,7 +221,7 @@ const component = {
       ),
 
 
-      { Model | Controller | Connector: { // OBJECT, invisible, usefull for app logic and data manipulation
+      { Model | Controller | Connector: { // OBJECT, invisible, usefull for app logic and data manipulation, with meta: { hasViewChilds: true } can be materialized into the view as <leobj></lepbj>
         data: {prop1: 23},
 
         ["=>"]: [
@@ -334,7 +334,7 @@ const TodoList = { // automatic root div!
 
 
     { div: { meta: { forEach:"todo",  of: $ => $.parent.todolist,  define:{ index:"idx", first:"isFirst", last:"isLast", length:"len", iterable:"arr",    ...CUSTOM_PROP_NAME: value | ($: "parent" $this (same as meta), $child: real $this of the child)=> ... }, define_alias:{ // my_var_extracted_with_meta_identifier..easy alias! //, todo_label: $ => $.this.todo_label_mapping[$.meta.todo]},  key,comparer: el=>... extractor/converter: $=> // opzionale, per fare es Obj.keys --> extractor:($, blabla)=>Object.keys(blabla) e i comparer per identificare i changes // 
-                     ,newScope: bool, noThisInScope: bool, noMetaInScope: bool}], (le ultime sono le "scope options") 
+                     ,newScope: bool, noThisInScope: bool, noMetaInScope: bool, hasViewChilds: bool}], (le ultime sono le "scope options") 
       
       "=>": [
 
@@ -1316,7 +1316,8 @@ class Component {
     this.meta_options = {
       isNewScope: this.convertedDefinition.meta?.newScope,
       noThisInScope: this.convertedDefinition.meta?.noThisInScope,
-      noMetaInScope: this.convertedDefinition.meta?.noMetaInScope
+      noMetaInScope: this.convertedDefinition.meta?.noMetaInScope,
+      hasViewChilds: this.convertedDefinition.meta?.hasViewChilds
     } 
 
     this.defineAndRegisterId()
@@ -1435,7 +1436,15 @@ class Component {
 
     if ( this.isObjComponent ){
 
-      this.html_pointer_element = document.createElement("obj")
+      this.html_pointer_element = document.createElement("leobj")
+      if( this.meta_options.hasViewChilds ){
+        if (this.isMyParentHtmlRoot){
+          this.parent.appendChild(this.html_pointer_element)
+        }
+        else {
+          this.parent.html_pointer_element.appendChild(this.html_pointer_element)
+        }
+      }
 
     }
     else {
@@ -3104,7 +3113,12 @@ class ConditionalComponent extends Component{
 
     if ( this.isObjComponent ){
 
-      this.html_pointer_element = document.createElement("obj")
+      this.html_pointer_element = document.createElement("leobj")
+
+      if( this.meta_options.hasViewChilds ){
+        
+        this.html_pointer_element_anchor.after(this.html_pointer_element)
+      }
 
     }
     else {
@@ -3269,7 +3283,8 @@ class IterableViewComponent{
     this.meta_options = {
       isNewScope: this.meta_def?.newScope,
       noThisInScope: this.meta_def?.noThisInScope,
-      noMetaInScope: this.meta_def?.noMetaInScope
+      noMetaInScope: this.meta_def?.noMetaInScope,
+      hasViewChilds: this.meta_def?.hasViewChilds
     }
   }
 
