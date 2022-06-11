@@ -2678,7 +2678,7 @@ class Component {
     let componentDef = (template instanceof UseComponentDeclaration ? template.computedTemplate : template) [componentType]
 
     // support smart component natively! must recreate template
-    if ((typeof componentDef === "string") || (typeof componentDef === "function")){
+    if ((typeof componentDef === "string") || (typeof componentDef === "function") || Array.isArray(componentDef)){
       componentDef = {text: componentDef}
       template = {[componentType]: componentDef}
     }
