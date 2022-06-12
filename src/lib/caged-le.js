@@ -75,7 +75,7 @@ const component = {
     "private:"? data | props: {
       name: "counter 1",
       counter: 0,
-      my_alias: Alias(getter $=>..., setter $,v=>..., ),
+      my_alias: Alias(getter $=>..., setter $,v=>..., caching(new, old)=>new!==old...),
       my_alias2: SmartAlias('@counter')
     },
 
@@ -461,19 +461,22 @@ const cloneDefinitionWithoutMeta = (definition)=>{
 // Framework
 
 class PropAlias {
-  constructor(getter=()=>{}, setter=()=>{}, markAsChanged=()=>{}, onChangesRegisterFunc){
+  constructor(getter=()=>{}, setter=()=>{}, markAsChanged=()=>{}, cachingComparer=()=>false, onChangesRegisterFunc){
     this.getter = getter
     this.setter = setter
     this.markAsChanged = markAsChanged
+    this.cachingComparer = cachingComparer
   }
 }
 // export
-const Alias = (getter=()=>{}, setter=()=>{}, markAsChanged=()=>{}, onChangesRegisterFunc)=>new PropAlias(getter, setter, markAsChanged, onChangesRegisterFunc)
+const Alias = (getter=()=>{}, setter=()=>{}, markAsChanged=()=>{}, cachingComparer=()=>false, onChangesRegisterFunc)=>new PropAlias(getter, setter, markAsChanged, cachingComparer, onChangesRegisterFunc)
 // export
-const SmartAlias = (getterAndSetterStr)=>{
+const SmartAlias = (getterAndSetterStr, cachingComparer=()=>false)=>{
   return new PropAlias(
     smartFunc(getterAndSetterStr, true),
-    smartFuncWithCustomArgs("v")("("+getterAndSetterStr+" = v)", true)
+    smartFuncWithCustomArgs("v")("("+getterAndSetterStr+" = v)", true), 
+    pass,
+    cachingComparer
   )
 }
 
@@ -494,8 +497,10 @@ class Property{
 
   init(valueFunc, onGet, onSet, onDestroy){
     this.oj_valueFunc = valueFunc
+    
     this.isAlias = valueFunc instanceof PropAlias
     if (this.isAlias) { valueFunc = valueFunc.getter }
+
     this.isFunc = isFunction(valueFunc)
 
     this._onGet = onGet
@@ -564,8 +569,16 @@ class Property{
     } // always execute this to retrive myDeps changes
     let _v = this.__getRealVaule()
     this._onSet(_v, this._valueFunc, this)
-    this.fireOnChangedSignal()
-    this._latestResolvedValue = _v
+    if (this.isAlias && this.oj_valueFunc.cachingComparer !== undefined ){
+      if (this.oj_valueFunc.cachingComparer(_v, this._latestResolvedValue)){
+        this.fireOnChangedSignal()
+        this._latestResolvedValue = _v
+      }
+      else { _debug.log("cached!")}
+    }else{
+      this.fireOnChangedSignal()
+      this._latestResolvedValue = _v
+    }
   }
 
 

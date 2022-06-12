@@ -5171,6 +5171,54 @@ const appDemoNestedDataChangeDetection = async ()=>{
 
   
 }
+
+const appDemoChachedWithAlias = async ()=>{
+
+  RenderApp(document.body, { div: {
+
+    let_data: {
+      p1: 123,
+      p2: "abc",
+      p3: [1,2,3]
+    },
+
+    let_adata: SmartAlias(`@t.data`, (_new, _old)=>_new.p1!==_old.p1),
+
+
+    '': [
+
+      { div: {
+        '': f`JSON.stringify(@data)` // $=>JSON.stringify($.scope.data)
+      }},
+
+      { div: {
+        '': f`JSON.stringify(@adata)`
+      }},
+
+      { div: {
+        let_a_data_follower: $=>$.scope.adata,
+
+        '': f`JSON.stringify(@a_data_follower)`
+      }},
+
+      { button: {
+        text: "edit p1",
+        h_onclick: $=>{
+          $.scope.data = {...$.scope.data, p1: 456}
+        }
+      }},
+      { button: {
+        text: "edit p2",
+        h_onclick: $=>{
+          $.scope.data = {...$.scope.data, p2: "cde"}
+        }
+      }},
+
+    ]
+
+  }})
+}
+
 // app0()
 // test2way()
 // appTodolist()
@@ -5196,6 +5244,7 @@ const appDemoNestedDataChangeDetection = async ()=>{
 // appDemoNewShortcuts()
 // appDemoSocialNetworkReactStyle()
 // appDemoConstructor()
-appDemoNestedDataChangeDetection()
+// appDemoNestedDataChangeDetection()
+appDemoChachedWithAlias()
 
 // appDemoStockApi()
