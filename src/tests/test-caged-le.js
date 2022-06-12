@@ -5097,6 +5097,80 @@ const appDemoConstructor = async ()=>{
 
   }})
 }
+
+const appDemoNestedDataChangeDetection = async ()=>{
+
+  let Obj = (name, props, UUID=undefined, _async=1, retF=true)=>{ 
+    const Storage = {}; 
+
+    const F = ($, name, props, UUID=undefined)=>{
+      if (UUID === undefined){
+        // console.log("id is..", $.this.comp_id)
+        UUID = $.this.comp_id
+      }
+
+      let inStorage = Storage[UUID+name]
+
+      if (inStorage){
+        return inStorage
+      }
+      else {
+        let obj = {}
+        
+        Object.keys(props).forEach(k=>{
+
+          obj['_'+k]=props[k]
+
+          Object.defineProperty(obj, k, {
+
+            get(){
+              return obj['_'+k]
+            },
+            set (v) {
+              obj['_'+k]=v
+              if(_async>0){
+                setTimeout(()=>$['this']['_mark_'+name+'_as_changed'](), _async)
+              }
+              else {
+                $['this']['_mark_'+name+'_as_changed']()
+              }
+            }
+          })
+        })
+
+        Storage[UUID+name] = obj
+        
+        return obj
+      }
+    }
+
+    return $=>F($,name,props,UUID)
+  }
+
+  RenderApp(document.body, { div: {
+
+    let_data: Obj("data", {
+      prop1: 10,
+      counter: 123
+    }),
+
+
+    onInit: $=>console.log($.this.data),
+
+    '': [
+      $=>$.scope.data.prop1,
+      { button: { text: "+1", h_onclick: $=>$.scope.data.prop1+=1 }},
+      
+      {br:{}},
+      
+      $=>$.scope.data.counter,
+      { button: { text: "+1", h_onclick: $=>$.scope.data.counter+=1 }},
+    ]
+
+  }})
+
+  
+}
 // app0()
 // test2way()
 // appTodolist()
@@ -5121,6 +5195,7 @@ const appDemoConstructor = async ()=>{
 // appResolveMultiCssProblem()
 // appDemoNewShortcuts()
 // appDemoSocialNetworkReactStyle()
-appDemoConstructor()
+// appDemoConstructor()
+appDemoNestedDataChangeDetection()
 
 // appDemoStockApi()
