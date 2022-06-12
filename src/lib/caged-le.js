@@ -3598,7 +3598,7 @@ const LE_InitWebApp = (appDef)=>{ document.addEventListener("DOMContentLoaded", 
  * */
 const smartFunc = (code, funcCall=false, ...oterArgs)=>{
   if (!funcCall) { code = code[0] }
-  code=code.replaceAll("@m.", "$.meta.").replaceAll("@s.", "$.scope.").replaceAll("@p.", "$.parent.").replaceAll("@t.", "$.this.").replaceAll("@l.", "$.le.").replaceAll("@c.", "$.ctx.").replaceAll("@d", "$.dbus.").replaceAll("@", "$.scope.")
+  code=code.replaceAll("@m.", "$.meta.").replaceAll("@s.", "$.scope.").replaceAll("@p.", "$.parent.").replaceAll("@t.", "$.this.").replaceAll("@l.", "$.le.").replaceAll("@c.", "$.ctx.").replaceAll("@d.", "$.dbus.").replaceAll("@", "$.scope.")
   code=code.replaceAll(":m:", "$.meta.").replaceAll(":s:", "$.scope.").replaceAll(":p:", "$.parent.").replaceAll(":t:", "$.this.").replaceAll(":l:", "$.le.").replaceAll(":c:", "$.ctx.").replaceAll(":d:", "$.dbus.").replaceAll(":::", "$.meta.").replaceAll("::", "$.scope.")
   if (code.includes("return") || code.startsWith("{")){
     return new Function("$", ...oterArgs, code)
