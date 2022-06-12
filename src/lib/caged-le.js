@@ -221,7 +221,7 @@ const component = {
       ),
 
 
-      { Model | Controller | Connector: { // OBJECT, invisible, usefull for app logic and data manipulation, with meta: { hasViewChilds: true } can be materialized into the view as <leobj></lepbj>
+      { Model | Controller | Connector..etc: { // OBJECT, invisible, usefull for app logic and data manipulation, with meta: { hasViewChilds: true } can be materialized into the view as <leobj></lepbj>
         data: {prop1: 23},
 
         ["=>"]: [
@@ -1311,7 +1311,7 @@ class Component {
     this.oj_definition = definition
 
     this.htmlElementType = getComponentType(definition)
-    this.isObjComponent = ["Model", "Controller", "Connector", "Signals", "Style", "Css"].includes(this.htmlElementType)
+    this.isObjComponent = ["Model", "Controller", "Component", "Connector", "Signals", "Style", "Css"].includes(this.htmlElementType)
     this.convertedDefinition = Component.parseComponentDefinition( (definition instanceof UseComponentDeclaration ? definition.computedTemplate : definition) [this.htmlElementType])
     this.meta_options = {
       isNewScope: this.convertedDefinition.meta?.newScope,
@@ -1475,6 +1475,7 @@ class Component {
     // t.b.d
     this.properties.el = this.html_pointer_element // ha senso??? rischia di spaccare tutto..nella parte di sotto..
     this.properties.parent = this.parent?.$this?.this // ha senso??? rischia di spaccare tutto.. recursive this.parent.parent & parent.parent le.x.parent.. etc..
+    this.properties.comp_id = this.id
 
     // todo: qualcosa del genere per gli attr
     // this.properties.attr = ComponentProxy(this.attrProperties)
