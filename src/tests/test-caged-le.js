@@ -5060,6 +5060,43 @@ const appDemoSocialNetworkReactStyle = async () => {
 
 }
 
+const appDemoConstructor = async ()=>{
+
+  const ShowText = { div: {
+    let_desc: "",
+    let_text: "",
+
+    constructor: ($, {text})=>{
+      if (text){
+        $.this.text = text($)
+      }
+    },
+
+    '': [  $=>$.this.desc, ": ", $=>$.this.text  ]
+  }}
+
+
+  const Input = { input: {
+    ha_value: Bind(f`@root_text`)
+  }}
+
+
+  RenderApp(document.body, { div: {
+    let_root_text: "hello",
+
+    '': [
+      Input,
+
+      Use(ShowText, { let_desc: "Copy value once" }, {init: {text: $=>$.scope.root_text }}),
+      Use(ShowText, { let_desc: "Follow Value (same scope..)" }, {init: {text: $=>_=>$.scope.root_text }}), // qui uso il punto di vista del padre in termini di reale accesso ($ è di parent) e scope per la change detection (fatta a livello di figlio, quindi serve scope). passo una funzione invece di un valore così ho la detection!
+      Use(ShowText, { let_desc: "Follow Value (new scope..)", meta: {newScope:true}}, {init: {text: (_,$)=>()=>$.parent.root_text }}), // qui con il nuovo scope in realtà qui $ si riferisce al figlio (secondo param, visto che nel costuctor passo ($)), ovvero bypasso il binding a livello padre! passo una funzione invece di un valore così ho la detection!
+
+
+      Use(ShowText, { let_desc: "No Constructor..", let_text: $=>$.parent.root_text }),
+    ]
+
+  }})
+}
 // app0()
 // test2way()
 // appTodolist()
@@ -5083,6 +5120,7 @@ const appDemoSocialNetworkReactStyle = async () => {
 // appDemoAlias()
 // appResolveMultiCssProblem()
 // appDemoNewShortcuts()
-appDemoSocialNetworkReactStyle()
+// appDemoSocialNetworkReactStyle()
+appDemoConstructor()
 
 // appDemoStockApi()
