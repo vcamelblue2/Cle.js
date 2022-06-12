@@ -5201,6 +5201,10 @@ const appDemoChachedWithAlias = async ()=>{
         '': f`JSON.stringify(@a_data_follower)`
       }},
 
+      { div: { meta: { forEach: "element", of: f`@data.p3`, comparer: (o, n)=>{ console.log(o,n, n.map((v,i)=>v!==o[i]).some(v=>v===true)); return o.length !== n.length || n.map((v,i)=>v!==o[i]).some(v=>v===true) } },
+        '': f`@element`
+      }},
+
       { button: {
         text: "edit p1",
         h_onclick: $=>{
@@ -5213,6 +5217,14 @@ const appDemoChachedWithAlias = async ()=>{
           $.scope.data = {...$.scope.data, p2: "cde"}
         }
       }},
+      { button: {
+        text: "edit p3",
+        h_onclick: $=>{
+          $.scope.data.p3 = [...$.scope.data.p3]
+          $.scope.data.p3[2]=5
+          $.scope.data = {...$.scope.data}
+        }
+      }}
 
     ]
 

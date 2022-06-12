@@ -334,6 +334,7 @@ const TodoList = { // automatic root div!
 
 
     { div: { meta: { forEach:"todo",  of: $ => $.parent.todolist,  define:{ index:"idx", first:"isFirst", last:"isLast", length:"len", iterable:"arr",    ...CUSTOM_PROP_NAME: value | ($: "parent" $this (same as meta), $child: real $this of the child)=> ... }, define_alias:{ // my_var_extracted_with_meta_identifier..easy alias! //, todo_label: $ => $.this.todo_label_mapping[$.meta.todo]},  key,comparer: el=>... extractor/converter: $=> // opzionale, per fare es Obj.keys --> extractor:($, blabla)=>Object.keys(blabla) e i comparer per identificare i changes // 
+                     ,comparer: (_new, _old)=>_new !== _old
                      ,newScope: bool, noThisInScope: bool, noMetaInScope: bool, hasViewChilds: bool}], (le ultime sono le "scope options") 
       
       "=>": [
@@ -3414,7 +3415,12 @@ class IterableViewComponent{
       none, 
       (v, _, prop)=>{ 
         _info.log("seeeetttinnggggggg iterablee", v, _, prop); 
-        if (v !== prop._latestResolvedValue) { 
+        if (this.meta_def.comparer !== undefined){
+          if (this.meta_def.comparer(v, prop._latestResolvedValue)) { 
+              this._create()
+            }
+        }
+        else if (v !== prop._latestResolvedValue) { 
           this._create()
         } 
       }, 
