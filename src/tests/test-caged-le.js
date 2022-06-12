@@ -4923,6 +4923,142 @@ const appDemoNewShortcuts = async ()=>{
   }})
 }
 
+const appDemoSocialNetworkReactStyle = async () => {
+  
+  class FeedModelApi extends LE_BackendApiMock{
+
+    constructor(apiSpeed=50){
+      super(apiSpeed)
+      this.users = [...Array(10).keys()].map(i=>({ uid: '00000'+i, name: 'user '+i }))
+      this.feed = [...Array(10).keys()].map(i=>({ id: "post_id_"+i, text: "Post n."+i, like: [...Array(i).keys()].map(l=>'user '+l+1 ), comments: 0, user: { uid: '00000'+i, name: 'user '+i }}))
+      this.feed_id = 10
+    }
+    _getUserByName(usr){
+      return this.users.find(u=>u.name==usr)
+    }
+    login(usr, pwd){
+      return this.response(this._getUserByName(usr))
+    }
+    getFeed(usr){
+      return this.response(this.feed.map(p=>({...p, like: p.like.length, user_like: p.like.includes(usr)}) ))
+    }
+    publishNewPost(text, usr){
+      this.feed_id += 1
+      this.feed.reverse().push({ id: "post_id_"+this.feed_id, text: text, like: [], comments: 0, user: this._getUserByName(usr)})
+      this.feed.reverse()
+      return this.response({})
+    }
+    likePost(usr, post_id){
+      let post = this.feed.find(p=>p.id === post_id)
+      !post.like.includes(usr) && post.like.push(usr)
+      return this.response({})
+    }
+    
+  }
+  const feedModelApi = new FeedModelApi()
+
+
+  const FeedPost = { div: { meta: { forEach: "post", of: f`@feed`},
+
+    handle_onclick: $=>{ // DO NOT UPDATE ALL THE FEED! set and continue..
+      if(!$.meta.post.user_like){
+        $.scope.likePost($.meta.post.id)
+        $.meta.post.like +=1
+        $.meta.post.user_like = true
+        $.meta._mark_post_as_changed()
+      }
+    },
+
+    a_style: { border: "1px solid black", width: "80%", margin: "0px 10%"  },
+
+    '': [
+      { h4: { text: f`@post.user.name`, a_style: "margin: 5px 0px"}},
+      { div: { text: f`@post.text`, a_style: "padding: 20px 0px;"}},
+      { div: [
+        f`'like: ' + @post.like`, ' - ', f`'Comments: ' + @post.comments`,
+      ]}
+    ]
+  }}
+
+
+  const NewPostInput = { div: {
+    let_text: "",
+
+    on_dbus_newPostPublishRequest: f`@text = ''`,
+
+    '': [
+      { textarea: {
+        ha_value: Bind(f`@text`),
+        a_style: "width: 100%; heigth: 200px",
+        handle_onkeypress: ($, e)=>{if(e.key === "Enter") {$.dbus.newPostPublishRequest.emit($.scope.text); e.preventDefault()}}
+      }},
+      { button: {
+        handle_onclick: $=>$.dbus.newPostPublishRequest.emit($.scope.text),
+        text: "Publish"
+      }}
+    ]
+  }}
+  const NewPostController = { Controller: {
+    on_dbus_newPostPublishRequest: async ($, text)=>{
+      await feedModelApi.publishNewPost(text, $.scope.user.name)
+      await $.scope.loadFeed()
+    }
+  }}
+  const NewPostCreator = { Component: { meta: { hasViewChilds: true },
+
+    dbus_signal_newPostPublishRequest: "stream => text",
+
+    '': [ 
+      NewPostInput,
+      NewPostController
+    ]
+  }}
+
+
+  const Feed = { div: {
+
+    a_style: { border: "1px solid black", width: "70%", paddin: "25px", margin: "0px 15%"},
+    '': [
+      NewPostCreator,
+      { hr: {}},
+      FeedPost
+    ]
+  }}
+
+  const Home = { div: {
+    let_user: undefined,
+    let_feed: [],
+    
+    def_login: async $=>{
+      $.this.user = await feedModelApi.login('user 0', 'dummy')
+    },
+    def_loadFeed: async $=>{
+      $.this.feed = await feedModelApi.getFeed($.this.user.name)
+    },
+    def_likePost: async ($, post_id)=>{
+      await feedModelApi.likePost($.this.user.name, post_id)
+    },
+
+    onInit: async $ => {
+      await $.this.login()
+      await $.this.loadFeed()
+    },
+
+    css: [
+      `* { box-sizing: border-box !important;}`, 
+      'body {padding: 0px; margin: 0px; }'
+    ],
+
+    '': [
+      Feed
+    ]
+
+  }}
+
+
+  RenderApp(document.body, Home)
+
+}
 
 // app0()
 // test2way()
@@ -4946,6 +5082,7 @@ const appDemoNewShortcuts = async ()=>{
 // appDemoDbus()
 // appDemoAlias()
 // appResolveMultiCssProblem()
-appDemoNewShortcuts()
+// appDemoNewShortcuts()
+appDemoSocialNetworkReactStyle()
 
 // appDemoStockApi()
