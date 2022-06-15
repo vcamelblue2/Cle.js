@@ -396,11 +396,13 @@ const GanttRowActivityGraph = { div: {
   let_subtask_position: DAY_SIZE_PX,
 
   def_addOrRemoveSubtask: ($, idx, isMilestone=false)=>{
-    if ($.this.subtasks.find(s=>s.idx===idx) !== undefined){
+    let subtask = $.this.subtasks.find(s=>s.idx===idx)
+    if ( subtask !== undefined){ // remove
+      if (subtask.description.length === 0  || (subtask.description.length > 0 && prompt("Are you sure you want to delete subtask? description says: "+subtask.description+". (Y/N)", "Y/N")==="Y"))
       $.this.subtasks = $.this.subtasks.filter(s=>s.idx!==idx)
     }
     else {
-      $.this.subtasks = [...$.this.subtasks, {idx: idx, name: isMilestone ? "M" : "T", description: ""}]
+      $.this.subtasks = [...$.this.subtasks, {idx: idx, name: isMilestone ? "M" : "T", description: ""}] // add
     }
     // $.scope.activity.subtasks = $.this.subtasks // in caso di no alias..mettere poi false in api qui.. 
     $.le.api.editSubTasks($.scope.project.id, $.scope.activity, $.scope.activity.subtasks, true)
