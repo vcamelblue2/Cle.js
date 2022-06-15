@@ -35,7 +35,7 @@ class GanttModelApi extends LE_BackendApiMock{
       }
     }
     __storeToDisk(){
-      localStorage.setItem("com.cle-demo.gantt::model", JSON.stringify({projects: this.projects, task_id_gen: this.task_id_gen}))
+      localStorage.setItem("com.cle-demo.gantt::model", JSON.stringify({task_id_gen: this.task_id_gen, projects: this.projects}))
     }
 
     getProjects(){
