@@ -679,10 +679,7 @@ export const HomePage = async (state)=>{ return {
 
         NavbarContents:[
 
-          { span: {
-            text: "Gantt Chart",
-            'a.style': "font-size: 1.9rem; margin-left: 15px; margin-right: 15px;"
-          }}
+          { span: { text: "Gantt Chart", a_style: "font-size: 1.9rem; margin-left: 15px; margin-right: 15px;" }}
 
         ], 
         SidebarComponents:[
