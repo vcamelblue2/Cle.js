@@ -2,11 +2,54 @@ import { range } from "./utils.js";
 
 const subsubsubchild1 = { type: "Text", definition: "Hello", childs: [] };
 const subsubchild1 = { type: "Model", definition: '{\n  id: "toolbarModel",\n  props: {\n    todolist: []\n  }\n}\n', childs: [] };
-const subsubchild2 = { type: "p", definition: '{\n  id: "detail"\n}\n', childs: [subsubsubchild1] };
-const subchild1 = { type: "div", definition: '{\n  id: "toolbar"\n}\n', childs: [subsubchild1, subsubchild2] };
+const subsubchild2 = { type: "p", definition: '{\n  id: "detail",\n}\n', childs: [subsubsubchild1] };
+const subchild1 = { type: "div", definition: '{\n  id: "toolbar",\n}\n', childs: [subsubchild1, subsubchild2] };
 const subchild2 = { type: "input", definition: '{\n  id: "todoInput"\n}\n', childs: [] };
 const subchild3 = { type: "span", definition: '{\n  id: "latestTodo"\n}\n', childs: [] };
-const initialAppDef = { type: "div", definition: '{\n  id: "app",\n  props: {\n    myVar: 123\n  }\n}\n', childs: [subchild1, subchild2, subchild3] };
+const initialAppDef = { type: "div", definition: '{\n  id: "app",\n  props: {\n    myVar: 123\n  },\n}\n', childs: [subchild1, subchild2, subchild3] };
+
+const initialAppDefAlt = { type: "div", definition: `{
+  id: "app",
+
+  props: {
+    myText: "Hello",
+    myTextAlwaysUpper: $=>$.this.myText.toUpperCase()
+  },
+
+  a_id: "app",
+  css: [ "#app { padding: 10px }" ],
+}`, childs: [
+
+{ type: "h3", definition: `{
+  '': "Welcome To CLE!",
+  
+  a_style: "text-align: center"
+}`, childs: [] },
+
+{ type: "input", definition: `{
+  id: "input",
+
+  ha_value: Bind($=>$.scope.myText),
+  // ha_value: Bind(f\`@myText\`), // shortcuts!
+}`, childs: [] },
+
+{ type: "div", definition: `{
+  id: "logger",
+
+  text: $=>"Logger: " + $.scope.myText,
+}`, childs: [] },
+
+{ type: "div", definition: `{
+  // id: "logger2", // id is not always required..
+
+  text: [
+    'Logger always upper: ', f\`@myTextAlwaysUpper\`
+  ],
+}`, childs: [] }
+
+]}
+
+const initialEmptyAppDef = { type: "div", definition: '{\n  id: "app",\n}', childs: []}
 
 const accessToChildByPointer = (appDefinition, pointer) => {
   let pointedDefinition = appDefinition;
@@ -24,8 +67,8 @@ export const Model = {
     id: "model",
 
     props: {
-      globalDef: 'console.log("init preview..")',
-      appDef: initialAppDef,
+      globalDef: '/*this is init code*/\n\nconsole.log("init preview..")',
+      appDef: initialEmptyAppDef,
       actualPointer: [],
 
       visibleRoot: $ => accessToChildByPointer($.this.appDef, $.this.actualPointer),
@@ -154,9 +197,24 @@ export const Model = {
         },
         loadDef: $=>{
             console.log("loading..")
-            $.this.actualPointer = []
-            $.this.globalDef = JSON.parse(localStorage.getItem("cle-demo.cle-creator.global-def"))  || " "
-            $.this.appDef = JSON.parse(localStorage.getItem("cle-demo.cle-creator.app-def"))
+            let storedGlobaldef = localStorage.getItem("cle-demo.cle-creator.global-def")
+            let storedAppdef = localStorage.getItem("cle-demo.cle-creator.app-def")
+
+            if (storedGlobaldef !== null && storedGlobaldef !== undefined && storedAppdef !== null && storedAppdef !== undefined){
+              $.this.actualPointer = []
+              $.this.globalDef = JSON.parse(storedGlobaldef) || " "
+              $.this.appDef = JSON.parse(storedAppdef)
+            }
+        },
+        resetToDemo: $=>{
+          $.this.actualPointer = []
+          $.this.globalDef = '/*this is init code*/\n\nconsole.log("init preview..")'
+          $.this.appDef = initialAppDefAlt
+        },
+        resetToEmpty: $=>{
+          $.this.actualPointer = []
+          $.this.globalDef = '/*this is init code*/\n\nconsole.log("init preview..")'
+          $.this.appDef = initialEmptyAppDef
         }
       }
     }

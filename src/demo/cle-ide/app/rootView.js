@@ -1,6 +1,8 @@
 import {pass, none, smart, Use, Extended, Placeholder, Bind, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp} from "../../../lib/caged-le.js"
 import { UseAnchors } from "./anchors.js";
 
+import { onclick } from "./utils.js"
+
 export const RootView = { div: {
 
   id: "rootView",
@@ -68,7 +70,7 @@ export const RootView = { div: {
                 },
 
                 handle: {
-                  onclick: $ => {
+                  [onclick]: $ => {
                     $.le.model.editTree.dropRoot();
                   }
                 },
@@ -94,7 +96,7 @@ export const RootView = { div: {
                 },
 
                 handle: {
-                  onclick: $ => {
+                  [onclick]: $ => {
                     $.le.model.goBack();
                   }
                 },
@@ -122,7 +124,7 @@ export const RootView = { div: {
                 },
 
                 handle: {
-                  onclick: $ => {
+                  [onclick]: $ => {
                     $.le.model.editTree.addNewChild();
                   }
                 },

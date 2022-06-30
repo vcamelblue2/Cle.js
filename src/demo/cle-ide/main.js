@@ -1,4 +1,4 @@
-import {pass, none, smart, Use, Extended, Placeholder, Bind, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock} from "../../lib/caged-le.js"
+import {pass, none, smart, f, fArgs, Use, Extended, Placeholder, Bind, Alias, SmartAlias, Switch, Case, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock} from "../../lib/caged-le.js"
 
 import { UseAnchors, UseAnchorsRoot, AnchorsSystmeRootStyle, AnchorsSystemInit } from "./app/anchors.js"
 
@@ -7,6 +7,9 @@ import { RootView } from "./app/rootView.js"
 import { ChildsView } from "./app/childsView.js"
 import { ConnectionsView } from "./app/connectionsView.js"
 import { AceEditor } from "./app/aceEditorView.js"
+
+import { onclick } from "./app/utils.js"
+
 
 LE_InitWebApp(async ()=>{
 
@@ -19,9 +22,28 @@ LE_InitWebApp(async ()=>{
     
     id: "app",
 
-    props: UseAnchorsRoot,
+    props: {
+      multiplier: "1.0",
+      ...UseAnchorsRoot,
+      width: $=>window.innerWidth * Math.max(1, ($.this.multiplier.length>0 ? parseFloat($.this.multiplier) : 1)),
+    },
     attrs: {id: "app", style: AnchorsSystmeRootStyle },
-    onInit: $ => AnchorsSystemInit($),
+    onInit: $ => {
+
+      // From:  AnchorsSystemInit($); (edited for multiplier..)
+      window.onresize = () => {
+        $.this.width = window.innerWidth * Math.max(1, ( $.this.multiplier.length>0 ? parseFloat($.this.multiplier) : 1));
+        $.this.height = window.innerHeight;
+      };
+      document.body.style.padding = "0px";
+      document.body.style.margin = "0px";
+
+      // prevent back to exit..
+      window.onbeforeunload = function(evt){
+        evt.returnValue = "Sicuro di voler uscire?";
+        return "Sicuro di voler uscire"
+      }
+    },
 
     css: [`
       * { box-sizing: border-box !important;}
@@ -44,19 +66,82 @@ LE_InitWebApp(async ()=>{
 
       ConnectionsView,
 
-      { button: { text: "Save", a:{ style: "position: absolute"}, handle: {onclick: $=>$.le.model.storage.saveDef()} }},
-      { button: { text: "Load", a:{ style: "position: absolute; top: 40px"}, handle: {onclick: $=>$.le.model.storage.loadDef()}, onInit: $=>$.le.model.storage.loadDef()}},
+      { div: {
+        a_style: "width: 200px; height: 50%; position: absolute",
+        '': [
 
-      { button: { 
-        text: "show", 
-        a:{ style: "position: absolute; top: 160px"}, 
-        handle: { onclick: $=>{
-          let recomposed = $.le.model.recompose()
-          // console.log(recomposed)
-          $.le.preview.code = `setTimeout(async ()=>{try{window.renderized_app.destroy()}catch{}; ${$.le.model.globalDef}; window.renderized_app = RenderApp(document.getElementById('app-preview'), ${recomposed});}, 1)`
-          $.le.preview.visible = true
-        }} 
+          { button: { text: "Save", a:{ style: "display: block"}, handle: {[onclick]: $=>$.le.model.storage.saveDef()} }},
+          { button: { text: "Load", a:{ style: "display: block"}, handle: {[onclick]: $=>$.le.model.storage.loadDef()}, onInit: $=>setTimeout(()=>$.le.model.storage.loadDef(), 1)}},
+
+          { br: {}},
+          { br: {}},
+
+          { button: { text: "Reset Demo", a:{ style: "display: block"}, handle: {[onclick]: $=>$.le.model.storage.resetToDemo()} }},
+          { button: { text: "Reset Empty", a:{ style: "display: block"}, handle: {[onclick]: $=>$.le.model.storage.resetToEmpty()}}},
+
+          { br: {}},
+          { br: {}},
+
+          { button: { 
+            text: "Global Def", 
+            a:{ style: "display: block;"}, 
+            handle: { [onclick]: $=>{
+              $.le.globalDef.visible = true
+            }} 
+          }},
+
+          { button: { 
+            text: "Show App", 
+            a:{ style: "display: block"}, 
+            handle: { [onclick]: $=>{
+              let recomposed = $.le.model.recompose()
+              // console.log(recomposed)
+              $.le.preview.code = `setTimeout(async ()=>{try{window.renderized_app.destroy()}catch{}; ${$.le.model.globalDef}; window.renderized_app = RenderApp(document.getElementById('app-preview'), ${recomposed});}, 1)`
+              $.le.preview.visible = true
+            }} 
+          }},
+
+
+          { br: {}},
+          { br: {}},
+
+          {div: "Zoom "},
+          { input: { ha_value: Bind(f`@multiplier`), a_style: "width: 50px"}}
+
+        ]
       }},
+
+
+      // click blocker
+      { div: {
+        id: "click_captur",
+
+        props: {
+          ...UseAnchors(),
+          visible: false, // $=>$.le.preview.visible || $.le.globalDef.visible,
+
+          width: $ => $.this.visible? $.parent.Width : 0,
+          height: $ => $.this.visible? $.parent.Height : 0,
+
+        },
+        on: {le: {
+          preview: {visibleChanged: $=>{
+            $.this.visible = $.le.preview.visible
+          }},
+          globalDef: {visibleChanged: $=>{
+            $.this.visible = $.le.globalDef.visible
+          }},
+        }},
+
+        handle: { [onclick]: ($, e)=>{
+          e.preventDefault(); e.stopPropagation();
+        }},
+
+        attrs: { 
+          style: $ => ({ ...$.this.Anchors, backgroundColor: "#00000077", zIndex: "998", visibility: $.this.visible ? "visible" : "hidden" }) 
+        },
+      }},
+
 
       // preview
       { div: {
@@ -84,7 +169,7 @@ LE_InitWebApp(async ()=>{
             text: "x", 
             props: { ...UseAnchors(), left: 0, top: -35, width: 30, height: 30}, 
             attrs: { style: $ => ({ ...$.this.Anchors, zIndex: "1000" }) }, 
-            handle: {onclick: $=>{try{window.renderized_app.destroy()}catch{}; $.le.preview.visible = false; $.le.preview.code = ""} } 
+            handle: {[onclick]: $=>{try{window.renderized_app.destroy()}catch{}; $.le.preview.visible = false; $.le.preview.code = ""} } 
           }},
 
           { div: {
@@ -115,15 +200,6 @@ LE_InitWebApp(async ()=>{
       }},
 
 
-
-      { button: { 
-        text: "global", 
-        a:{ style: "position: absolute; top: 80px"}, 
-        handle: { onclick: $=>{
-          $.le.globalDef.visible = true
-        }} 
-      }},
-
       // globalDef
       { div: {
         id: "globalDef",
@@ -149,7 +225,7 @@ LE_InitWebApp(async ()=>{
             text: "x", 
             props: { ...UseAnchors(), left: 0, top: -35, width: 30, height: 30}, 
             attrs: { style: $ => ({ ...$.this.Anchors, zIndex: "1000" }) }, 
-            handle: {onclick: $=>{$.scope.visible = false} } 
+            handle: {[onclick]: $=>{$.scope.visible = false} } 
           }},
 
           Use(AceEditor, {

@@ -1,6 +1,8 @@
 import {pass, none, smart, Use, Extended, Placeholder, Bind, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp} from "../../../lib/caged-le.js"
 import { UseAnchors } from "./anchors.js";
 
+import { onclick } from "./utils.js"
+
 
 
 export const ChildsView = {
@@ -150,7 +152,7 @@ export const ChildsView = {
                   },
   
                   handle: {
-                    onclick: $ => {
+                    [onclick]: $ => {
                       $.le.model.editTree.moveChildLeft($.meta.idx);
                     }
                   },
@@ -175,7 +177,7 @@ export const ChildsView = {
                   },
   
                   handle: {
-                    onclick: $ => {
+                    [onclick]: $ => {
                       $.le.model.editTree.dropChild($.meta.idx);
                     }
                   },
@@ -201,7 +203,7 @@ export const ChildsView = {
                   },
 
                   handle: {
-                    onclick: $ => {
+                    [onclick]: $ => {
                       $.le.model.goNext($.meta.idx);
                     }
                   },
@@ -225,7 +227,7 @@ export const ChildsView = {
                   },
   
                   handle: {
-                    onclick: $ => {
+                    [onclick]: $ => {
                       $.le.model.editTree.addNewChildToChild($.meta.idx);
                     }
                   },
@@ -250,7 +252,7 @@ export const ChildsView = {
                   },
   
                   handle: {
-                    onclick: $ => {
+                    [onclick]: $ => {
                       $.le.model.editTree.moveChildRight($.meta.idx);
                     }
                   },
