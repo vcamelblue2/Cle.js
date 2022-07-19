@@ -5364,5 +5364,6 @@ export const HomePage = async (state)=>{ return {
 // appDemoConstructor()
 // appDemoNestedDataChangeDetection()
 // appDemoChachedWithAlias()
+appDemoStackblitz()
 
 // appDemoStockApi()
