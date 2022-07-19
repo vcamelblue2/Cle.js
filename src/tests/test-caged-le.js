@@ -5231,6 +5231,112 @@ const appDemoChachedWithAlias = async ()=>{
   }})
 }
 
+const appDemoStackblitz = async ()=>{
+
+  await Promise.all([
+    LE_LoadScript("https://unpkg.com/@stackblitz/sdk/bundles/sdk.umd.js"),
+    LE_LoadScript("https://cdnjs.cloudflare.com/ajax/libs/axios/0.21.1/axios.min.js"),
+  ])
+
+  let [ f_libs_cle_lib_cagedle_js, f_libs_cle_routing_lite_routing_js, f_libs_cle_layouts_layouts_js
+   ] = await Promise.all([
+    await axios.get('https://raw.githubusercontent.com/vcamelblue2/import-cle/main/lib/caged-le.js'),
+    await axios.get('https://raw.githubusercontent.com/vcamelblue2/import-cle/main/routing/lite_routing.js'),
+    await axios.get('https://raw.githubusercontent.com/vcamelblue2/import-cle/main/layouts/layouts.js')
+   ])
+
+  RenderApp(document.body, { div: {
+    id: "app",
+
+    a_style: "height: 100vh",
+
+    css: ["body{margin: 0}"],
+
+    '': { div: {
+      
+
+    onInit: async $ => {
+
+        StackBlitzSDK.embedProject( $.this.el, { files: {
+// MAIN JS
+'main.js': `
+import {pass, none, smart, Use, Extended, Placeholder, Bind, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock} from "./libs/cle/lib/caged-le.js"
+
+import {InitRouter, Router} from "./libs/cle/routing/lite_routing.js"
+
+import {HomePage} from "./pages/home.js"
+
+LE_InitWebApp(async ()=>{
+
+  await InitRouter({
+
+    pages: {
+      "home": HomePage
+    },
+  
+    defaultRoute: "home"
+  })
+
+})`,
+
+// PAGES
+'pages/home.js': `
+import {pass, none, smart, Use, f, Extended, Placeholder, Bind, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock, Alias} from "../libs/cle/lib/caged-le.js"
+
+export const HomePage = async (state)=>{ return { 
+  div: {
+
+    id: "app",
+
+    '': [
+
+      { h2: { 
+        text: "Hello World!",  a_style: "text-align: center"
+      }}
+      
+    ],
+
+}}}
+`,
+
+// LIBS
+'libs/cle/lib/caged-le.js': f_libs_cle_lib_cagedle_js.data,
+'libs/cle/routing/lite_routing.js': f_libs_cle_routing_lite_routing_js.data,
+'libs/cle/layouts/layouts.js': f_libs_cle_layouts_layouts_js.data,
+
+// INDEX HTML
+'index.html': `
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta http-equiv="Content-Style-Type" content="text/css">
+  <title>StackblitzApp</title>
+  <script type="module" src="main.js" ></script>
+</head>
+<body>
+</body>
+</html>`,
+
+          },
+          title: "test title",
+          description: "test description",
+          template: 'polymer',
+          // dependencies?: {[name: string]: string};
+          // settings?: {
+          //   compile?: {
+          //     trigger?: 'auto' | 'keystroke' | 'save';
+          //     action?: 'hmr' | 'refresh'
+          //     clearConsole?: boolean
+          //   }
+          // }
+        }, {height: "100%", openFile: "main.js"})
+    }
+
+    }}
+  }})
+}
+
 // app0()
 // test2way()
 // appTodolist()
@@ -5257,6 +5363,6 @@ const appDemoChachedWithAlias = async ()=>{
 // appDemoSocialNetworkReactStyle()
 // appDemoConstructor()
 // appDemoNestedDataChangeDetection()
-appDemoChachedWithAlias()
+// appDemoChachedWithAlias()
 
 // appDemoStockApi()
