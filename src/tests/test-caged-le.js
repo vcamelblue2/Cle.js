@@ -1,6 +1,21 @@
-
-import {pass, none, smart, f, fArgs, Use, Extended, Placeholder, Bind, Alias, SmartAlias, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock} from "../lib/caged-le.js"
+import { Alias, Bind, Extended, f, fArgs, LE_BackendApiMock, LE_LoadCss, LE_LoadScript, pass, Placeholder, RenderApp, smart, SmartAlias, toInlineStyle, Use, cle } from "../lib/caged-le.js"
 import { NavSidebarLayout } from "../layouts/layouts.js"
+
+
+const NEW_APP_TEMPLATE = async ()=>{
+
+  RenderApp(document.body, { div: {
+    id: "app",
+
+    '': [
+
+    ]
+
+  }})
+}
+
+
+
 
 const app0 = ()=>{
 
@@ -4853,74 +4868,143 @@ const appResolveMultiCssProblem = async ()=>{
 
 const appDemoNewShortcuts = async ()=>{
   
+  let NEW_SHORTCUTS = true
 
-  RenderApp(document.body, { div: {
+  if (!NEW_SHORTCUTS){
 
-    data: {
-      text: "hellooo",
+    RenderApp(document.body, { div: {
+
+      data: {
+        text: "hellooo",
+      },
+
+      '': [
+
+        { h1: "Test!"},
+
+        { h5: { text: "Hello World Shortcuts!" }},
+
+        { div: {
+          '': { div: {
+            '': { div: {
+              text: "i'm a super nested div"
+            }}
+          }}
+        }},
+
+        { input: {
+
+          hattrs: {
+            value: Bind($ => $.scope.text)
+          },
+
+          attrs: {
+            style: "color: red"
+          }
+
+        }},
+
+        { input: {
+
+          ha_value: Bind( $ => $.scope.text),
+
+          a_style: "color: red",
+
+        }},
+
+        { input: {
+
+          let_myText: Alias($ => $.scope.text + "---", ($,v)=>$.scope.text=v),
+
+          ha_value: Bind( $ => $.scope.myText),
+
+          a_style: "color: red",
+
+          handle_onclick: $=> (console.log("clicked!"), $.dbus.iptClicked.emit()),
+
+          dbus_signal_iptClicked: "stream => void"
+
+        }},
+
+        { div: {
+          on_dbus_iptClicked: $=>console.log("sono dbus, ipt clicked!")
+        }},
+        
+        { div: {
+          '': [
+            { i: {'': "I'm a I"}}, { b: { '': "I'm a B" }}, { span: {'': "I'm a SPAN"}}
+          ]
+        }}
+
+      ]
+
+    }})
+    
+  }
+
+
+  else {
+    // test inline dynamic with separation view/model and optional DY registration
+    const CLE = new Proxy({}, {
+
+    get: (_, componentNameForDY, __)=>{
+      return (modelDef={}, root='div', viewDef={}, ...childs)=>{
+        let parsedModelDef = {}; Object.entries(modelDef).forEach(([k,v])=>{ parsedModelDef[k.replaceAll(" ", "_")]=v;})
+        let parsedViewDef = {}; Object.entries(viewDef).forEach(([k,v])=>{ parsedViewDef[k.replaceAll(" ", "_")]=v;})
+        return {[root]:{...parsedModelDef, ...parsedViewDef, '': childs}}
+      }
     },
 
-    '': [
+    set: function(_target, prop, value) {}
+    })
+    const root = new Proxy({}, {
 
-      { h1: "Test!"},
+      get: (_, prop, __)=>{
+        return prop
+      },
 
-      { h5: { text: "Hello World Shortcuts!" }},
+      set: function(_target, prop, value) {}
+    })
 
-      { div: {
-        '': { div: {
-          '': { div: {
-            text: "i'm a super nested div"
-          }}
-        }}
-      }},
+    const str = new Proxy({}, { get: (_, prop, __)=>{ return prop },set: function(_target, prop, value) {} })
+    console.log(str.this_is_a_string, "..", str.hello, "!")
 
-      { input: {
 
-        hattrs: {
-          value: Bind($ => $.scope.text)
+    RenderApp(document.body, { div: { '': [
+      
+      // NO DOUBLE OBJ
+      cle.button({
+        text: "change data",
+
+        h_onclick: $=>console.log("bla bla, do something")
+
+      }),
+
+
+      // INLINE OBJ DECLARATION WITH DY & Sepration
+      CLE.myComponent(
+        
+        // Model
+        { 
+          ['let content']: "Hello World",  // ==> props: { content: "Hello World" },
+
+          onInit: $=>{
+            console.log("hello world! the content is: ", $.this.content )       // todo: this.content), //meta: { thisAs: "scope" },
+          }
         },
 
-        attrs: {
-          style: "color: red"
-        }
-
-      }},
-
-      { input: {
-
-        ha_value: Bind( $ => $.scope.text),
-
-        a_style: "color: red",
-
-      }},
-
-      { input: {
-
-        let_myText: Alias($ => $.scope.text + "---", ($,v)=>$.scope.text=v),
-
-        ha_value: Bind( $ => $.scope.myText),
-
-        a_style: "color: red",
-
-        handle_onclick: $=> (console.log("clicked!"), $.dbus.iptClicked.emit()),
-
-        dbus_signal_iptClicked: "stream => void"
-
-      }},
-
-      { div: {
-        on_dbus_iptClicked: $=>console.log("sono dbus, ipt clicked!")
-      }},
-      
-      { div: {
-        '': [
-          { i: {'': "I'm a I"}}, { b: { '': "I'm a B" }}, { span: {'': "I'm a SPAN"}}
+        // View
+        root.div, {  a_style: {width: "200px", height: "200px", backgroundColor: "red"}  },
+        ...[
+          "Content: ", $=>$.scope.content
         ]
-      }}
+        
+      )
 
-    ]
+    ]}})
 
-  }})
+  }
+
 }
 
 const appDemoSocialNetworkReactStyle = async () => {
@@ -5063,6 +5147,7 @@ const appDemoSocialNetworkReactStyle = async () => {
 const appDemoConstructor = async ()=>{
 
   const ShowText = { div: {
+    // @Input
     let_desc: "",
     let_text: "",
 
@@ -5337,6 +5422,142 @@ export const HomePage = async (state)=>{ return {
   }})
 }
 
+const appDemoMetaEditsPushBack = async ()=>{
+  const SIMPLE_TEST = false
+  
+  if (SIMPLE_TEST){
+
+    RenderApp(document.body, { div: {
+  
+      id: "app",
+  
+      let_items: [{v:1}, {v:2}, {v:3}],
+  
+      '': [
+  
+        { h3: "Demo set meta value (with pushback)"},
+  
+        { div: { meta: {forEach: "item", of: f`@items`},
+  
+          "=>": { div: {
+            
+              text: [ "VAL: ", f`@item.v`],
+              
+              h_onclick: $ => {
+                $.meta.item = {v:99},
+                console.log($.scope.items)
+              }
+              
+            }}
+          }}
+        ]
+  
+    }})
+
+  } 
+  
+  else {
+
+    RenderApp(document.body, { div: {
+  
+      id: "app",
+  
+      let_todos: [{todo: "test pushback", done: false}],
+
+      on_this_todosChanged: $=>{console.log("changed!!")},
+
+      def_create: ($, todo) => {
+        return {todo: todo, done: false}
+      },
+
+      def_add: ($, todo) => {
+        $.this.todos = [...$.this.todos, todo]
+      },
+
+      def_remove: ($, todo) => {
+        $.this.todos = $.this.todos.filter(t=>t!==todo)
+      },
+
+      a_style: { marginLeft: "25%", marginRight: "25%", padding: "25px", border: "0.5px solid #dedede", minHeight: "500px" },
+  
+      '': [
+
+        cle.div({ 
+          a_style: { display: "flex" }
+        },
+          
+          cle.input({
+            ctx_id: "input",
+            
+            let_text: "",
+            ha_value: Bind(f`@text`),
+            
+            a_style: { flexGrow: "1"},
+  
+            h_onkeypress: ($, e) => { 
+              if(e.key === "Enter") {
+                $.scope.add($.scope.create($.this.text))
+                $.ctx.input.text = ""
+              }
+            }
+          }),
+  
+          cle.button({
+            text: "Add",
+            h_onclick: $=>{ 
+              $.scope.add($.scope.create($.ctx.input.text))
+              $.ctx.input.text = ""
+            }
+          })
+
+        ),
+
+        cle.hr({}),
+  
+        cle.div({ meta: {forEach: "todo", of: f`@todos`},
+          a_style: { display: "flex", justifyContent: "space-between", alignItems: "center" }
+        },
+          
+          // todo with checkbox
+          cle.span({ a_style: { display: "flex"}},
+
+            cle.input({ 
+              ha_type: "checkbox", 
+              ha_checked: f`@todo.done`,
+
+              h_onchange: f`{ @todo = {...@todo, done: !@todo.done} }`
+            }), 
+            
+            cle.label({ 
+              text: f`@todo.todo` 
+            })
+
+          ),
+
+          // remove button
+          cle.button({  
+            text: "remove", 
+
+            a_style: { marginLeft: "15px" }, 
+
+            h_onclick: f`@remove(@todo)`
+
+          }),
+        
+        ),
+
+        cle.textarea({ a_style: { position: "absolute", bottom: "25px", left: "25.2%", width: "calc(50% - 12px)", height: "100px"}}, 
+
+          $=>("DATA: "+JSON.stringify($.le.app.todos, pass, 2))
+
+        )
+      ]
+  
+    }})
+  }
+    
+}
+
 // app0()
 // test2way()
 // appTodolist()
@@ -5364,6 +5585,9 @@ export const HomePage = async (state)=>{ return {
 // appDemoConstructor()
 // appDemoNestedDataChangeDetection()
 // appDemoChachedWithAlias()
-appDemoStackblitz()
+// appDemoStackblitz()
+appDemoMetaEditsPushBack()
+
+
 
 // appDemoStockApi()
