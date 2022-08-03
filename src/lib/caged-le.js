@@ -192,7 +192,7 @@ const component = {
     }
 
 
-    contains | childs | text | '>>' | '=>' | '' | _ : [
+    contains | childs | text | view | '>>' | '=>' | '' | _ : [
 
       { 
         h1: { ctx_id: "counter_name", text: $ => $.parent.name }
@@ -248,7 +248,7 @@ first_lvl = ["signals", "dbus_signals", "data", "private:data", "props", "privat
 second_lvl = ["on", "on_s", "on_a"]
 first_or_second_lvl = ["def", "private:def"] // check for function (may exist "first lvl namespace")
 // TODO: actually merge unsupported
-"hattrs", "ha", "private:hattrs", "private:ha", "attrs", "private:attrs", "a", "private:a", css, states, state, stateChangeStrategy, onState, contains | childs | text | '>>' | '=>' | '' | _???
+"hattrs", "ha", "private:hattrs", "private:ha", "attrs", "private:attrs", "a", "private:a", css, states, state, stateChangeStrategy, onState, contains | childs | text | view | '>>' | '=>' | '' | _???
 
 
 
@@ -335,7 +335,7 @@ const TodoList = { // automatic root div!
 
     { div: { meta: { forEach:"todo",  of: $ => $.parent.todolist,  define:{ index:"idx", first:"isFirst", last:"isLast", length:"len", iterable:"arr",    ...CUSTOM_PROP_NAME: value | ($: "parent" $this (same as meta), $child: real $this of the child)=> ... }, define_alias:{ // my_var_extracted_with_meta_identifier..easy alias! //, todo_label: $ => $.this.todo_label_mapping[$.meta.todo]},  key,comparer: el=>... extractor/converter: $=> // opzionale, per fare es Obj.keys --> extractor:($, blabla)=>Object.keys(blabla) e i comparer per identificare i changes // 
                      ,comparer: (_new, _old)=>_new !== _old
-                     ,newScope: bool, noThisInScope: bool, noMetaInScope: bool, hasViewChilds: bool}], (le ultime sono le "scope options") 
+                     ,newScope: bool, noThisInScope: bool, noMetaInScope: bool, hasViewChilds: bool, metaPushbackAutomark: bool}], (le ultime sono le "scope options") 
       
       "=>": [
 
@@ -867,7 +867,7 @@ class UseComponentDeclaration{
     
     // now check for injections!
     let injections = this.inject || {}
-    let childs_def_typology = ["childs", "contains", "text", ">>", "=>", "_", '']
+    let childs_def_typology = ["childs", "contains", "text", "view", ">>", "=>", "_", '']
     const recursive_check_injection = (resolved_component, lvl=0) =>{
 
       // _debug.log("Level: ", lvl, resolved_component)
@@ -975,8 +975,8 @@ class PlaceholderDeclaration{
 
 const extractChildsDef = (definition)=>{
   let extracted_childs = undefined
-  let { childs, contains: childs_contains, text: childs_text, ">>":childs_ff, "=>": childs_arrow, _: childs_underscore, '': childs_empty } = definition
-  extracted_childs = childs || childs_contains || childs_text || childs_ff || childs_arrow || childs_underscore || childs_empty
+  let { childs, contains: childs_contains, text: childs_text, view: childs_view, ">>":childs_ff, "=>": childs_arrow, _: childs_underscore, '': childs_empty } = definition
+  extracted_childs = childs || childs_contains || childs_text || childs_view || childs_ff || childs_arrow || childs_underscore || childs_empty
   if (extracted_childs !== undefined && !Array.isArray(unifiedDef.childs)) {extracted_childs = [extracted_childs]}
   return extracted_childs
 }
@@ -1333,7 +1333,8 @@ class Component {
       isNewScope: this.convertedDefinition.meta?.newScope,
       noThisInScope: this.convertedDefinition.meta?.noThisInScope,
       noMetaInScope: this.convertedDefinition.meta?.noMetaInScope,
-      hasViewChilds: this.convertedDefinition.meta?.hasViewChilds
+      hasViewChilds: this.convertedDefinition.meta?.hasViewChilds,
+      metaPushbackAutomark: this.convertedDefinition.meta?.metaPushbackAutomark === undefined ? true : this.convertedDefinition.meta?.metaPushbackAutomark,
     } 
 
     this.defineAndRegisterId()
@@ -2385,8 +2386,8 @@ class Component {
 
     // multi choice def
 
-    let { childs, contains: childs_contains, text: childs_text, ">>":childs_ff, "=>": childs_arrow, _: childs_underscore, '': childs_empty } = definition
-    unifiedDef.childs = childs || childs_contains || childs_text || childs_ff || childs_arrow || childs_underscore || childs_empty
+    let { childs, contains: childs_contains, text: childs_text, view: childs_view, ">>":childs_ff, "=>": childs_arrow, _: childs_underscore, '': childs_empty } = definition
+    unifiedDef.childs = childs || childs_contains || childs_text || childs_view || childs_ff || childs_arrow || childs_underscore || childs_empty
     if (unifiedDef.childs !== undefined && !Array.isArray(unifiedDef.childs)) {unifiedDef.childs = [unifiedDef.childs]}
     // can be: template | string | $ => string | array<template | string | $ => string>
 
@@ -3188,7 +3189,14 @@ class IterableComponent extends Component{
     this.meta_config = meta_config
     this.meta_options = meta_options
 
-    this.meta[this.meta_config.iterablePropertyIdentifier] = new Property(this.meta_config.value, none, none, none, ()=>this.$this, none, true)
+    // now with the onSet it's possible to sync back to the original array the value!
+    this.meta[this.meta_config.iterablePropertyIdentifier] = new Property(this.meta_config.value, none, 
+      (v)=>{
+        _info.log("META: push back value edit!"); 
+        this.meta_config.define_helper.iterable[this.meta_config.define_helper.index]=v; 
+        this.meta_options.metaPushbackAutomark && this.meta_config.realPointedIterableProperty.markAsChanged(); 
+      }, none, ()=>this.$this, none, true
+    )
     if (this.meta_config.define !== undefined){
       // define:{ index:"idx", first:"isFirst", last:"isLast", length:"len", iterable:"arr" }
       Object.entries(this.meta_config.define).forEach(([define_var, dev_var_name])=>{
@@ -3244,6 +3252,8 @@ class IterableViewComponent{
   html_pointer_element_anchor
   html_end_pointer_element_anchor
 
+  real_pointed_iterable_property // = {markAsChanged: ()=>{}} // the "of" of as Property (not value) to be able to mark as changed!
+
   // step 1: build
   constructor(parent, definition, $le, $dbus){
     this.parent = parent
@@ -3257,8 +3267,10 @@ class IterableViewComponent{
       isNewScope: this.meta_def?.newScope,
       noThisInScope: this.meta_def?.noThisInScope,
       noMetaInScope: this.meta_def?.noMetaInScope,
-      hasViewChilds: this.meta_def?.hasViewChilds
+      hasViewChilds: this.meta_def?.hasViewChilds,
+      metaPushbackAutomark: this.meta_def?.metaPushbackAutomark === undefined ? true : this.meta_def?.metaPushbackAutomark,
     }
+    this.real_pointed_iterable_property = {markAsChanged: ()=>{}}
   }
 
   get$ScopedPropsOwner(prop, search_depth=0, noMetaInScope=false){
@@ -3340,7 +3352,7 @@ class IterableViewComponent{
     this._destroyChilds()
 
     // todo, algoritmo reale euristico, che confronta itmet per item (via this.iterableProperty.value._latestResolvedValue[idx] !== arrValue)
-    this.childs = (this.iterableProperty.value?.map((arrValue, idx, arr)=>new IterableComponent(this.parent, this.real_iterable_definition, this.$le, this.$dbus, this, idx, {iterablePropertyIdentifier: this.iterablePropertyIdentifier, value: arrValue, define: this.meta_def.define, define_helper: {index: idx, first: idx === 0, last: idx === arr.length-1, length: arr.length, iterable: arr}}, this.meta_options)) || [] )
+    this.childs = (this.iterableProperty.value?.map((arrValue, idx, arr)=>new IterableComponent(this.parent, this.real_iterable_definition, this.$le, this.$dbus, this, idx, {realPointedIterableProperty: this.real_pointed_iterable_property, iterablePropertyIdentifier: this.iterablePropertyIdentifier, value: arrValue, define: this.meta_def.define, define_helper: {index: idx, first: idx === 0, last: idx === arr.length-1, length: arr.length, iterable: arr}}, this.meta_options)) || [] )
 
     // devo sicuramente fare una roba come per il conditional..un componente che estende component, perchè devo per forza gestire meglio la parte di append all'html pointer..
 
@@ -3391,22 +3403,30 @@ class IterableViewComponent{
         deps.$parent_deps?.forEach(d=>{
           let depRemover = this.parent.properties[d]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
           depRemover && depsRemover.push(depRemover)
+
+          this.real_pointed_iterable_property.markAsChanged = ()=>{this.parent.properties[d]?.markAsChanged()}
         })
 
         deps.$scope_deps?.forEach(d=>{
           let [propsOwner, isPropertiesProp] = this.get$ScopedPropsOwner(d);
           let depRemover = (isPropertiesProp ? propsOwner.properties[d] : propsOwner.meta[d])?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() ); // qui il ? server affinche si ci registri solo alle props (e non alle func etc!)
           depRemover && depsRemover.push(depRemover)
+
+          this.real_pointed_iterable_property.markAsChanged = ()=>{(isPropertiesProp ? propsOwner.properties[d] : propsOwner.meta[d])?.markAsChanged()}
         }) // supporting multiple deps, but only of first order..
 
         deps.$le_deps?.forEach(d=>{ // [le_id, property]
           let depRemover = this.$le[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
           depRemover && depsRemover.push(depRemover)
+
+          this.real_pointed_iterable_property.markAsChanged = ()=>{this.$le[d[0]].properties[d[1]]?.markAsChanged()}
         })
 
         deps.$ctx_deps?.forEach(d=>{ // [le_id, property]
           let depRemover = this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
           depRemover && depsRemover.push(depRemover)
+
+          this.real_pointed_iterable_property.markAsChanged = ()=>{this.$ctx[d[0]].properties[d[1]]?.markAsChanged()}
         })
         return depsRemover
       }, 
@@ -3615,8 +3635,17 @@ class LE_BackendApiMock{ // base class for backend api mock -> purpose is to hav
   put(route, data){ return this.response(this.services[route](this.request(data))) }
 }
 
+// export 
+/** Syntactic Sugar to define component using cle.div({ DEFINITION }, ...CHILDS), instead of normal object.*/
+const cle = new Proxy({}, {
+  get: (_target, prop, receiver)=>{ return (args_dict, ...childs)=>({[prop]:{...args_dict, ...(childs.length ? {'':childs} : {}) }}) },
+  set: function(_target, prop, value) {}
+})
 
-export { pass, none, smart, smartFunc as f, smartFuncWithCustomArgs as fArgs, Use, Extended, Placeholder, Bind, Alias, SmartAlias, Switch, Case, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock }
+
+// // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // 
+
+export { pass, none, smart, smartFunc as f, smartFuncWithCustomArgs as fArgs, Use, Extended, Placeholder, Bind, Alias, SmartAlias, Switch, Case, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock, cle }
 // full import: {pass, none, smart, Use, Bind, RenderApp, LE_LoadScript, LE_LoadCss, LE_InitWebApp}
 
 
