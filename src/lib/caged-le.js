@@ -3456,7 +3456,7 @@ class IterableViewComponent{
 
 
 // export 
-const Case = (clausole, el)=>{ 
+const Case = (clausole, definition)=>{ 
 
   let componentType = getComponentType(definition)
     
@@ -3480,7 +3480,7 @@ const x = { div: {
     )
   ]
 }}*/
-const Switch = (conditions)=>{
+const Switch = (...conditions)=>{
   return conditions
 }
 

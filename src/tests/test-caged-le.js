@@ -1,4 +1,4 @@
-import { Alias, Bind, Extended, f, fArgs, LE_BackendApiMock, LE_LoadCss, LE_LoadScript, pass, Placeholder, RenderApp, smart, SmartAlias, toInlineStyle, Use, cle } from "../lib/caged-le.js"
+import { Alias, Bind, Extended, f, fArgs, LE_BackendApiMock, LE_LoadCss, LE_LoadScript, pass, Placeholder, RenderApp, smart, SmartAlias, toInlineStyle, Use, cle, Switch, Case } from "../lib/caged-le.js"
 import { NavSidebarLayout } from "../layouts/layouts.js"
 
 
@@ -5458,13 +5458,32 @@ const appDemoMetaEditsPushBack = async ()=>{
   
   else {
 
+    // https://milligram.io/#getting-started
+    await Promise.all([
+      LE_LoadCss('https://fonts.googleapis.com/css?family=Roboto:300,300italic,700,700italic'),
+      LE_LoadCss('https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.css'),
+      LE_LoadCss('https://cdnjs.cloudflare.com/ajax/libs/milligram/1.4.1/milligram.min.css'),
+    ])
+
     RenderApp(document.body, { div: {
   
       id: "app",
   
-      let_todos: [{todo: "test pushback", done: false}],
+      let_todos: undefined,
 
-      on_this_todosChanged: $=>{console.log("changed!!")},
+      on_this_todosChanged: ($, _, old_v)=>{old_v !== undefined && $.this.store()}, // is an init?
+
+      onInit: $ => { $.this.load() },
+
+      def_store: $ => {
+        localStorage.setItem("cle.demopushback.todos-data", JSON.stringify({ todos: $.this.todos }))
+      },
+
+      def_load: $ => {
+        let loaded = localStorage.getItem("cle.demopushback.todos-data")
+        try{ $.this.todos = JSON.parse(loaded).todos } 
+        catch { $.this.todos = [{todo: "Test pushback!", done: true}] }
+      },
 
       def_create: ($, todo) => {
         return {todo: todo, done: false}
@@ -5478,12 +5497,17 @@ const appDemoMetaEditsPushBack = async ()=>{
         $.this.todos = $.this.todos.filter(t=>t!==todo)
       },
 
-      a_style: { marginLeft: "25%", marginRight: "25%", padding: "25px", border: "0.5px solid #dedede", minHeight: "500px" },
+      a_style: { marginLeft: "25%", marginRight: "25%", marginTop: "25px", padding: "25px", border: "0.5px solid #dedede", minHeight: "540px" },
   
       '': [
 
+        cle.h1({
+          text: "Cle - To Do List",
+          a_style: { textAlign: "center", fontSize: "5rem"}
+        }),
+
         cle.div({ 
-          a_style: { display: "flex" }
+          a_style: { display: "flex", gap: "10px" }
         },
           
           cle.input({
@@ -5504,6 +5528,7 @@ const appDemoMetaEditsPushBack = async ()=>{
   
           cle.button({
             text: "Add",
+            a_style: { minWidth: "120px" },
             h_onclick: $=>{ 
               $.scope.add($.scope.create($.ctx.input.text))
               $.ctx.input.text = ""
@@ -5513,40 +5538,85 @@ const appDemoMetaEditsPushBack = async ()=>{
         ),
 
         cle.hr({}),
-  
-        cle.div({ meta: {forEach: "todo", of: f`@todos`},
-          a_style: { display: "flex", justifyContent: "space-between", alignItems: "center" }
-        },
-          
-          // todo with checkbox
-          cle.span({ a_style: { display: "flex"}},
-
-            cle.input({ 
-              ha_type: "checkbox", 
-              ha_checked: f`@todo.done`,
-
-              h_onchange: f`{ @todo = {...@todo, done: !@todo.done} }`
-            }), 
-            
-            cle.label({ 
-              text: f`@todo.todo` 
-            })
-
-          ),
-
-          // remove button
-          cle.button({  
-            text: "remove", 
-
-            a_style: { marginLeft: "15px" }, 
-
-            h_onclick: f`@remove(@todo)`
-
-          }),
         
+        cle.div({
+          a_style: { overflowY: "auto", height: "310px", overflowY: "auto" }
+        }, 
+
+          cle.div({ meta: {forEach: "todo", of: f`@todos`},
+            let_in_edit: false,
+
+            a_style: { display: "flex", justifyContent: "space-between", alignItems: "center" },
+          },
+            
+            // todo with checkbox
+            cle.span({ a_style: { display: "flex", marginLeft: "2px"}},
+
+              cle.input({ 
+            cle.input({ 
+              cle.input({ 
+                ha_type: "checkbox", 
+              ha_type: "checkbox", 
+                ha_type: "checkbox", 
+                ha_checked: f`@todo.done`,
+                a_style: { height: "3rem", width: "3rem"},
+
+                h_onchange: f`{ @todo = {...@todo, done: !@todo.done} }`
+              }), 
+            }), 
+              }), 
+              
+              ...Switch(
+                
+                Case(f`!@in_edit`,
+
+                  cle.label({
+            cle.label({ 
+                  cle.label({
+                    text: f`@todo.todo`,
+                    a_style: { margin: "3px 0px 0px 15px;" },
+
+                    h_onclick: f`{ @in_edit = true }`
+                  })
+                ),
+
+                Case(f`@in_edit`,
+                    
+                  cle.input({
+                    let_new_text: Alias(f`@todo.todo`, fArgs('v')`{ @todo = {...@todo, todo: v }}`), // alias with custom setter required here to pushback text change
+
+                    ha_value: Bind(f`@new_text`, {event: "change"}),
+                    a_style: { margin: "3px 0px 0px 15px;" },
+
+                    onInit: $ => $.this.el.focus(),
+                    h_onblur: f`{ @in_edit = false }`,
+                    h_onkeypress: fArgs('e')`{ if(e.key === 'Enter') { e.preventDefault(); @el.onblur = undefined; @in_edit = false; }}`, // must remove onblur event before delete!!
+                  })
+                )
+              )
+
+            ),
+
+            // remove button
+            cle.button({  
+          cle.button({  
+            cle.button({  
+              text: "remove", 
+            text: "remove", 
+              text: "remove", 
+
+              a_style: { marginLeft: "15px", minWidth: "120px" }, 
+
+              h_onclick: f`@remove(@todo)`
+
+            }),
+          
+          )
         ),
 
-        cle.textarea({ a_style: { position: "absolute", bottom: "25px", left: "25.2%", width: "calc(50% - 12px)", height: "100px"}}, 
+        cle.textarea({ 
+          a_style: { position: "absolute", bottom: "10px", left: "25.2%", width: "calc(50% - 5px)", height: "110px"}
+        }, 
 
           $=>("DATA: "+JSON.stringify($.le.app.todos, pass, 2))
 
