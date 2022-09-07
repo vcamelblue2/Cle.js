@@ -2511,6 +2511,9 @@ class Component {
         else if (k.startsWith('let_')){
           dash_shortucts_keys.data[k.substring(4)] = val
         }
+        else if (k.startsWith('let ')){
+          dash_shortucts_keys.data[k.substring(4)] = val
+        }
 
         else if (k.startsWith('d_')){
           dash_shortucts_keys.def[k.substring(2)] = val
