@@ -6510,8 +6510,6 @@ const appDemoExternalPropsAndDyDef = async ()=>{
 // appDemoStackblitz()
 // appDemoMetaEditsPushBack()
 appDemoExternalPropsAndDyDef()
-
-
 // appDemoStockApi()
 
 
@@ -6535,3 +6533,24 @@ appDemoExternalPropsAndDyDef()
 //       in realtà questa cosa dovrebbe essere più ampia e fare in modo che ci possano essere dei "dynamic sub child" dichiarati con una condizione in if, in modo da avere una prop per creare e distruggere i sub component..
 
 // todo: possibilità di dichiarare interfaccia che uso via scope: expect: { required: ["prop1", "prop2"], optional: ["prop3"]}. in pratica faccio un test all'avvio, e se non trovo quanto richiesto mi spacco
+
+
+
+// idea pure server side component: in pratica mi basta scrivere all inizio di ogni cosa in props '$=>' es "$=>@counter" e quella viene riconosciuta come espressione..bisognerebbe farla a livello di framework per non rallentare, alternativa una classe che rielabora es ServersideComponent e passargli la def/json
+
+// idea: non ha senso realizzare un #ref alla angular qui..ha però senso copiare la sua modalità "input & output", ovvero l'idea è quella di fare una cosa tipo
+// { div: {
+//   '=>': [
+//     Use(Subel, pass, {
+//       in: {
+//         myVar: xxx --> FOLLOWING, REDEFINE WITH PARENT $ IN MIND
+//       },
+//       on: {
+//         subelSignal: $=>$_is_parent_here..
+//       },
+//       // eventualmente anche
+//       refAs: "subel"
+//     }
+//   ]
+// }}
+
