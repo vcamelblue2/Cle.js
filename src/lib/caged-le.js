@@ -227,6 +227,11 @@ class Property{
     return oldChangedHandlers
   }
 
+  /** return [Prop, getter, setter] */
+  get asFunctions(){
+    return [this, ()=>this.value, (v)=>{this.value=v}]
+  }
+
 }
 
 // signalHandler = {
@@ -2728,7 +2733,7 @@ class ConditionalComponent extends Component{
   create(){
     this.buildPropertiesRef()
     // step 1: geenrate If property, and configure to create (that build) or destry component!
-    this.visible = new Property(this.convertedDefinition.meta.if, none, (v, _, prop)=>{ _info.log("set: ", v, _, prop); if (v !== prop._latestResolvedValue) { v ? this._create() : this._destroy() } }, pass, ()=>this.$this, (thisProp, deps)=>{
+    this.visible = new Property(this.convertedDefinition.meta.if, none, (v, _, prop)=>{ _info.log("set: ", v, _, prop); if (v !== prop._latestResolvedValue) { v ? this._create() : this._destroy() } }, pass, ()=>this.$this, (thisProp, deps, externalDeps=[])=>{
 
       let depsRemover = []
       
@@ -2754,6 +2759,13 @@ class ConditionalComponent extends Component{
         let depRemover = this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
         depRemover && depsRemover.push(depRemover)
       })
+      
+      externalDeps?.forEach(extDep=>{
+        let depRemover = extDep?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+        depRemover && depsRemover.push(depRemover)
+      })
+      
+
       return depsRemover
     }, true)
 
@@ -2998,7 +3010,7 @@ class IterableViewComponent{
       }, 
       pass, 
       // aggancio gli autoaggiornamenti della property per far in modo che la set vada a buon fine senza una "set" reale e diretta
-      ()=>this.$this, (thisProp, deps)=>{
+      ()=>this.$this, (thisProp, deps, externalDeps=[])=>{
         let depsRemover = []
         _info.log("calculating deps")
         // deps connection logic
@@ -3030,6 +3042,14 @@ class IterableViewComponent{
 
           this.real_pointed_iterable_property.markAsChanged = ()=>{this.$ctx[d[0]].properties[d[1]]?.markAsChanged()}
         })
+
+        externalDeps?.forEach(extDep=>{
+          let depRemover = extDep?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+          depRemover && depsRemover.push(depRemover)
+
+          this.real_pointed_iterable_property.markAsChanged = ()=>{extDep?.markAsChanged()}
+        })
+        
         return depsRemover
       }, 
       true

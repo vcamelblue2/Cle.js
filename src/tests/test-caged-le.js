@@ -6396,6 +6396,9 @@ const appDemoExternalPropsAndDyDef = async ()=>{
 
 
     let sharedCounter = ExternalProp(0)
+    let sharedElements = ExternalProp([1,2,3])
+
+    let [usernameProp, getUsername, setUsername] = ExternalProp('will').asFunctions
     
     const Page1 = ()=> RenderApp(document.body, cle.div({
 
@@ -6407,7 +6410,7 @@ const appDemoExternalPropsAndDyDef = async ()=>{
         sharedCounter.removeOnChangedHandler($.this)
       },
 
-      a_style: { width: "200px", height: "200px", border: "1px solid black", padding: "25px" },
+      a_style: { width: "500px", height: "500px", border: "1px solid black", padding: "25px" },
     }, 
       cle.h1("this is page 1"),
       cle.button({h_onclick: $=>{ activePage.value = 'page 2'}}, 'Go To Page 2'),
@@ -6418,6 +6421,17 @@ const appDemoExternalPropsAndDyDef = async ()=>{
       cle.h4({}, 
         useExternal([sharedCounter], $=>"Direct Counter Value: "+sharedCounter.value) 
       ),
+
+      cle.h4({}, 
+        useExternal([usernameProp], $=>"Username: " + getUsername()) 
+      ),
+
+      cle.div({ meta: {forEach: "element", of: useExternal([sharedElements], $=>sharedElements.value)} },
+        $ => $.scope.element
+      ),
+
+      cle.button({h_onclick: $=>{ sharedElements.value = [...sharedElements.value, "Added From Page 1!"] }}, 'Inc Elements'),
+
     ))
 
 
@@ -6431,7 +6445,7 @@ const appDemoExternalPropsAndDyDef = async ()=>{
         sharedCounter.removeOnChangedHandler($.this)
       },
       
-      a_style: { width: "200px", height: "200px", border: "1px solid black", padding: "25px" },
+      a_style: { width: "500px", height: "500px", border: "1px solid black", padding: "25px" },
     }, 
       cle.h1("this is page 2"),
       cle.button({h_onclick: $=>{ activePage.value = 'page 1'}}, 'Go To Page 1'),
@@ -6442,6 +6456,16 @@ const appDemoExternalPropsAndDyDef = async ()=>{
       cle.h4({}, 
         useExternal([sharedCounter], $=>"Direct Counter Value: "+sharedCounter.value) 
       ),
+      
+      cle.h4({}, 
+        useExternal([usernameProp], $=>"Username: " + getUsername()) 
+      ),
+
+      cle.div({ meta: {forEach: "element", of: useExternal([sharedElements], $=>sharedElements.value)} },
+        $ => $.scope.element
+      ),
+
+      cle.button({h_onclick: $=>{ sharedElements.value = [...sharedElements.value, "Added From Page 2!"] }}, 'Inc Elements'),
     ))
     
     activePage = ExternalProp('', (newPage, oldPage)=>{
