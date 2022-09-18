@@ -1,408 +1,3 @@
-
-/*
-
-// mettiamo insieme le idee..
-
-
-
-// ricordati che è sempre possibile segnalare una change in una prop facendo esplicitamente $.this.xxxpropNamexxxChanged()
-
-// todo: signal subsystem, un qualcosa tipo dbus, per cui tutte le props e signal notificano al sottositema il cambiamento..nient'altro che un msg broker / dispatcher. così da svincolare sender e reciver. più semplicie eliminare i segnali e gli "ascoltatori" post destroy
-// todo: funzione F in cui dichiarare una lambda e le sue deps (per magheggi strani..) ---> const f = (lambda, deps=[])=>...   ---> { div: {text: f($ => $.le.qualcosa.prop + 123, ["le.qualcosa.prop"])}} oppure vere e proprie Property istanziate a parte..con js scope
-
-
-// NOTE DONE:
-// $.meta per le var in meta..es nei foreach etc
-// "$.ctx" che rappresenta il contest dov'è definito il componente..escludendo quindi figli as component, parent e altre cagate
-// grazie a questa cosa posso definire un "local_id" o "private:id" che potrei usare per fare hoisting dei nomi! aumentando riusabilità e un minimo di private/public
-// altra cosa interessante sarebbero i modificatorie public e private, esempio "private:data": ... oppure "private:def", per avere anche più "def" etc pubbliche e private
-
-// l'uso di questi oggetti apre a nuove possibilità, come ad esempio i tratti..ovvero poter prendere alcune cose in var e poi usarle in vari punti..
-// ricordarsi di tutte le cose buone che abbiamo in le attuale..come i global signal, e a livello di page. nonchè una zona dove poter definire regole css
-
-
-// se volessimo usare le classi sarebbe così: (anche meglio, perchè così ad ogni new ho già una copia che non alterna nulla..non devo fare copy)
-const myComponet = {
-  htmlType: class myComponentDef {
-    props = {...},
-    ...
-  }
-}
-
-
-const component = {
-
-  component_name: { meta: { if: $ => some.condition },
-
-    "private:"? id: "compoent_id",
-
-    constructor: ($, {param1, param2, param3 ...}) => { // costruttore, quando viene generato il componente
-      $.this.blabla = blilbi
-    },
-    
-    beforeInit: $ => { // prima di tutto
-
-    }
-
-    onInit: $ => { // prima di inizializzare html 
-      console.log()
-    },
-
-    afterChildsInit: $ => { // dopo la onInit dei childs
-
-    }
-
-    afterInit: $ => { // dopo html init (auto lazy)
-      console.log()
-    },
-
-    onUpdate: $ => { // cancellato per essere ricreato
-
-    },
-
-    onDestroy: $ => {
-
-    },
-
-    signals: {
-      counterReset: "stream => (void)" // definiamo il tipo di segnale (es: stream [per indicare chi c'è c'è], observable [per indicare che chi non c'è riceverà tutti i next e poi stream]) "=>" una descrizione dei params (es il tipo dei parametry, la signature etc etc..è solo testo che documenta!)
-    },
-
-    dbus_signals: { // qui definiamo i segnali globali..un modo per creare uno stream su un canale comune con un compagno che non riesco a raggiungere facilmente "by name", e che entrambi conosciamo
-      iEmitThisGlobalSignal_UniqueName: "stream => (int: counter status)"
-    }
-
-    "private:"? data | props: {
-      name: "counter 1",
-      counter: 0,
-      my_alias: Alias(getter $=>..., setter $,v=>..., caching(new, old)=>new!==old...),
-      my_alias2: SmartAlias('@counter')
-    },
-
-    on: { // on props | alias changes
-      this: {
-        counterChanged: ($, newCounter, oldCounter) => console.log($.this.counter),
-      }, 
-      parent: ...
-      scope: ... any prop in self or any parent anchestor
-      le: ..byname.. : {props | alias changed},
-      ctx: ...qui mettiamo solo i nomi dei sub_componenti + this di questo componente! 
-      // ci vorrebbe anche un $.subel, (un array, non obj con in le) in cui è possibile filtrare by type: es $.subel.get("div")[0]..oppure il concetto di tref di le..o magari questa in realtà con ctx si risolve.. vedi sotto che ho descritto bene
-      
-      TODO: direct_child: ... // in alternativa alle menate di sopra. conscio del fatto che è una "multicast", e in congiunzione con l'inserimento in properties di una ".childs" in grado quindi di poter fare $.this.childs[0].doSomething
-      // todo: reserved keyword for property signal etc naming
-    },
-
-    on_s: { // on signal
-      this: {
-        counterReset: $ => console.log("counter reset!")
-      }, 
-      parent: ...
-      scope: ... any prop in self or any parent anchestor
-      le: .component byname.. : { signal},
-      ctx: ...qui mettiamo solo i nomi dei sub_componenti + this di questo componente! 
-      dbus: ...qui mettiamo i signals globali che ascolto
-
-      // valitare anche "child:0" & "child:*" | child: { "0" | "*" : .. }
-
-      // è anche possibile "autopropagare" i segnali che elaboro, senza ridefinirli (per favorire sub child to parent flow, o evitare inutili remap), come?  con una classe/costante che instanziamo e dunque definire: ctx: {subchildSignal: Autopropagate}
-    },
-
-    TODO: on_a { /////// AL MOMENTO NON PREVISITO!!!
-      this: {
-        "class" | "style.width" : $ => ... 
-      }
-      ... come sopra
-    },
-
-    // todo: valutare anche i "transoformer/reducer" in quanto con il sistema di auto change propagation per fare una op in blocco dovrei avere un mega stato..ma poi ho il problema che ci sono troppi update inutili..i reducer/transformer aiuterebbero!
-
-
-    "private:"? def: {
-      resetCounter: $ => {
-        $.this.counter = 0
-        $.this.counterReset.emit()
-      }, 
-
-      utils: { // def namespace example
-        toUppercase: ($, txt) => txt.toUppercase()
-      }
-    },
-
-    alias: { // nice to have, alias, per permettere di vedere all'esterno alcune proprietà interne e ridefinirle con la use senza toccare la logica o via prop extra!
-      ctx: {
-        counter_txt: $ => $.ctx.counter_value.text // qui probabilmente devo andare con la tecnica retry untill..
-      }
-    }
-
-    "private:"? attrs | a : { // html attr  -> // altri nomi possibili: "has" | "viewProps" | "</>" P.S: qui magari veramente che potrebbe starci il fatto che qualsiasi altra cosa che non sia tra quelle descritte da noi diventa un attribute o un $.this.el.XXX
-
-      style: {
-        width: 200,
-        height: $ => 200
-      }, // oppure style: $ => ({ width... }) su questo devo ancora ragionare..
-
-      class: "someclass"
-
-      "@lazy:scrollTop": 100 // con il prefisso '@lazy:' indico che quell'attributo lo voglio inizializzare lazy!
-
-      value: Bind($ => $.this.counter) // per effettuare 2 way data binding!
-    
-      // todo: style e class devono stare separati?? in roba apposita? in teoria si..perchè così potremmo anche andare a utilizzarli per creare l'anchors system definitivo..visto che starebbero in qualcosa di separato è anche più facile la sovrascrittura..
-    },
-    // NB: ricordarsi che è possibile osservare i changes degli attributi tramite un semplicissimo "mutationObserver"..questo ci permette di fare il 2 way binding in modo super semplice! infatti basta fare questa cosa: https://stackoverflow.com/a/41425087 unita al una classe che usiamo come trap per configurare il 2 way binding! ovviamente dovrà essere possibile configurare anche solo il flusso attr to property, in modo p.es da bindre la select a una nostra property in modo unidirezionale
-
-
-    // hattrs ... "harmfulAttr" todo, capire se ha senso..in pratica qui non settiamo via "setAttribute", ma direttamente via this.el.xxxx = e anche in ricorsione..
-    "private:"? hattrs | ha: {
-      scrollTop: "0px",
-      'style.backgroundColor': "red",
-      'myAttr.nested.prop': $ => "follow some stuff"
-      "@lazy:scrollTop": Bind($ => $.this.counter) // per lazy binding!
-    }
-
-    // novità: ora è anche possibile usare le shortcuts: "ha.style.color": "red"  oppure "a.style": {color: "red"}
-
-    handle: { // html event
-      onclick: ($, e) => $.this.count++
-    },
-
-    css: [ ".class { bla:bli ... }", $=>".r0 { .."+$.this.somedeps +"}" ] | {rule1: ".class { bla:bli ... }", rule2: $=>".r0 { .."+$.this.somedeps +"}"} // todo..magari qualcosa di più complesso..come hoisting (via replacer, o anche per i subel), or namaed definition (tipo le)..oppure per automatizzare l'hoisting =>  css: [ ".class { bla:bli ... }", ".class2 { foo:bar; ...", NoHoisting("sostanzialmente ::ng-dep..")]
-
-    TODO: states: {
-      // "default": "this", // implicit, always chang
-
-      "bigger": { // 
-
-        attrs: {
-          style: {
-            width: 400,
-            backgroundColor: "red"
-          }
-        }
-      }
-
-    },
-
-    TODO: state: "default" // optional different starting state
-    TODO: stateChangeStrategy: "merge XXXstatenameXXX" | "replace" | "remove" // magari questa cosa va dentro i singoli state..
-
-    TODO: onState: ($, newState, oldState)=> {
-
-    }
-
-
-    contains | childs | text | view | '>>' | '=>' | '' | _ : [
-
-      { 
-        h1: { ctx_id: "counter_name", text: $ => $.parent.name }
-      },
-      { 
-        span: { ctx_id: "counter_value", text: $ => "count:" + $.parent.counter }
-      },
-      "simple text",
-      $ => "lazy text:" + $.this.state,
-
-      Use( MyComponent, { // component creation / use example (from following code) 
-        // redefinition..
-          handle: {
-            onclick: ...
-          }
-          on_s: { 
-            this: { 
-              mySignal: ($, ...args) => do whatever
-            }
-          } 
-        }, 
-        {
-          init: { childPropToInitInConstructor: $ => $.meta.idx }
-        }, 
-        // todo: qui potrebbe starci una connect del signal con autopropagate, ovvero poter indicare che propago un certo segnale nel mio parent!
-      ),
-
-
-      { Model | Controller | Connector..etc: { // OBJECT, invisible, usefull for app logic and data manipulation, with meta: { hasViewChilds: true } can be materialized into the view as <leobj></lepbj>
-        data: {prop1: 23},
-
-        ["=>"]: [
-
-          { Model: { // sub model/obj
-            data: {prop2: 25},
-            afterInit: $ => console.log($.this.prop2),
-            text: $ => $.parent.prop1, // but also: $.scope.prop1, because $scope use dynamic binding (and shadowing) and compact all the props and signal from me and my parents
-          }
-        },
-        ]
-      }},
-
-    ],
-
-  }
-}
-
-// COMPONENT REDEFINITION SEPARATION
-
-impossible_to_redefine = ["ctx_id"]
-direct_lvl = ["id", "constructor", "beforeInit", "onInit", "afterChildsInit", "afterInit", "onUpdate", "onDestroy"]
-first_lvl = ["signals", "dbus_signals", "data", "private:data", "props", "private:props", "alias", "handle"]
-second_lvl = ["on", "on_s", "on_a"]
-first_or_second_lvl = ["def", "private:def"] // check for function (may exist "first lvl namespace")
-// TODO: actually merge unsupported
-"hattrs", "ha", "private:hattrs", "private:ha", "attrs", "private:attrs", "a", "private:a", css, states, state, stateChangeStrategy, onState, contains | childs | text | view | '>>' | '=>' | '' | _???
-
-
-
-const DeleteTodoButton = { 
-
-  button: {
-  
-    props: { todoIndex: undefined },
-
-    constructor: ($, {todoIndex})=>{ // qua forse capiamo, perchè sarebbe carino poter definire dinamicamente prop..anche se potrebbe diventare illegibile!
-      $.this.todoIndex = todoIndex // sabebbe bello avere anche un mini constructor di default per questi casi, ovvero constructor: autoConstructor; autoConstructor: (arg_as_obj)=>Object.entries..map in data/pros etc..
-    },
-
-    text: $ => "delete me ("+$.this.todoIndex+")",
-
-    signals: {
-      deleteRequest: "stream => (void)",
-    }
-
-    handle: {
-      onclick: $ => $.this.deleteRequest.emit()
-    }
-
-  }
-}
-
-
-const TodoList = { // automatic root div!
-
-  id: "todolist", 
-
-  data: {
-    todolist: []
-  }
-
-  on: {
-    this: {
-      todoListChanged: $ => $.this._logTodoEdits()
-    }
-  },
-
-  on_s: {
-    le | ctx : {
-      input_bar: {
-        newTodoRequest: ($, todo) => $.this.addTodo(todo)
-      }
-    }
-  },
-
-
-  def: {
-    addTodo: ($, todo) => $.this.todolist = [...$.this.todolist, todo],
-    deleteTodo: ($, todo) => ...find and delete..
-  }
-
-  "private:def":{
-    logTodoEdits: $ => console.log("todo edited!!")
-  }
-
-  '=>': [
-
-    { input: { 
-
-        id: "input_bar", 
-
-        signals: { 
-          newTodoRequest: "stream => (string: new inserted todo)"
-        },
-        props | data: { todo: "" }
-        attrs: { 
-          value: $ => $.this.todo, 
-          placeHolder: "Insert some Todo..", 
-          style: { width: "300px", height: "100px"} 
-        }, 
-        handle: { 
-          onInput: ($,e) => $.this.todo = e.target.value, 
-          onEnterPressed: $ => $.this.newTodoRequest.emit($.this.todo) 
-        } //mock
-      }
-    },
-
-    { hr: {} },
-
-
-    { div: { meta: { forEach:"todo",  of: $ => $.parent.todolist,  define:{ index:"idx", first:"isFirst", last:"isLast", length:"len", iterable:"arr",    ...CUSTOM_PROP_NAME: value | ($: "parent" $this (same as meta), $child: real $this of the child)=> ... }, define_alias:{ // my_var_extracted_with_meta_identifier..easy alias! //, todo_label: $ => $.this.todo_label_mapping[$.meta.todo]},  key,comparer: el=>... extractor/converter: $=> // opzionale, per fare es Obj.keys --> extractor:($, blabla)=>Object.keys(blabla) e i comparer per identificare i changes // 
-                     ,comparer: (_new, _old)=>_new !== _old
-                     ,newScope: bool, noThisInScope: bool, noMetaInScope: bool, hasViewChilds: bool, metaPushbackAutomark: bool}], (le ultime sono le "scope options") 
-      
-      "=>": [
-
-        { div: { text: $ => $.meta.idx + ") " $.meta.todo, // oppure "stringa" oppure $=>$.meta.idx ..shortcut for textNode (vecchio {$: fff} in le)
-
-        Use( DeleteTodoButton, { 
-            on_s: { 
-              this: { 
-                deleteRequest: $ => $.ctx.root.deleteTodo() 
-              }
-            } 
-          }, 
-          {
-            init: { todoIndex: $ => $.meta.idx } // nella init il punto di vista del this E' SEMPRE IL MIO PARENT, qui meta è sempre quello DEL MIO PARENT
-          }, 
-          // todo: qui potrebbe starci una connect del signal con autopropagate, ovvero poter indicare che propago un certo segnale nel mio parent!
-        )
-      ]
-
-    }},
-
-
-    { div: { meta: { if: $ => $.ctx.root.todolist.length > 50},
-      text: "ohhh nooo, hai molti todo"
-    }},
-
-    { div: { meta: { if: $ => $.ctx.root.todolist.length === 0},
-      text: "hurrraaa, non hai nulla da fare!"
-    }},
-
-
-    // oppure
-    { div: { meta: { 
-      swich: $ => $.ctx.root.todolist.length, 
-      cases: [
-        [($, len) => len > 50, { div: { text: "ohhh nooo, hai molti todo"} }]
-        [($, len) => len == 0, { div: { text: "hurrraaa, non hai nulla da fare!"} }]
-      ], 
-      default: undefined
-    },
-    }}, // così però devo per forza wrappare in un div etc..
-    
-    // alternativa: lo switche non è ninent'altro che una trasfromazione identificata a beckend (con classe sentinel) e riconvertita in le-if da noi
-    Switch( $ => $.ctx.root.todolist.length, 
-
-      Case( ($, len) => len > 50,  
-      { 
-        div: { text: "ohhh nooo, hai molti todo"} 
-      }),
-
-      Case( ($, len) => len == 0, 
-      { 
-        div: { text: "hurrraaa, non hai nulla da fare!"} 
-      }),
-
-      Default( pass )
-    )
-
-  ],
-
-}
-
-
-*/
-
-
-
 const DEBUG_ENABLED = false
 const DEBUG_INFO_ENABLED = false
 const DEBUG_WARNING_ENABLED = true
@@ -464,17 +59,20 @@ const cloneDefinitionWithoutMeta = (definition)=>{
 // Framework
 
 class PropAlias {
-  constructor(getter=()=>{}, setter=()=>{}, markAsChanged=()=>{}, cachingComparer=()=>false, onChangesRegisterFunc){
+  constructor(getter=()=>{}, setter=()=>{}, markAsChanged=()=>{}, cachingComparer, onChangesRegisterFunc, externalDeps){
     this.getter = getter
     this.setter = setter
     this.markAsChanged = markAsChanged
-    this.cachingComparer = cachingComparer
+    this.cachingComparer = cachingComparer // AKA is different? (newVal, oldVal)=>bool
+    this.externalDeps = externalDeps
+
+    this.isExternal = this.externalDeps !== undefined && this.externalDeps.length > 0
   }
 }
 // export
-const Alias = (getter=()=>{}, setter=()=>{}, markAsChanged=()=>{}, cachingComparer=()=>false, onChangesRegisterFunc)=>new PropAlias(getter, setter, markAsChanged, cachingComparer, onChangesRegisterFunc)
+const Alias = (getter=()=>{}, setter=()=>{}, markAsChanged=()=>{}, cachingComparer, onChangesRegisterFunc, externalDeps)=>new PropAlias(getter, setter, markAsChanged, cachingComparer, onChangesRegisterFunc, externalDeps)
 // export
-const SmartAlias = (getterAndSetterStr, cachingComparer=()=>false)=>{
+const SmartAlias = (getterAndSetterStr, cachingComparer)=>{
   return new PropAlias(
     smartFunc(getterAndSetterStr, true),
     smartFuncWithCustomArgs("v")("("+getterAndSetterStr+" = v)", true), 
@@ -482,6 +80,18 @@ const SmartAlias = (getterAndSetterStr, cachingComparer=()=>false)=>{
     cachingComparer
   )
 }
+
+// export
+const ExternalProp = (value, onSet) => {
+  return new Property(value, none, onSet || none, none, none, none, none, true)
+}
+class _UseExternal extends PropAlias {}
+// export
+// a simply renamed alias! (reordered params..)
+const useExternal = (externalDeps, getter=()=>{},  setter=()=>{}, markAsChanged=()=>{}, cachingComparer, onChangesRegisterFunc )=>{
+  return new _UseExternal(getter, setter, markAsChanged, cachingComparer, onChangesRegisterFunc, externalDeps)
+}
+const isUseExternalDefinition = f=>f instanceof _UseExternal;
 
 class Property{
   constructor(valueFunc, onGet, onSet, onDestroy, executionContext, registerToDepsHelper, init=true){
@@ -499,9 +109,11 @@ class Property{
   }
 
   init(valueFunc, onGet, onSet, onDestroy){
+    this.isAlias = valueFunc instanceof PropAlias
+    this.hasExternalDeps = this.isAlias && valueFunc.externalDeps !== undefined && valueFunc.externalDeps.length > 0
+
     this.oj_valueFunc = valueFunc
     
-    this.isAlias = valueFunc instanceof PropAlias
     if (this.isAlias) { valueFunc = valueFunc.getter }
 
     this.isFunc = isFunction(valueFunc)
@@ -526,7 +138,7 @@ class Property{
     if (this.isFunc){
       this.dependency = analizeDepsStatically(this._valueFunc)
       _info.log("analysis - dependency: ", this, this.dependency)
-      this.registeredDependency = this.registerToDepsHelper(this, this.dependency) // it's my parent competence to actually coonect deps!
+      this.registeredDependency = this.registerToDepsHelper(this, this.dependency, this.hasExternalDeps ? this.oj_valueFunc.externalDeps : undefined) // it's my parent competence to actually coonect deps!
     }
   }
 
@@ -549,8 +161,16 @@ class Property{
   }
   set value(v){
     if(this._onSet === undefined){_warning.log("CLE - WARNING: the onSet is undefined!", this);return} // todo: teeemp!! c'è un bug più subdolo da risolvere..riguarda gli le-for e le-if nested..
+    if(isUseExternalDefinition(v)){ // set at runtime new useExternal!
+      this.init(v, this._onGet, this._onSet, this._onDestroy)
+      v = v.getter
+    }
     if(this.isAlias){
       this.oj_valueFunc.setter(...this.executionContext.map(ec=>ec()), v)
+      if (this.hasExternalDeps){
+        _debug.log("fire use ext changed!!")
+        this.fireOnChangedSignal()
+      }
     }
     else {
       this.isFunc = isFunction(v)
@@ -573,7 +193,7 @@ class Property{
     let _v = this.__getRealVaule()
     this._onSet(_v, this._valueFunc, this)
     if (this.isAlias && this.oj_valueFunc.cachingComparer !== undefined ){
-      if (this.oj_valueFunc.cachingComparer(_v, this._latestResolvedValue)){
+      if (this.oj_valueFunc.cachingComparer(_v, this._latestResolvedValue)){ // AKA is different?
         this.fireOnChangedSignal()
         this._latestResolvedValue = _v
       }
@@ -647,35 +267,6 @@ class Signal {
 
   // proxy dei signal esposto agli user, che possono fare solo $.this.signalName.emit(...)
   static getSignalProxy = (realSignal)=> ( {emit: (...args)=>realSignal.emit(...args)} )
-
-}
-
-class SignalSubSystem {
-  singals = {} // Map?? e uso un component dell'albero direttamente..così però rischio di perdere il "riferimento" in caso di dynamics..o meglio, va gestito bene..
-
-  toRegister = {}
-
-  addSignal(signal){
-
-  }
-  removeSignal(signal){
-
-  }
-
-  replaceSignal(oldSignal, newSignal){ // quando so che c'è una replace/update di un nodo..devo replecare per far in modo che le subscribe funzionino ancora
-
-  }
-
-  registerToSignal(signal, who){
-
-  }
-
-  sendSignal(signal, ...args) {
-    //mentre segnalo bisogona controllare che esiste ancora il sengale..potrebbe portare all'eleiminazione'..
-
-  }
-
-  _dispatchSignal(){}
 
 }
 
@@ -1000,11 +591,11 @@ const getComponentType = (template)=>{
   // return [elementType, componentDef ?? definition] // per i template veri restituisco la definizione (aka la definizione del componente), mentre per gli UseComponent il template/classe passata
 }
 
-const analizeDepsStatically = (f)=>{
+const analizeDepsStatically = (f, isUseExt=false)=>{
 
   // const f = $ => $.this.title + $.parent.width + $.le.navbar.height
 
-  let to_inspect = f.toString()
+  let to_inspect = isUseExt ? f.getter.toString() : f.toString()
 
   // replace va perchè fa la replace solo della prima roba..alternativa un bel cut al numero di caratteri che sappiamo già
   let $this_deps = to_inspect.match(/\$.this\.([_$a-zA-Z]+[0-9]*[.]?)+/g)
@@ -1025,6 +616,11 @@ const analizeDepsStatically = (f)=>{
   let $meta_deps = to_inspect.match(/\$.meta\.([_$a-zA-Z]+[0-9]*[.]?)+/g)
   $meta_deps = $meta_deps?.map(d=>d.replace("$.meta.", "").split(".")[0]) // fix sub access!
 
+  let $external_deps
+  if (isUseExt){
+    $external_deps = [...f.externalDeps]
+  }
+
   return {
     // todo: vedere se hanno senso
     $this_deps: $this_deps, 
@@ -1044,15 +640,12 @@ const analizeDepsStatically = (f)=>{
 
     $meta_deps: $meta_deps, 
     // $pure_meta_deps: $meta_deps.length === 1 && $meta_deps[0]==="", 
+
+    $external_deps: $external_deps
   }
 
 }
 
-// class ComponentProxySentinel {
-//   constructor(obj){
-//     Object.assign(this, obj)
-//   }
-// }
 
 // Property proxy, frontend for the dev of the component Property, usefull to hide the .value mechanism (get/set) of Property
 // let deps_stack = [];
@@ -1520,7 +1113,7 @@ class Component {
       Object.entries(this.convertedDefinition.data).forEach(([k,v])=>{
 
         // Create but do not init
-        this.properties[k] = new Property(pass, pass, pass, pass, ()=>this.$this, (thisProp, deps)=>{
+        this.properties[k] = new Property(pass, pass, pass, pass, ()=>this.$this, (thisProp, deps, externalDeps=[])=>{
 
           // deps connection logic
 
@@ -1562,6 +1155,11 @@ class Component {
 
           deps.$ctx_deps?.forEach(d=>{ // [le_id, property]
             let depRemover = this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+            depRemover && depsRemover.push(depRemover)
+          })
+
+          externalDeps?.forEach(extDep=>{
+            let depRemover = extDep?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
             depRemover && depsRemover.push(depRemover)
           })
           
@@ -1632,25 +1230,25 @@ class Component {
               this.signalsHandlerRemover.push(remover)
             })
           }
-          if (typologyNamespace === "parent"){
+          else if (typologyNamespace === "parent"){
             Object.entries(defs).forEach(([s, fun])=>{
               let remover = this.parent.signals[s].addHandler(this, (...args)=>fun.bind(undefined, this.$this, ...args)())
               this.signalsHandlerRemover.push(remover)
             })
           }
-          if (typologyNamespace === "scope"){
+          else if (typologyNamespace === "scope"){
             Object.entries(defs).forEach(([s, fun])=>{
               let remover = this.get$ScopedPropsOwner(s)[0].signals[s].addHandler(this, (...args)=>fun.bind(undefined, this.$this, ...args)())
               this.signalsHandlerRemover.push(remover)
             })
           }
-          if (typologyNamespace === "dbus"){
+          else if (typologyNamespace === "dbus"){
             Object.entries(defs).forEach(([s, fun])=>{
               let remover = this.$dbus.addSignalHandler(s, this, (...args)=>fun.bind(undefined, this.$this, ...args)())
               this.signalsHandlerRemover.push(remover)
             })
           }
-          if (typologyNamespace === "le"){
+          else if (typologyNamespace === "le"){
             Object.entries(defs).forEach(([leItem, leItemDefs])=>{ // get requested element name
               Object.entries(leItemDefs).forEach(([s, fun])=>{
                 // exponential retry to handle signal
@@ -1674,7 +1272,7 @@ class Component {
             })
           }
           // todo: fattorizzare con le, se possibile!
-          if (typologyNamespace === "ctx"){
+          else if (typologyNamespace === "ctx"){
             Object.entries(defs).forEach(([ctxItem, ctxItemDefs])=>{ // get requested element name
               Object.entries(ctxItemDefs).forEach(([s, fun])=>{
                 // exponential retry to handle signal
@@ -2649,7 +2247,7 @@ class Component {
 
     let component;
 
-    if ((typeof template === "string") || (typeof template === "function")){
+    if ((typeof template === "string") || (typeof template === "function") || isUseExternalDefinition(template)){
       component = new TextNodeComponent(parent, template)
       return component
     }
@@ -2668,9 +2266,6 @@ class Component {
     if("meta" in componentDef){
       if ("if" in componentDef.meta){ // is a conditionalComponet
         component = new ConditionalComponent(parent, template, $le, $dbus)
-      }
-      else if ("swich" in componentDef.meta){ // is a switchConditionalComponent
-        component = new SwitchConditionalComponent(parent, template, $le, $dbus)
       }
       else if ("forEach" in componentDef.meta) { // is a foreach component (IterableViewComponent)
         component = new IterableViewComponent(parent, template, $le, $dbus)
@@ -2718,14 +2313,15 @@ class TextNodeComponent {
   }
 
   _renderizeText(){
-    this.html_pointer_element.textContent = isFunction(this.definition) ? this.definition.bind(undefined, this.parent.$this)() : this.definition
+    this.html_pointer_element.textContent = isFunction(this.definition) || isUseExternalDefinition(this.definition) ? (isUseExternalDefinition(this.definition) ? this.definition.getter : this.definition).bind(undefined, this.parent.$this)() : this.definition
   }
   
   depsRemover = []
   staticAnDeps = {} // TEST, DEMO
   analizeDeps(){
-    if (typeof this.definition === "function"){
-      this.staticAnDeps = analizeDepsStatically(this.definition)
+    let isUseExt = isUseExternalDefinition(this.definition)
+    if (typeof this.definition === "function" || isUseExt){
+      this.staticAnDeps = analizeDepsStatically(this.definition, isUseExt)
       _debug.log("Text Deps Analysis: ", this, this.staticAnDeps)
     }
 
@@ -3040,6 +2636,12 @@ class TextNodeComponent {
       }
     })
 
+    this.staticAnDeps.$external_deps?.forEach(extProp=>{
+      if (extProp !== undefined && "addOnChangedHandler" in extProp){
+        this.depsRemover.push(extProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+      }
+    })
+
     this._renderizeText()
     
   }
@@ -3177,9 +2779,6 @@ class ConditionalComponent extends Component{
 
 }
 
-class SwitchConditionalComponent extends Component{
-  visible = false
-}
 
 
 class IterableComponent extends Component{
@@ -3641,183 +3240,11 @@ class LE_BackendApiMock{ // base class for backend api mock -> purpose is to hav
 // export 
 /** Syntactic Sugar to define component using cle.div({ DEFINITION }, ...CHILDS), instead of normal object.*/
 const cle = new Proxy({}, {
-  get: (_target, prop, receiver)=>{ return (args_dict, ...childs)=>({[prop]:{...args_dict, ...(childs.length ? {'':childs} : {}) }}) },
+  get: (_target, prop, receiver)=>{ return (args_dict, ...childs)=>(  typeof args_dict === "string" || typeof args_dict ==="function" ? {[prop]: args_dict} : {[prop]:{...args_dict, ...(childs.length ? {'':childs} : {}) }}  ) },
   set: function(_target, prop, value) {}
 })
 
 
 // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // 
 
-export { pass, none, smart, smartFunc as f, smartFuncWithCustomArgs as fArgs, Use, Extended, Placeholder, Bind, Alias, SmartAlias, Switch, Case, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock, cle }
-// full import: {pass, none, smart, Use, Bind, RenderApp, LE_LoadScript, LE_LoadCss, LE_InitWebApp}
-
-
-
-// // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // //
-// TESTING
-
-
-// BUGFIX:
-
-  // todo: in css non devo reinserire se ho già inserito..specie per le-for
-
-  // todo: MEGA->al momento è imposibile registrarsi a proprità di elementi che sono dopo di me..perchè l'elemento è vero che esiste, ma non esistono sncora le sue prop! quindi fallirà sempre, e con il "?" non esplode e non trovi il bu facilmente. la soluzione è la retry, da implementare alla riga 1327 e ovunque ci sia questa logica! alternativa semplice: spostare (e testare!) la creazione delle Property nella fase 2 (build skeleton) e non nella 3 (create). nella fase 2 all'ultimo, dopo la creazione dei contesti..perchè tanto definiamo solo le prop, senza dargli val ne deps ne nulla, ma esistendo tutte non avremo problemi ad agganciarle dopo..aka codice da riga 1300 a 1288
-  //       --> ancora meglio fare un componente che gestisce queste cose a lungo termine..ovvero quando provo a fare lu sub e non riesco mando la richiesta un gestore che la completerà per me dopo. qundo? quand un componente viene creato (le sue prop etc) chiede prima della fine al rgistro se qualcuno lo ha cercato, e il registro completa le op pending. l'importanza del registro (oltre a dover implementare sta roba anche nei signal al posto della retry) è quella dei componenti dinamici: dovrà anche essere avvisato delle destroy, in modo che possa ricreare i binding quando il componente viene eventualmente ricreato.
-  //           ciò ovviamenete ci porta anche a dover migliorare le destroy e soprattutto la parte dinamica..che al momento è solo abbozzata: vedi sotto
-
-  // todo: bugfix reale della _onSet che sparisce per gli le-if nested in un le-for
-
-  // todo: rendere i _debug e _info sensati, fare i warn/err
-
-  // done: support def deps on TextNode..only for ordinary def (not namespaces). easy: only need to test & find in defDep for "namespace.defname"
-  // todo: dipendenze delle def..perchè al momento non posso usare in una Property e avere l'autoaggiornamneto..anche se a dirla tutta, avrebbe poco senso! nel caso pensare ai "trasformer" ovvero delle "pure_def" che sono appunto funzioni pure senza side effects e quinid utilizzabili in modo safe da noi --> quetsa nota deriva dal questo commento // noooo...potenzialmente buggato! specialmente in ricorsione..perchè se uso una funzione che assegna invece di usare aggiungo una dipendenza inutile.. dovrei accertarmi che non sto a sinistra di un uguale..ma non solo! forse va specificata questa cosa e usato un paradigma appisito, "pure_def", ovvero funzioni pure senza side effects! poi sta al dev capire che fare..
-  // todo: analisi dipendenze funzioni (in cascata..ovvero se uso func le "importo")..qui il senso è NON rielaborare la funzione ad ogni changes delle deps, ma segnalare le deps, in modo che le property che veramente la usano e devono autoupdatarsi possono agganciarsi alle deps..in modo da "far funzionare l'auto aggiornamento" in quanto il signal delle deps delle func farà si che si uppi la prop/text etc che la segue e tutto funge. in cascata perchè se uso altre func devo agganciarmi a tutto. 
-  // todo/nota: una cosa molto figa che viene fuori da questa cosa è che posso anche "dichiarare" le dipendenze , ovvero: se scrivo in una def tipo "myVarDeps": $ => ($.this.dep1, $.this.dep2..., "") posso usarla in un text o una property o qualsiasi altra cosa e stabilire le deps a piacimento (non so se veramnete utile..)
-
-  // todo: l'analisi delle dipendenze al momento avviene via testo..questo significa che legge anche i commenti! qui ho un mezzo bug/feature: da un lato posso inserire le dipendenze in un commento, es /* deps: $.this.counter */, dall'altro se commento un pezzo di codice ne continuo a seguire le deps..
-
-
-  // todo: il bugfix dei text node va anche da altre parti..ovvero di avere $.this.miavar.something.. il parser restituisce [miavra, something] e non miavar..qui devo fozare di prendere [0]..alternativa farlo bene perchè in effetti potrei bindarmi a tutto..e poi mi serve per la catena dei parent
-  // todo: al momento la catena dei parent non è contemplata nella risoluzione delle dipendenze..migliorare. per farlo: durante l'analisi delle deps ho bisogno di un nuovo items che si chiama "$parentChain": qui ci devono far finire il numero di ".parent" a partire da "$.this" e "$.parent". in questo modo risolvo anche per bene il bug che ho segnalato sopra, ovvero quello dei TextNode
-
-  // todo: visto che il punto di vista nella redefine dei componenent è sempre se stessi..quando faccio una use component non posso in alcun modo usare $.ctx per riferirmi al mio contesto visibile al momento della definizione..quindi forse ho due "problemi", il primo è che i context dovrebbero essere inclusivi (ovvero il mio as subchild è l'insieme del mio e di tutti quelli sopra di me. in alternativa devo avere il concetto di "supctx" ovvero ctx di mio padre (che deve rimanere tale anche per i miei child interni al componente). in effetti è semplice da fare, sostanzialmente è: this.getMyCtx().parent.getMyCtx()). in alternativa devo poter andare in cascata come per parent.. oppure: definisco "elemento speciale" in ogni context "super_ctx" e modifico il codice affinche si possa fare: $.ctx.super_ctx.myElId.Prop..però così mi perdeo la possibilità di definire in on on_s etc l'aggancio a un super ctx element..per cui la migliore sarebbe un $.super_ctx.. oppure la ricorsione
-
-
-// NEW FEATURES:
-  // semi-done: injector palceholders: meccanismo per permettere di inserire sottocomponenti in punti specifici di un componente Use: sostanzialmente in una Use possiamo definire dei Placeholder (classe Placeholder), che hanno dei "nomi", e dunque possiamo passare alla Use un dict con i nome i componenti che vogliamo ignettare (via passaggio params). la semplicità del meccanismo è tutta nella definizione della Use, che si occupa di matchare i placeholder (tra i subel) e di rimuovere quelli inutilizzati. trasparente per la factory! ovviamente possibilità di default if not set, e opzione per forzare il match con un id specifico (private) o un rename forzato di un id privato (per far si che si possano definire "interfacce" e usarle)
-  // done: ricorsione nei sottochild? (solo se stesso ctx, aka non per i nested Use..però se potessi andare anche dentro gli use potrei sustituire la qualunque! il problema è che nella use sostituisco i placeholder..quoindi diventa dura..)
-  // todo: valutare se fare copia del default placeholders e/o dell injected
-
-  // todo: smart id component: qualcosa per cui al posto di { div: { id: "myElId" }}  posso scrivere: { "div -> myElId": {..} }. ovvero sfruttare un po di parsing per avere lil fatto che così vedo struttura e id insieme..
-  // todo: smart shortcuts: l'idea è di poter scrivere "attrs.style": ... per evitare l'obj e compattare la sintassi..ovviamente con "_" come sep sarebbe migliore, in quanto si eviterebbero un po di cose..
-  // todo: questa cosa come molte altre in realtà mette in luce il fatto che ogni componente e sottocomponete dovrebbe subire una prima "trasformazione" in una sintassi migliori per il framework, che ha diverse opzioni e modi di scrivere..come più o meno avvine già, ma dovrebbe essere la "first of all"
-
-  // todo: concetto di "re_emit_as" -> combina in automatico la possibilità di gestire un segnale e rialnciarlo con un altro nome..per propagare i sengali! ovviamente devo inserire il nome di un mio segnale e non di altri.. potrebbe avere senso avere una sentinel del tipo "NewSignal("xxx") per indicare un nuovo segnale ? eìsenza stare a dichiaraare 2 volte..per easy propagation.. vedere bene su..di fatto questa cosa è da realizzare nella on_s lato dev
-
-  // todo: "SelfStyle" o altro meccanismo per esplicitare hoisting del css..vedi su..alternativa andare di replace e tutto è "pubblico" (aka ng-deep) di default..in questo caso è compito dello sviluppatore inserire un "replacer" che indica all'engine che quella classe è "locale"
-  // todo: tutti gli elementi devono avere un attributo che mappa un identificativo univoco dell'elemento (stabile nel tempo, anche per gli ng-if e ng-for) per poter aiutare l'hoisting..
-
-  // todo: state
-  // todo: behavioural property: utilty per creare animazioni, clone di quelle QML. in pratica l'idea è quella di definire una serie di azioni (in modo dichiarativo e non imperativo) all'acadere di un'azione, es all'on change di una property (ma anche eventi, tipo onclick), seguendo una linea temporale e/o quantizzando il valore della property che sta cambiando. l'idea è quella di definire che ad es: quando una property assume valore "vero" o ad un "click" vengono eseguiti una serie di step in sequenza (ovvero una serie di set timeout). tipo subito cambio il colore in blue e dopo 0.5 sec lo cambio nell'originale. ma anche 
-
-  // todo: private..come realizzo il meccanismo dei private? name mangling in python style? (più semplice ma "inutile") o reale (e quindi tentare di capire come filtrare le properties visibili..)
-
-  // todo: le-switch
-  
-  // todo: routing (also partial!) con history api
-
-  // todo: per supportare al meglio il passaggio di un componente come data ad un altro componente, e poterne seguire le sue proprietà: è possibile autoanalizzare (ad ogni set) se la prop passata è un component. in caso positivo potrei sottoscrivermi al meglio nelle prop che la usano, visto che un'eventuale chiamata a una sottoproperty implica in realtà "l'hook" originale alle su property, (e non una sottoproperty che non saprei gestire di un altro tipo di dato), ergo posso fare $.this.selectedEl.property..basta solo modificare i subscruber di conseguenza. e ovviamente devono essere notificati del cambio di tipo, per eventuale risottoscrizione
-
-  // todo: component scafholding via notazione semplice..anche natural lang like (script a se)
-
-  // todo: debug, possibilità di avere albero struttura rendered con id
-  
-  // todo: all'interno degli iterable component potrebbe essere utile (nel meta) definire previus e next: due variabili in cui mettiamo l'elemento precedente e quello successivo. in questo modo posso fare $.meta.previus.prop/def etc etc..utile ad esempio in anchors, per fare flow like interface..ù
-
-  // todo: cached property..ovvero la get non deve rieseguire se ha già eseguito e la cache è valida (non è stata marked as changed..)
-
-  // todo: standardizzare un po la parte di syncback di una var nel local storage..in modo da poter indicare "@autosync_in_local_storage", o nel name come per lazy o in altra roba apposita. in quest'ultimo caso possiamo anche specificare come scriverle, quali e l'ordine di recupero
-
-  // todo: possibilità di definire la "struct" di una Property, in modo da provare a seguire i cambiamenti di valore nested..es se ho un dict o un array..deve essere un cosa persistente anche a successive set di valore..nonchè trasparente, in modo da dare problemi agli sviluppatori
-  //       una cosa carina sarebbe definire una classe che eredita da una nostra classe base, per cui definiamo delle cose e che fa la magia automaticmante!
-
-  // todo: $scope deve contenere anche meta..in modo da superare il problema del meta bloccato con Use in se stesso e poter usare il meta del parent anche negli use. in alternativa fixare la Use per vedere anche sopra..
-
-
-// IMPROVEMENTS:
-
-  // todo: tipi
-
-  // todo: lanciare eccezioni quando parso dei componenenti (anche Use) con nome di proprietà non conosciuti! magari regole di similarità per hint su cosa si voleva scrivere!
-
-  // todo: anche se abbiamo fatto una prima versione di le-for, in realtà molto è da fare..al momento distruggo e ricreo, e dunque non posso neanche legarmi agli aggiornamenti delle property in meta..anche perchè non è semplice recuperare il who/what id-metaOfComponent. anche perchè i componenti non sopravvivono mai ad un aggiornamento!
-  // todo: le-for e le-if: se qualcuno seguiva qualche proprità e distruggo, devo riagganciare al rebuild!
-
-  // todo: le dipendenze in cascata devono avere il meccanismo della retry, altrimenti al primo undefined ciaone
-  // todo: destroy delle dipendenze, properties, signal, attr etc alla destroy! fatte per bene! anche in Text etc..
-
-
-  // todo: ragionare se ci piace davveero "private: xxx": "blabla"   o è meglio un   private_xxx: "blibli"
-  //       allo stesso tempo potrebbe eanche essere utile invertire: normalmente tutto è privato (aka by $ctx), con public: si va in modalità pubblica..quantomeno per gli id!
-
-  // todo: la computed_template della UseDeclaration dovrebbe essere un gettr con singleton, in modo che venga calcolato solo se utilizzato..cercando di minimizzare le elaborazioni inutili all'avvio
-
-
-// IDEAS:
-  // todo: novita della novità rispetto a tutto quello che c'è dopo: il modo più semplice per una handle di qualcosa di un mio figlio ma senza nome è usare il concetto di slot e connect: in pratica il parent dichiara uno slot: ovvero una funzione che ha un nome e che gestisce un segnale di un qualcuno generico, e i figli possono fare la connect di un proprio signal allo slot del parent. in questo modo davvero si elimina il problema di non avere id, visto che per il contrario (parent to child) basta una property o un signal che i figli interessati seguono..dove mettiamo la logica per discriminare se è o meno interessante per me. infine, se si vuole andare di codice imperativo si possono definire delle var (es selected, se c'è una cosa del genere) in cui i figli inseriscono se stessi alla init..
-  //       anche se in realtà alla fine la child to parent non è un problema..visto che in modo imperativo posso sempre fare parent.blabla
-
-  // todo: resta il fatto che 99% delle problematiche si risolverebbero in realtà con: catena dei parent, meta che ingloba i super meta, ctx che ingloba i super ctx (o è già così?), e infine un flag per dire di riportare tutte le props del mio parent (anche in scrittura!! ergo ci vuole una sorta di Bind)
-  
-  // todo: una cosa più semplice da fare sarebbe quella di avere un nuovo campo "ref_id" e poi $.ref.up/down/same|lvl.refxxx oer andare in ricerca sull'albero del ref..ovviamente first is return
-
-
-  // todo: rispetto a tutto quello che ho scritto qui sotto, forse la cosa migliore per gestire le on e on_s (non ovviamente tutti gli altri problemi..) almeno di 1 livello (child diretti) è quella di aggiungere una on: {direct_childs: ... }, che da realizzare sarebbe mooolto semplice..in quanto devo solo andare sui miei child (dopo la creazione dei child, o con retry) a cercare di sottoscrivermi..easy e via! in congiunzione con l'inserimento in properties di una ".childs" in grado quindi di poter fare $.this.childs[0].doSomething. a quel punto posso sottoscrivermi alle onchange e ai signal del figlio (per attaccarmi alle props), e chiamare su di lui cose senza nome!
-
-  // todo: anche se non voglio farlo, potremmo usare un meccanismo per gestire anche le cose dei figli senza usare il nome..la prima cosa è andare alla angular maniera..ovvero aggiungere dettagli nel meta quando definisco un componente..in questo modo non ho problemi e posso risalire facile! -- altrimenti un qualcosa tipo  " on: {this: Child(0, {dataChanged: $=>...})} "..occhio che deve essere lazy!! o fatto dopo i child..
-  // ---v
-  // todooo: in realtà la cosa migliore sarebbe utilizare una nomencalutura particolare per tutti i figli (che non hanno definito un id e un _id). ovvero dare il nome del padre + indice figlio (contanto eventuale figli con nome as ++) es: Root => [ undefeined => [undefined], myElementName, undefined ] diventerebbe: Root => [Root_cld_0 => [Root_cld_0_cld_0], myElementName, Root_cld_2]  oppure: Root => [Root.0 => [Root.0.0], myElementName, Root.2]
-  // un'altra cosa figa di questa cosa è che ora possiamo avere il "full name", ovvero il nome completo di un elemento, come Root.Root_cld_0.Root_cld_0_cld_0  oppure  Root.0.0 (prendendo solo index)
-  // todo: quindi a questo punto gli elementi dovrebbero stare anche anche in una property "child", accessibile sia come array che by name (realizzabile tramite "proxy", tenendo gli elementi come dict [solo se unordered] altrimenti come array)
-
-  // todo: per la comunicazion "child to parent" potremmo srubacchiare da angular..ovvero nuova proprietà oltre id e _id in cui dichiaro il nome del children dal punto di vista del parent (e solo di lui! come quando in angular dichiari un #nome, ma li va per "contesto" ovvero il nostro ctx), quindi ogni parent avrà un nuovo $.child.XXXNAMEXXX da poter usare e di conseguenza ovunque..ovviamente è un extra rispetto a quanto definito
-
-  // todo: iniziare a pensare alla questione che posso definire e usare anche pezzi dei children nel parent (se quello di sopra dovesse realizzarsi), in partiolare gli alias..portano dritto questo problema alla luce
-
-  // todo: potrebbe essere più semplice per il discorso "padre deve seguire il figlio senza replace/merge" definire nella "Use" una parte specifica dove posso definire delle "add" in modo da non compromettere il funzionamento di un componente..e quindi poter definire delle "on" etc che si aggiungono e non sovrappongono (basta duplicare on etc per la Use in una nuova property)
-  // todo/note: come fare per fare in modo che un padre possa operare su un child senza nome? (neanche di contesto) opz 1: proprietà child come array (ma questo richiede la specifica di un estrapolatore etc, nonchè una nuova logica per gestire tutte le paturnie degli array..es: [x], find.. etc etc..). opzione 2: ogni elemento che ha figli ha al suo interno delle proprità "_child_XXX" con XXX numero/indice del child. essendo proprietà a tutti gli effetti potrei seguirle e bona, e al suo interno ci troverei il suo $this. per poter tenere in piedi il meccanismo di estrapolazione deps dovrei realizzare un $.childs.c_xxx
-
-  // todo??: namespace anche per i data (solo di 1 livello)..via "namespace:xxx" come nome della prop..quindi quello diventa il primo livello, es=> data: {miaPropObj: {a: 12}, "@namespace:myNamespace": {prop1:..., prop2:.., prop3:..}} --> questo complica parecchio l'estrazione delle deps etc..
-  // todo: 2wayBinding anche property to property..utile per trattare come "mia" una property di un altro..e isolare da "$.parent.." 
-
-  // todo: full name di un elemento..come insieme del suo nome e dei suoi parent separati da punto: "parentParentId.parentId.thisId"
-
-
-  // todo: deduplicare le deps prima della subscribe..anche e soprattutto per via delle deps dell func, ma probabilemnte lo abbiamo già adesso questo problema! a meno della "buona gestione" in Property per cui non riaggiungiamo se siamo già subscribed (visto che passo this come who), ancdrebbe però comunque migliorato, per evitre aggiornamenti multipli! qui si capisce l'importanza di angular e del change detector..ovvero un loop per "ridurre" i repaint "accorpandoli". come? al posto di iposta al change l'azione diretta, basta segnalarla in un array con "esecuzione a scadenza" ovvero timeout ad es 2 ms dell'esecuzione delle azioni, con autodelete delle azioni "replicate" all'esecuzione, e auto reset del timeout con l'avanzare del codice. questo garantisce la separazione tra rendering e prop, ma potrebbe incasinare il codice che faceva affidamento su di essa.
-
-  // todo??: nuova idea su come bindare il this con qualunque funzione (anche => ) (che però annulla la possibilità di avere cose extra framework..): basta fare il toString della func, e poi ricostruirla con new Function assegnando il this..però si perdono tutti gli extra ref!
-  
-
-  // todo: relative name componenti: questa è da ragionare..l’effetto che vorrei è poter fare: .parent.MyObj.SubObj2 .. in this, parent, le e ctx. In pratica è come se i componenti dovessere stare dentro i $.X attraverso gli id (se definito) come delle props speciali, e poterle usare nelle deps..
-
-  // todo: Nuova classe helper per le func in cui non voglio usare dollaro ma non ho voglia di modificare il retriver delle deps:
-  // todo: Nuova classe che accetta una func e una explain o un retriver diverso. L’explain accetta (con “;” come separatore) una stringa di deps nel formato senza dollaro, es: “parent.x;this.y”
-
-  // todo: per aiutare il sistema a identificare i changes anche per obj mutabili: il type system, ovvero nelle props posso wrappare i dati in CLE.List(func.., description), in modo che per queste cose specifiche possiamo andare a wrappare con un nostro modo l’array etc i metodi base, al fine di pushare i changes automaticamente)
-
-  // todo: Funzione per disabilitare temporaneamente il mark for changes, per evitare troppi ricolcoli inutili e abilitarlo manualmente dopo
-
-  // todo: classe Exetrnal, che mi permette di definire delle property esterne e bindarmi ovunque (props, attr, view etc)
-
-  // todo: validation rules, qualcosa che posso definire nella mia definizione (solo this) di proprietà, per cui definisco delle regole di validazione per le assegnazioni alle Props. in pratica poi prima di assegnare esweguo le validazioni e nel caso lancio errore. così quando assegno mi basta fare try catch e centralizzo le regole
-  // todo: in realtà questa cosa può diventare più figa e complessa: con anche le pre/post action, in pratica così ho anche gli alias, perchè posso per esempio andare a dire che come post action ho la possibilità di settare indietro una var (e riagganciare l'hook, senza essere nel loop della on changed..)
-  // todo: sicuramente questa cosa è semi-ridondante, ma non è "inutile"
-
-  // todo: lazy negli on e on_s..da capire ancora come, se con keyword lazy o come..a quel punto anche un bel "throttle"
-
-  // todo: oggetto Channel instanziabile che posso utilizzare in modo da mettere in contatto due o + elementi. creo il channel con new, lo passo a un param "cannels: {xxx: myChannel.onMessage($=>dosomething), ...}" e poi lo posso usare con this.xxx.send. easy
-  
-
-
-
-
-// DONE:
-
-  //// note: tutto è un signal: ovvero le prop hanno dei signal associati (signal particolari, che portano con se il vecchio e il nuovo valore al triggher.. ergo: on, on_s e on_a sono solo degli alias (sovrapponibili a differenza di children etc) che servono allo sviluppatore pià che altro.
-  // conseguenza esistono solo due cose da gestire: i dati (le property) e i signal. da qui va da se che anche gli attr sono property, con tutto quello che ne derive (signal etc)
-
-  // done/note: i Model/Controller (object) devono poter definire css? sarebbe mooolto utile, in quanto sarebbe il modo naturale (magari via Css) per definirlo, integrando anche l'auto update dei dati..ovvero le classi possono dipendere dai dati e quinid non devo più aggiornare la classe css dell'elemento, ma una property, che in cascata aggiornerà tutto. questo porta alla necessità di avere gli ng-if anche per gli object in modo obbligatorio! [done]
-
-  // note: forse per le-for la cosa migliore è andare con una classe sentinel apposita, ForEach($=>blabla, {options}, {...component to repeat..}) perchè altrimenti devo eliminare dal meta prima di replicare e non è facile..a quel punto nella factory ricevo la sentinel e creo la classe che wrappa come pensavo in modo semplice..riutilizzando molto codice
-
-  // done: "smart component", ovvero la possibilità di scrivere {div: "mio text"} e in automatico venga parsata in modo corretto con l'autoespansione in {div: { text: "mio text" }}
-    
-  // todo (old?): ng if, ng for, ng switch.. => per poter fare questa cosa c'è bisogno di un refactoring abbastanza importante, affiche ogni componente sia di fatto un contenitore per N elementi. questa è la base. per i componenti nomrmali ho solo 1 elemento, mentre per gli ngfor ne ho N. questo è l'uncio modo per poter continuare ad andare in questa direzione. altrimenti l'albero perde completamente di senso, a meno di non creare una sorta di "wrapper" per tutte le proprietà e quindi far diventare trasparente quell'operazione
-  // di fatto questa visione torna con l'originale dell'idea di avere dei "pointer html" via commento. ovvero ho un albero di componenti virtuali, nella quale in ogni fogli posso avere un albero di componenti reali. i cui sottocomponenti sono ancora una volta virtuali.
-  // in alternativa: devo agire a livello di factory..creando un qualcosa che wrappa ma solo per l'ng for..visto che switch e if sono già ok..ma a quel punto il controllo della situazione chi ce l'ha??
-
-  // todo/done?: iniziare a strutturare come funziona "meta" lato dev, nel senso che il mio meta è in realtà l'insieme di tutti i meta dei miei parent (nello stesso componente? in teoria si, perchè il il compoente è entità "atomica", non dividibile, quindi dentro e fuori non si "conoscono") compreso il mio..a questo punto tutto deve andare con retry incrementale?
-
-  // done: $scope, un meccanismo che permette di superare molti problemi di cle, tra cui la parent chain. il suo obbiettivo è vedere i componenti come codice js, per cui posso vedere tutte le variabili, segnali etc, che sono definiti nel mio blocco e nei blocchi sopra di me. è dynamic (leggermente più lento), funziona su props e signal, (posso bindarmi ovunque con $.scope.xxx) e ha il concetto di shadowing. di fatto è una vista al nome più vicino a me per quella cosa
-  // done: possibile usare meta per bloccare lo scope, taggando in meta: {newScope: true}
-  // done: {noThisInScope: true} per indicare che non voglio il this nello scope
+export { pass, none, smart, smartFunc as f, smartFuncWithCustomArgs as fArgs, Use, Extended, Placeholder, Bind, Alias, SmartAlias, ExternalProp, useExternal, Switch, Case, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock, cle }
