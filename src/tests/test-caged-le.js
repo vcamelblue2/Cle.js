@@ -5557,6 +5557,53 @@ const appDemoTodoCard = async ()=>{
   ))
 }
 
+const appRxJs = async ()=>{
+
+  // // V6 =>
+  // await LE_LoadScript("https://cdnjs.cloudflare.com/ajax/libs/rxjs/6.6.0/rxjs.umd.min.js") 
+  // V7 => 
+  await LE_LoadScript("https://unpkg.com/rxjs@^7/dist/bundles/rxjs.umd.min.js")
+
+  const $signal = new rxjs.Subject()
+
+
+  const AppLogic = {
+    
+    let_latest_observed_val: undefined,
+
+    onInit: $=>{
+      
+      $signal.asObservable().subscribe((val)=>{
+        console.log("arrived:", val);
+        $.this.latest_observed_val = val // there is no other way to renderize a value other than in a property. this will be renderized in a div
+      })
+
+      let counter = 0
+      let interval;
+      interval = setInterval(() => {
+        if (counter >= 10){
+          clearInterval(interval)
+
+          $signal.next("COUNTER ENDED! " + counter)
+        } else {
+          $signal.next(counter++)
+        }
+      }, 1000);
+
+    }
+
+  }
+
+  RenderApp(document.body, cle.root(AppLogic,
+    
+    cle.h2("Test RXJS inside CLE"),
+    
+    cle.div({}, 
+      "Counter (deliverd by observable): ", $ => $.scope.latest_observed_val
+    )
+  ))
+}
+
 // app0()
 // test2way()
 // appTodolist()
@@ -5587,8 +5634,8 @@ const appDemoTodoCard = async ()=>{
 // appDemoStackblitz()
 // appDemoMetaEditsPushBack()
 // appDemoExternalPropsAndDyDef()
-appDemoTodoCard()
-
+// appDemoTodoCard()
+appRxJs()
 
 
 
@@ -5620,6 +5667,8 @@ appDemoTodoCard()
 
 
 // idea pure server side component: in pratica mi basta scrivere all inizio di ogni cosa in props '$=>' es "$=>@counter" e quella viene riconosciuta come espressione..bisognerebbe farla a livello di framework per non rallentare, alternativa una classe che rielabora es ServersideComponent e passargli la def/json
+// todo: "SmartChain", ovvero un modo per nestare facilmente strutture es: SmartChain.table.tr.td(...)
+
 
 // idea: non ha senso realizzare un #ref alla angular qui..ha però senso copiare la sua modalità "input & output", ovvero l'idea è quella di fare una cosa tipo
 // { div: {
