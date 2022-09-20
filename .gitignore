@@ -76,3 +76,13 @@ typings/
 .fusebox/
 
 .DS_Store
+
+harmful/
+
+# parcel dist stuf
+package.json
+package-lock.json
+.parcel-cache
+.terserrc
+dontuseterserrc
+/dist
