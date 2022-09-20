@@ -274,6 +274,7 @@ const Day = { div: { meta: {forEach: "day", of: $=>$.scope.days, define: {index:
         // console.log("plans!", $.meta.day, day, new_plan)
         $.meta.day === day && !$.this.updateDetached && ($.this.planned = new_plan)
         // if ($.scope.plans[$.meta.day] !== $.this.planned ){ $.this.setupPlan() }
+        console.log("planned changed")
       }
     },
     this: {
@@ -347,7 +348,7 @@ const Day = { div: { meta: {forEach: "day", of: $=>$.scope.days, define: {index:
 
   "=>": [
 
-    smart({ div: $=>$.meta.day.split("-").slice(1,3).reverse().map(s=>s.padStart("2", '0')).join("/")}, {'ha.style.marginLeft': '5px', 'ha.style.paddingLeft': '5px', 'ha.style.marginBottom': '5px', 'ha.style.fontSize': '14px'}),
+    smart({ div: $=>$.meta.day.split("-").slice(1,3).reverse().map(s=>s.padStart("2", '0')).join("/")}, {'ha.style.marginLeft': '5px', 'ha.style.paddingLeft': '5px', 'ha.style.marginBottom': '5px', 'ha.style.fontSize': '14px', 'ha.style.fontWeight': $=>$.scope.today.getMonth()+1 == $.meta.day.split("-")[1] && $.scope.today.getDate()  == $.meta.day.split("-")[2] ? '900':'inherit'}),
 
     { div: {
       a: { style: {position: "relative", width: "100%", paddingLeft: "5px", paddingRight: "5px",  marginLeft: "5px", fontSize:"11px"}},
@@ -395,9 +396,72 @@ const Calendar = { div: {
   
 }}
 
+// $$ means sub app / new dynamic render
+const $$ProjectEditor = ({parent, project, onConfirm, onCancel, onDelete}={})=>({ div: {
+
+  props: {
+    parent: parent, 
+    projectName: project.name,
+    projectColor: project.color,
+  },
+
+  a: { style: `
+    width: 100%;
+    height: 100%;
+    position: fixed;
+    background: #00000033;
+    top: 0px;
+    left: 0px;
+    z-index: 9999;`
+  },
+
+  handle: { onclick: ($, evt) => { evt.stopPropagation(); onCancel() } },
+
+  '=>':[
+
+    { div: {
+
+      a: { style: `
+        width: 50%;
+        height: 50%;
+        position: relative;
+        background: white;
+        top: 25%;
+        left: 25%;
+        border: 3px solid black;
+        border-radius: 25px;
+        padding: 25px;`
+      },
+
+      handle: { onclick: ($, evt) => { evt.stopPropagation(); } },
+
+      '=>': [
+
+        { h5: { text: "Project" }},
+        { input: { 
+          'ha.value': Bind($ => $.scope.projectName)
+        }},
+
+        { h5: { text: "Color" }},
+        { input: { 
+          'ha.value': Bind($ => $.scope.projectColor)
+        }},
+
+        { br: {}},
+        { br: {}},
+
+        { button: { text: "Cancel", handle: { onclick: $=>onCancel() }}},
+        { button: { text: "Delete", handle: { onclick: $=>onDelete() }}},
+        { button: { text: "Confirm", handle: { onclick: $=>onConfirm({name: $.scope.projectName, color: $.scope.projectColor}) }}}
+      ]
+    }}
+    
+  ]
+  
+}})
 
 const ProjectsToolbar = { div: { meta: {forEach: "project", of: $=>$.scope.projects},
-  a: { 
+  attrs: { 
     style: $=>({
       display: "inline-block",
       width: "100%", height: "40px",
@@ -406,14 +470,42 @@ const ProjectsToolbar = { div: { meta: {forEach: "project", of: $=>$.scope.proje
     }),
     draggable:"true",
   },
+
+  def: {
+    openProjectEditor: $=>{
+      let app;
+
+      let onConfirm = (edits)=>{
+        $.scope.editProject($.meta.project, edits)
+        app.destroy()
+        app = undefined
+      }
+      let onCancel = ()=>{
+        app.destroy()
+        app = undefined
+      }
+      let onDelete = ()=>{
+        $.scope.deleteProject($.meta.project)
+        app.destroy()
+        app = undefined
+      }
+      app = RenderApp(document.body, $$ProjectEditor({parent: $.this, project: $.meta.project, onConfirm: onConfirm, onCancel: onCancel, onDelete: onDelete}))
+    }
+  },
   
   handle: {
     ondragstart: ($, evt)=>{
       $.scope.moovingPlan = { new_plan: true, plan: { project: $.meta.project } }
+    },
+    onclick: $=>{
+      $.this.openProjectEditor()
     }
   },
   
-  text: [ {div: { a:{style:"width: 100%; height: 100%; display:flex; justify-content: center; align-items: center"}, text: $=>$.meta.project.name}} ]
+  '=>': { div: { 
+    'a.style': "width: 100%; height: 100%; display:flex; justify-content: center; align-items: center", 
+    text: $=>$.meta.project.name
+  }}
 }}
 
 
@@ -431,20 +523,43 @@ export const HomePage = async (state)=>{ return {
       monthLabelMapping: {"1":"Gennaio","2":"Febbraio", "3":"Marzo", "4":"Aprile", "5":"Maggio", "6":"Giugno", "7":"Luglio", "8":"Agosto", "9":"Settembre", "10":"Ottobre", "11":"Novembre", "12":"Dicembre"},
 
       days: getMonthDays(state !== undefined ? new Date(state.viewDay) : new Date()),//["2022-4-1", "2022-4-2", "2022-4-3", "2022-4-4", "2022-4-5"],
-      plans: state !== undefined ? state.plans : {
+      plans: state !== undefined ? state.plans : {},//{
         // "2022-4-1":[
         //   { slot_idx: 0, len: 2, project: { name: "proj1", color: "#f1c40f"} },
         //   { slot_idx: 2, len: 2, project: { name: "proj2", color: "#1abc9c"} }
         // ], 
         // "2022-4-2":[], "2022-4-3":[], "2022-4-4":[], "2022-4-5":[]
-      },
-      projects: [
-        { id: "proj1", name: "Project 1", color: "#f1c40f"},
-        { id: "proj2", name: "Project 2", color: "#1abc9c"},
-        { id: "proj3", name: "Project 3", color: "#e74c3c"},
-        { id: "proj4", name: "Project", color: "#2ecc71"}
-      ],
+      //},
+      projects: state !== undefined ? state.projects : [], //[
+      //   { id: "proj1", name: "Project 1", color: "#f1c40f"},
+      //   { id: "proj2", name: "Project 2", color: "#1abc9c"},
+      //   { id: "proj3", name: "Project 3", color: "#e74c3c"},
+      //   { id: "proj4", name: "Project 4", color: "#2ecc71"}
+      // ],
+      projectUUID: state !== undefined ? state.projectUUID : -1,// 4,
       moovingPlan: undefined,
+
+      storageInLoading: false,
+    },
+
+    onInit: $=>{
+      if(state === undefined){
+        $.this.storageInLoading = true
+        try{
+          $.this.storage.load()
+        }catch (e){
+          console.log(e)
+          $.this.projectUUID = 4,
+          $.this.projects = [
+            { id: "proj1", name: "Project 1", color: "#f1c40f"},
+            { id: "proj2", name: "Project 2", color: "#1abc9c"},
+            { id: "proj3", name: "Project 3", color: "#e74c3c"},
+            { id: "proj4", name: "Project 4", color: "#2ecc71"}
+          ],
+          $.this.plans = {}
+        }
+        $.this.storageInLoading = false
+      }
     },
 
     signals: {
@@ -454,12 +569,57 @@ export const HomePage = async (state)=>{ return {
     def: {
       editPlan: ($, day, new_plan)=>{
         $.this.plans[day] = new_plan
+        $.this.storage.save()
         // $.this._mark_plans_as_changed() // inutile per la logica attuale
         $.this.plannedDayEdited.emit(day, new_plan)
       },
 
-      // renameProject
+      createNewProject: $=>{
+        $.this.projectUUID++
+        $.this.projects = [...$.this.projects, { id: "proj"+$.this.projectUUID, name: "Project "+$.this.projectUUID, color: "#353535"}]
+      },
+
+      editProject: ($, projectRef, edits)=>{
+        let {name, color} = edits
+        projectRef.name = name
+        projectRef.color = color
+        $.scope.projects = [...$.scope.projects]
+        $.scope.days = [...$.scope.days]
+      },
+      
+      deleteProject: ($, project)=>{
+        $.scope.projects = $.scope.projects.filter(p=>p!==project)
+        $.scope.days = [...$.scope.days]
+      },
+
+      storage: {
+        save: $=>{
+          localStorage.setItem("demo.cle.planner2.projectUUID", JSON.stringify({val: $.scope.projectUUID}))
+          localStorage.setItem("demo.cle.planner2.projects", JSON.stringify({val: $.scope.projects}))
+          localStorage.setItem("demo.cle.planner2.plans", JSON.stringify({val: $.scope.plans}))
+          console.log("writing", $.scope.plans)
+        },
+        getOrError: ($, prop)=>{
+          let data = JSON.parse(localStorage.getItem(prop))
+          console.log("readed..", data)
+          if (data !== null && data !== undefined){
+            return data.val
+          }
+          throw Error("prop not found")
+        },
+        load: $=>{
+          console.log("load..")
+          $.scope.projectUUID = $.this.storage.getOrError("demo.cle.planner2.projectUUID")
+          $.scope.projects = $.this.storage.getOrError("demo.cle.planner2.projects")
+          $.scope.plans = $.this.storage.getOrError("demo.cle.planner2.plans")
+        }
+      }
     },
+
+    on: { this: {
+      plansChanged: $=>{if (!$.this.storageInLoading) {$.this.storage.save(); console.log("Plans changed!!")}},
+      projectsChanged: $=>{if (!$.this.storageInLoading) {$.this.storage.save(); console.log("Projects changed!!")}},
+    }},
 
 
     "=>": [ MainLayout({
@@ -480,7 +640,7 @@ export const HomePage = async (state)=>{ return {
               }else {
                 previusMonth.setMonth(previusMonth.getMonth()-1)
               }
-              Router.navigate("home", {viewDay: previusMonth, plans: $.scope.plans})
+              Router.navigate("home", {viewDay: previusMonth, plans: $.scope.plans, projects: $.scope.projects, projectUUID: $.scope.projectUUID})
             } }, 'a.style': { background: 'transparent', border: 'none', color: '#dddddd', cursor: 'pointer', fontSize: '1.9rem', fontWeight: 100} }),
 
             { span: {
@@ -497,7 +657,7 @@ export const HomePage = async (state)=>{ return {
               }else {
                 nextMonth.setMonth(nextMonth.getMonth()+1)
               }
-              Router.navigate("home", {viewDay: nextMonth, plans: $.scope.plans})
+              Router.navigate("home", {viewDay: nextMonth, plans: $.scope.plans, projects: $.scope.projects, projectUUID: $.scope.projectUUID})
             } }, 'a.style': { background: 'transparent', border: 'none', color: '#dddddd', cursor: 'pointer', fontSize: '1.9rem', fontWeight: 100} }),
           ]
         }}
@@ -510,7 +670,19 @@ export const HomePage = async (state)=>{ return {
 
           "=>":[
             { div: { text: "Projects", 'ha.style.marginTop': '25px', 'ha.style.fontSize': '1.6rem', 'ha.style.marginBottom': '15px'  }}, 
-            ProjectsToolbar
+
+            { button: {
+              text: "+",
+
+              'a.class': "waves-effect waves-light btn",
+              'a.style': "width: 100%; margin-bottom: 15px",
+
+              handle: { onclick: $=>{
+                $.scope.createNewProject()
+              }}
+            }},
+
+            ProjectsToolbar,
           ]
         }},
 
