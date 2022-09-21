@@ -5604,6 +5604,48 @@ const appRxJs = async ()=>{
   ))
 }
 
+const appDemoDynamicDbusSignal = async ()=>{
+
+  RenderApp(document.body, cle.root({
+
+    onInit: $=>{
+
+      $.dbus.newSignal("counterChanged")
+      
+
+      let counter = 0
+      let interval;
+      interval = setInterval(() => {
+        if (counter >= 10){
+          clearInterval(interval)
+
+          $.dbus.counterChanged.emit("COUNTER ENDED! " + counter)
+        } else {
+          $.dbus.counterChanged.emit(counter++)
+        }
+      }, 1000);
+
+    }
+
+  },
+    
+    cle.h2("Test Dynamic Dbus Signal"),
+    
+    cle.div({
+      let_latest_counter_value: undefined,
+
+      onInit: $ => {
+        $.dbus.subscribe("counterChanged", $.this, (val)=>{
+          console.log("arrived:", val);
+          $.this.latest_counter_value = val // there is no other way to renderize a value other than in a property. this will be renderized in a div
+        })
+      }
+    }, 
+      "Counter (deliverd by dynamic Dbus Signal): ", $ => $.scope.latest_counter_value
+    )
+  ))
+}
+
 // app0()
 // test2way()
 // appTodolist()
@@ -5635,7 +5677,8 @@ const appRxJs = async ()=>{
 // appDemoMetaEditsPushBack()
 // appDemoExternalPropsAndDyDef()
 // appDemoTodoCard()
-appRxJs()
+// appRxJs()
+appDemoDynamicDbusSignal()
 
 
 

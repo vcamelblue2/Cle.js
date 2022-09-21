@@ -286,7 +286,12 @@ class DBus {
   constructor(){
     this.signals = {}
     this.handlersToRegister = {}
-    this.proxy = {}
+    this.proxy = {
+      newSignal: (name, definition="stream => void")=>this.addSignal(name, definition),
+      // todo: destroy signal
+      subscribe: (name, who, handler) => this.addSignalHandler(name, who, handler),
+      unsubscribe: (name, who) => this.signals[name].removeHandler(who)
+    }
   }
 
   hasSignal(name){
