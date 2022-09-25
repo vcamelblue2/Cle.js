@@ -548,7 +548,7 @@ class PlaceholderDeclaration{
       return this.default_component
     }
 
-    if (typeof component === "function" || typeof component === "string" ){
+    if (typeof component === "function" || typeof component === "string" || (component instanceof UseComponentDeclaration) ){ // todo: è giusto che passi liscia una use?
       return component
     }
 
