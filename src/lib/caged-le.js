@@ -1116,6 +1116,7 @@ class Component {
     this.properties.el = this.html_pointer_element // ha senso??? rischia di spaccare tutto..nella parte di sotto..
     this.properties.parent = this.parent?.$this?.this // ha senso??? rischia di spaccare tutto.. recursive this.parent.parent & parent.parent le.x.parent.. etc..
     this.properties.comp_id = this.id
+    this.properties.getAsExternalProperty = (prop_name)=>{let found = this.properties[prop_name]; if (found instanceof Property){return found}} // stupid utils to retrive the real Property behind the $.this proxy..useful to be used as "external" deps in a dynamic context.. (via set value as useExternal([extractedProp], $=>extractedProp.value))
 
     // todo: qualcosa del genere per gli attr
     // this.properties.attr = ComponentProxy(this.attrProperties)

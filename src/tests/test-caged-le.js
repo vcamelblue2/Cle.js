@@ -5650,6 +5650,9 @@ const appDemoGetCleElByDomEl = async ()=>{
 
   RenderApp(document.body, cle.root({
 
+    let_prop_to_follow: "prop1",
+    let_followCostumCleCompProp: undefined,
+
     afterChildsInit: $=>{
       let dom_el = document.querySelector("h2")
       console.log(dom_el)
@@ -5665,9 +5668,14 @@ const appDemoGetCleElByDomEl = async ()=>{
 
       // ------- //
 
+      // novità getAsExternalProperty in ogni $.this per fare questo trick qui sotto e agganciarsi in modo dinamico ad OGNI prop (pasando o trovando l'el e la prop in questione..)
+      let myCustomCleComponent = $.u.getCleElementByDom("myCustomCleComponent")
+      let propToFollowAsProp = myCustomCleComponent.getAsExternalProperty($.this.prop_to_follow)
+      $.this.followCostumCleCompProp = useExternal([propToFollowAsProp], $=>propToFollowAsProp.value)
+      
       setTimeout(() => {
-        $.u.getCleElementByDom("myCustomCleComponent").prop1 = "100 changed!"
-      }, 2000);
+        myCustomCleComponent.prop1 = "100 changed!"
+      }, 3000);
     }
 
   },
@@ -5678,7 +5686,9 @@ const appDemoGetCleElByDomEl = async ()=>{
     cle.myCustomCleComponent({
       let_prop1: 1,
       let_prop2: 2
-    }, f`@prop1`, " - ", f`@prop2`)
+    },"myCustomCleComponent:", f`@prop1`, " - ", f`@prop2`),
+
+    cle.div({}, "Followed in Root: ", f`@followCostumCleCompProp`)
     
   ))
 }
@@ -5791,14 +5801,13 @@ const appDemoLazyRuntimeRender = async ()=>{
 // appDemoTodoCard()
 // appRxJs()
 // appDemoDynamicDbusSignal()
-// appDemoGetCleElByDomEl()
-appDemoLazyRuntimeRender()
+appDemoGetCleElByDomEl()
+// appDemoLazyRuntimeRender()
 
 
 // todo: capire se estendere $.xxx con qualcosa tipo: $.query(""), ovvero usare la logica di $.u.getCleElementByDom etc, per trovare gli elementi le anche in props etc. basterebbe migliorare static parser per aggiungere le parentesi e apici..problema: porta un tema non indifferente, ovvero che le persone devono sapere che NON verrà aggiornata la deps cambiando proprietà "querybili" (ovvero cose native HTML), a meno di: observer su quella roba li, oppure (più semplice) funzione disponibile lato dev "recompute_XXXpropXXX_deps" necessaria per ricompilare le deps (anche se in realtà basta un nuovo "set value" come lambda identico per riaggiornare le deps..)
 
 // todo: migliorare Extended e Use, in particolare al posto della signature: (component, redefinitions=undefined, { strategy="merge", init=undefined, passed_props=undefined, inject=undefined})   dovrei avere    (component, redefinitions=undefined, { strategy="merge", init=undefined, passed_props=undefined, inject=undefined}, inject=undefined, ...extra_childs)   in modo da poter 1) evitare un dict con injetc:, 2) avere extrachild per migliorare la sintassi di inserimento figli (solo diretti!) [questo da esplorare meglio, potrebbe avere una sintassi tipo: "before", "after", "idx: 0" per avere inserimenti mirati! ], 3) controllare il supporto ad array!! per inject di N elementi e non uno solo..(posto che attualmente potresti injettare un wrapper con gli N childs..)
-
 
 
 // todo: rispetto ai dynamic signal di sotto in realtà a me per disaccoppiare il child dal parent mi basta davvero solo poter creare segnali dbus a runtime e fare in modo che i child li invino ai parent..per il parent to child invece è composizione e delga, quindi lo devo conoscere ed esporre metodi intermedi (interfaccia) all'esterno, più stabili.
@@ -5847,6 +5856,7 @@ appDemoLazyRuntimeRender()
 //   ]
 // }}
 
+//////// OLD
 
 // OLD, superato dal ref sopra..
 // // todo
@@ -5872,3 +5882,11 @@ appDemoLazyRuntimeRender()
 
 //   }})
 // }
+
+// old, ora superato da lazyRender in u
+// todo: real dynamic childs definition, SOLO per i tipo con meta (if e le-for). in pratica nella childs si potrebbe passare qualcosa del tipo: '=>': LazyViewEval(($parent)=>[...]), ovvero qualcosa che viene richiamato (la parse) prima della create.. in modo da poter cambiare dinamicamente il template! visto che loro già supportano la lazy eval in un certo senso del template.
+//       -- per questa idea al posto della roba di sopra, qualcosa di più strutturato, che ti porta nel modo "react" style: ci vorrebbe una signature tipo LazyComponentDef(ifCondition: $parent=>bool [usare anche per agganciarsi alle dipendenze!], cachingComparerFunc: $parent=>bool, templateGenFunc: ($parent, state)=>compoent_obj_def[]) BY Design Support Array! (se possibile..)
+//       -- es LazyComponentDef($=>$.scope.todolist.length > 0, pass, ($p, state)=>[{ div: {
+//              '': { li: $p.scope.todolist.map((todo)=>({li: "TODO: "+ todo}) }
+//          }})]
+//       -- state serve per far sopravviviere lo stato alle varie changes (se deve!) in modo che possa tenere anche un suo stato..
