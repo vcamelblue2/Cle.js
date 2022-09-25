@@ -1,4 +1,4 @@
-import { Bind, Extended, f, fArgs, LE_BackendApiMock, LE_LoadCss, LE_LoadScript, pass, Placeholder, RenderApp, smart, Alias, SmartAlias, ExternalProp, useExternal, toInlineStyle, Use, cle, Switch, Case } from "../lib/caged-le.js"
+import { Bind, Extended, f, fArgs, LE_BackendApiMock, LE_LoadCss, LE_LoadScript, pass, Placeholder, RenderApp, smart, Alias, SmartAlias, ExternalProp, useExternal, toInlineStyle, Use, cle, Switch, Case, str, str_ } from "../lib/caged-le.js"
 import { NavSidebarLayout } from "../layouts/layouts.js"
 
 /*

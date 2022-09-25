@@ -3269,7 +3269,13 @@ const cle = new Proxy({}, {
   set: function(_target, prop, value) {}
 })
 
+// export 
+// fast define string (without "") with this function, e.g to assign id { id: str.app }
+const str = new Proxy({}, { get: (_, prop, __)=>{ return prop },set: function(_target, prop, value) {} })
+// export 
+// fast define string (without "") with this function with "_" as " ", eg to: { button: { text: str_.inc_counter }}
+const str_ = new Proxy({}, { get: (_, prop, __)=>{ return prop.replaceAll("_", " ")  },set: function(_target, prop, value) {} })
 
 // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // 
 
-export { pass, none, smart, smartFunc as f, smartFuncWithCustomArgs as fArgs, Use, Extended, Placeholder, Bind, Alias, SmartAlias, ExternalProp, useExternal, Switch, Case, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock, cle }
+export { pass, none, smart, smartFunc as f, smartFuncWithCustomArgs as fArgs, Use, Extended, Placeholder, Bind, Alias, SmartAlias, ExternalProp, useExternal, Switch, Case, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock, cle, str, str_ }
