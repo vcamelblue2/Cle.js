@@ -802,6 +802,22 @@ const RenderApp = (html_root, definition)=>{
 
 }
 
+// Exposed as $.u (utils), return array of components, for a bettere "react style" rendere (via func). this will share $le, $dbus, parent, scope etc
+const LazyRender = (parent, definition_func, state, ...args)=>{
+
+  let definitions = definition_func(parent.$this.this, state, ...args)
+
+  if (!Array.isArray(definitions)){
+    definitions = [definitions]
+  }
+  
+  let components = definitions.map(d=>Component.componentFactory(parent, d, parent.$le, parent.$dbus))
+  components.map(c=>c.buildSkeleton())
+  components.map(c=>c.create())
+
+  return components
+}
+
 // todo: routing (also partial!) con history api
 // class VDoom {
 //   constructor(renderRoot, route){
@@ -882,6 +898,10 @@ class Component {
   isMyParentHtmlRoot // boolean
   parent // Component
   childs // Component []
+  dynamicChilds = [] // Component [] solo per la lazy render!
+  dynamicChildsBeforeDestroy = ($parent, state)=>{} // function to call before childs being destroyed (maybe to save state!)
+  dynamicChildsAfterDestroy = ($parent, state)=>{} // function to call after childs being destroyed (maybe to save state!)
+  dynamicChildsState = {} // obj useful to restore and save state
 
   properties = {}// real Props Container, exposed (in a certain way) to the dev. Contains: [Property, ()=> ... manual property changes signal launcher, SignalProxy (aka signals api for dev, .emit..), def namespace (std object), def]
   // attrProperties = {}// real attr Props Container // todo: qualcosa del genere per gli attr
@@ -1103,9 +1123,69 @@ class Component {
     // todo: parent and le visible properties only..
     this.$parent = (this.parent instanceof Component) ? ComponentProxy(this.parent.properties) : undefined
     this.$scope = ComponentScopeProxy(this)
-    this.$this = ComponentProxy(/*new ComponentProxySentinel(*/{this: ComponentProxy(this.properties), parent: this.$parent, scope: this.$scope,  le: this.$le.proxy, ctx: this.$ctx.proxy, dbus: this.$dbus.proxy, meta: this.$meta} /*)*/ ) //tmp, removed ComponentProxySentinel (useless)
+    this.$this = ComponentProxy(/*new ComponentProxySentinel(*/{this: ComponentProxy(this.properties), parent: this.$parent, scope: this.$scope,  le: this.$le.proxy, ctx: this.$ctx.proxy, dbus: this.$dbus.proxy, meta: this.$meta, u: this.getUtilsProxy() } /*)*/ ) //tmp, removed ComponentProxySentinel (useless)
 
     // mettere private stuff in "private_properties" e "private_signal", a quel punto una strada potrebbe essere quella di avere un "private_this" qui su..ma in teoria dovrebbe essere qualcosa di context, e non solo in me stesso..
+  }
+
+  getUtilsProxy(){ // gemellata con la funzione in iterableview..
+    return ComponentProxy({ 
+      
+      // fastSetScopedVarsAsChanged,
+      changed: ((scope, ...scopedVars)=>{ // todo: capire moolto bene..perchè è utile ma rompe concetti e 
+        for (let v of scopedVars){
+          scope['_mark_'+v+'_as_changed']()
+        }
+      }).bind(undefined, this.$scope),
+
+      // utils per andare ad ottenre l'elemento CLE da elementi HTML/DOM .. per fare cosy tricky :(
+      getCleElementByDom: (dom_el)=>{
+        if (typeof dom_el === 'string'){
+          dom_el = document.querySelector(dom_el)
+        }
+        if (dom_el === null){
+          throw Error("Null-Query-Sel")
+        }
+        return Object.values(this.$le).find(component=>(component instanceof Component) && component.html_pointer_element === dom_el).$this.this
+      },
+      getCleElementsByDom: (...dom_els)=>{
+        console.log(dom_els)
+        if (dom_els.length === 1 && typeof dom_els[0] === 'string'){
+          dom_els = [...document.querySelectorAll(dom_els)]
+        }
+        if (dom_els.length === 0){
+          throw Error("Null-Query-Sel")
+        }
+        return Object.values(this.$le).filter(component=>(component instanceof Component) && dom_els.includes(component.html_pointer_element)).map(el=>el.$this.this)
+      },
+
+      // Lazy Render: dynamic create, get and render template at run time!
+      /**definition_as_func signature:  (parent.$this.this, state, ...args) => obj || obj[] */
+      lazyRender: (definition_as_func, {afterCreate=undefined, beforeDestroy=undefined, afterDestroy=undefined, auto=false}={}, ...args)=>{
+        if (auto){
+          this.destroyDynamicChilds(undefined, false, false)
+        }
+
+        if(beforeDestroy){
+          this.dynamicChildsBeforeDestroy = beforeDestroy
+        }
+          
+        if (afterDestroy){
+          this.dynamicChildsBeforeDestroy = afterDestroy
+        }
+
+        let dynComp = LazyRender(this, definition_as_func, this.dynamicChildsState, ...args)
+        this.dynamicChilds = this.dynamicChilds.concat(dynComp)
+        
+        if (afterCreate !== undefined){ setTimeout(() => { afterCreate() }, 10); }
+        
+        return dynComp.map(e=>e.$this) // restituisco il loro $this (per la rimozione by ref)
+      },
+      getLazyRenderState: () => this.dynamicChildsState,
+      clearLazyRender: (generatedDynComp, clearState=false, clearDestroyHook=false)=>{
+        this.destroyDynamicChilds(generatedDynComp, clearState, clearDestroyHook)
+      }
+    })
   }
 
   // step 3: create and renderize
@@ -1962,6 +2042,7 @@ class Component {
   // regenerate(){}
   destroy(){
     this.childs?.forEach(child=>child.destroy())
+    this.destroyDynamicChilds(undefined, true, true)
 
     this.hooks.onDestroy !== undefined && this.hooks.onDestroy()
     
@@ -1986,6 +2067,30 @@ class Component {
 
     // todo: destroy properties and signal well..
 
+  }
+
+  destroyDynamicChilds(childsToDestroy, clearState=false, clearDestroyHook=false){ // array of component.$this
+
+    this.dynamicChildsBeforeDestroy(this.parent.$this, this.dynamicChildsState)
+
+    if (childsToDestroy === undefined){
+      this.dynamicChilds?.forEach(child=>child.destroy())
+      this.dynamicChilds = []
+    }
+    else {
+      this.dynamicChilds?.forEach(child=>childsToDestroy.includes(child.$this) && child.destroy())
+      this.dynamicChilds = this.dynamicChilds?.filter(child=>!childsToDestroy.includes(child.$this))
+    }
+
+    this.dynamicChildsAfterDestroy(this.parent.$this, this.dynamicChildsState)
+
+    if (clearState){
+      this.dynamicChildsState = {}
+    }
+    if (clearDestroyHook){
+      this.dynamicChildsBeforeDestroy = ($parent, state)=>{}
+      this.dynamicChildsBeforeDestroy = ($parent, state)=>{}
+    }
   }
 
   static parseComponentDefinition = (definition) => {
@@ -2961,7 +3066,7 @@ class IterableViewComponent{
 
     this.$parent = (this.parent instanceof Component) ? ComponentProxy(this.parent.properties) : undefined
     this.$scope = ComponentScopeProxy(this)
-    this.$this = ComponentProxy({parent: this.$parent, le: this.$le.proxy, scope: this.$scope, ctx: this.parent.$ctx.proxy, meta: this.parent.$meta})
+    this.$this = ComponentProxy({parent: this.$parent, le: this.$le.proxy, scope: this.$scope, ctx: this.parent.$ctx.proxy, meta: this.parent.$meta }) // qui $.u nonha senso di esister, visto che viene valutato usato solo per valutare la "of", quindi per cercare le deps. utils non serve!
   }
 
 

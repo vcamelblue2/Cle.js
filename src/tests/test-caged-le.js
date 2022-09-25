@@ -4174,7 +4174,7 @@ const appDemoDbus = async ()=>{
 }
 
 const appDemoAlias = async ()=>{
-  
+  // novità: $.u.changed('values', 'entries') per markare as changed (solo in scope) cose senza _mark..
 
   const MyInput = { 
     input: {
@@ -5646,6 +5646,118 @@ const appDemoDynamicDbusSignal = async ()=>{
   ))
 }
 
+const appDemoGetCleElByDomEl = async ()=>{
+
+  RenderApp(document.body, cle.root({
+
+    afterChildsInit: $=>{
+      let dom_el = document.querySelector("h2")
+      console.log(dom_el)
+
+      let cle_el = $.u.getCleElementByDom(dom_el)
+      console.log(cle_el)
+
+      console.log(dom_el === cle_el.el)
+
+      // ------- //
+
+      console.log("list", $.u.getCleElementsByDom("h2"))//...document.querySelectorAll("h2")))
+
+      // ------- //
+
+      setTimeout(() => {
+        $.u.getCleElementByDom("myCustomCleComponent").prop1 = "100 changed!"
+      }, 2000);
+    }
+
+  },
+    
+    cle.h2("Test Get Cle El By Dom El"),
+    cle.h2("Another Test Get Cle El By Dom El"),
+
+    cle.myCustomCleComponent({
+      let_prop1: 1,
+      let_prop2: 2
+    }, f`@prop1`, " - ", f`@prop2`)
+    
+  ))
+}
+
+const appDemoLazyRuntimeRender = async ()=>{
+
+  await Promise.all([
+    LE_LoadCss('https://fonts.googleapis.com/css?family=Roboto:300,300italic,700,700italic'),
+    LE_LoadCss('https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.css'),
+    LE_LoadCss('https://cdnjs.cloudflare.com/ajax/libs/milligram/1.4.1/milligram.min.css'),
+  ])
+
+  const RuntimeComponet = ($parent, state, {counter=0})=>{
+    console.log("called lazy!")
+
+    state.renderedTimes = state.renderedTimes === undefined ? 1 : (state.renderedTimes + 1)
+
+    return cle.div({}, 
+      cle.b({}, "Rendered Times: "+state.renderedTimes),
+
+      cle.div({},
+        (counter % 2 === 0 ? 
+          cle.b({}, counter + " is even!") :
+          cle.i({}, counter + " is odd!"))
+      ),
+
+      cle.br({}),
+
+      cle.div(f`'I follow the text: ' + @text`),
+    )
+  }
+
+  RenderApp(document.body, cle.root({
+    id: str.app, 
+
+    let_counter: 0,
+    let_text: "",
+
+    let_simulateCustomRemove: false
+  },
+    
+    cle.h2("Test Runtime Lazy Component geeration"),
+
+    cle.h5({}, "Counter: ", f`@counter`),
+    cle.button({h_onclick: f`{ @counter +=1 }`}, "Inc Counter"),
+
+    cle.div({}, "Text: ", cle.input({ha_value: Bind(f`@text`)})),
+
+    cle.runtimeComp({
+
+      on_scope_counterChanged: $=>{
+        $.u.clearLazyRender()
+        $.u.lazyRender(RuntimeComponet, pass, {counter: $.scope.counter})
+      },
+
+    }),
+
+    cle.div({ meta: {if: f`@simulateCustomRemove`}}, 
+      cle.hr(),
+
+      cle.h4("With custom remover"),
+
+      cle.runtimeComp({
+        let_dynComponent: [],
+
+        on_scope_counterChanged: $=>{
+          
+          if ($.scope.counter % 2){
+            $.u.clearLazyRender($.this.dynComponent)
+          }
+          $.this.dynComponent = [...$.this.dynComponent, ...$.u.lazyRender(RuntimeComponet, pass, {counter: $.scope.counter})]
+        },
+
+      }),
+    )
+    
+  ))
+}
+
 // app0()
 // test2way()
 // appTodolist()
@@ -5678,8 +5790,14 @@ const appDemoDynamicDbusSignal = async ()=>{
 // appDemoExternalPropsAndDyDef()
 // appDemoTodoCard()
 // appRxJs()
-appDemoDynamicDbusSignal()
+// appDemoDynamicDbusSignal()
+// appDemoGetCleElByDomEl()
+appDemoLazyRuntimeRender()
 
+
+// todo: capire se estendere $.xxx con qualcosa tipo: $.query(""), ovvero usare la logica di $.u.getCleElementByDom etc, per trovare gli elementi le anche in props etc. basterebbe migliorare static parser per aggiungere le parentesi e apici..problema: porta un tema non indifferente, ovvero che le persone devono sapere che NON verrà aggiornata la deps cambiando proprietà "querybili" (ovvero cose native HTML), a meno di: observer su quella roba li, oppure (più semplice) funzione disponibile lato dev "recompute_XXXpropXXX_deps" necessaria per ricompilare le deps (anche se in realtà basta un nuovo "set value" come lambda identico per riaggiornare le deps..)
+
+// todo: migliorare Extended e Use, in particolare al posto della signature: (component, redefinitions=undefined, { strategy="merge", init=undefined, passed_props=undefined, inject=undefined})   dovrei avere    (component, redefinitions=undefined, { strategy="merge", init=undefined, passed_props=undefined, inject=undefined}, inject=undefined, ...extra_childs)   in modo da poter 1) evitare un dict con injetc:, 2) avere extrachild per migliorare la sintassi di inserimento figli (solo diretti!) [questo da esplorare meglio, potrebbe avere una sintassi tipo: "before", "after", "idx: 0" per avere inserimenti mirati! ], 3) controllare il supporto ad array!! per inject di N elementi e non uno solo..(posto che attualmente potresti injettare un wrapper con gli N childs..)
 
 
 
