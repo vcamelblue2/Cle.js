@@ -1,4 +1,4 @@
-import { Bind, Extended, f, fArgs, LE_BackendApiMock, LE_LoadCss, LE_LoadScript, pass, Placeholder, RenderApp, smart, Alias, SmartAlias, ExternalProp, useExternal, toInlineStyle, Use, cle, Switch, Case, str, str_ } from "../lib/caged-le.js"
+import { Bind, Extended, f, fArgs, LE_BackendApiMock, LE_LoadCss, LE_LoadScript, pass, Placeholder, RenderApp, smart, Alias, SmartAlias, ExternalProp, useExternal, toInlineStyle, Use, cle, Switch, Case, str, str_ , ExtendSCSS} from "../lib/caged-le.js"
 import { NavSidebarLayout } from "../layouts/layouts.js"
 
 /*
@@ -94,7 +94,7 @@ const component = {
     "private:"? def: {
       resetCounter: $ => {
         $.this.counter = 0
-        $.this.counterReset.emit()
+        $.this.counterReset.emit() // also lazy: $.this.counterReset.emitLazy(10)
       }, 
 
       utils: { // def namespace example
@@ -140,8 +140,22 @@ const component = {
       onclick: ($, e) => $.this.count++
     },
 
-    css: [ ".class { bla:bli ... }", $=>".r0 { .."+$.this.somedeps +"}" ] | {rule1: ".class { bla:bli ... }", rule2: $=>".r0 { .."+$.this.somedeps +"}"} // todo..magari qualcosa di più complesso..come hoisting (via replacer, o anche per i subel), or namaed definition (tipo le)..oppure per automatizzare l'hoisting =>  css: [ ".class { bla:bli ... }", ".class2 { foo:bar; ...", NoHoisting("sostanzialmente ::ng-dep..")]
+    when: { // html event (in the form of addEventListener) configurable!
+      focusin: ($, e) => $.this.count++
+      focusout: { options: {capture: true, useCapture: true}, handler: ($, e) => $.this.count++, }
+    },
 
+    css: [ ".class { bla:bli ... }", $=>".r0 { .."+$.this.somedeps +"}" ] | {rule1: ".class { bla:bli ... }", rule2: $=>".r0 { .."+$.this.somedeps +"}"} // todo..magari qualcosa di più complesso..come hoisting (via replacer, o anche per i subel), or namaed definition (tipo le)..oppure per automatizzare l'hoisting =>  css: [ ".class { bla:bli ... }", ".class2 { foo:bar; ...", NoHoisting("sostanzialmente ::ng-dep..")]
+    
+    s_css:{
+      ".myClass": [{
+        display: "inline"
+      }]
+      ".myClassDynRule": [$=>({
+        display: $.scope.condition ? "inline" : "none"
+      })]
+    } // Use/Extended(component, {s_css: {".myClass": [ExtendSCSS, {opacity: 0.8}]}})
+    
     TODO: states: {
       // "default": "this", // implicit, always chang
 
@@ -5646,6 +5660,52 @@ const appDemoDynamicDbusSignal = async ()=>{
   ))
 }
 
+
+const appDemoDynamicSignal = async ()=>{
+
+  RenderApp(document.body, cle.root({
+
+    onInit: $=>{
+
+      $.u.newSignal("counterChanged")
+      
+
+      let counter = 0
+      let interval;
+      interval = setInterval(() => {
+        if (counter >= 10){
+          clearInterval(interval)
+
+          $.this.counterChanged.emit("COUNTER ENDED! " + counter)
+        } else {
+          $.this.counterChanged.emit(counter++)
+        }
+      }, 1000);
+
+    }
+
+  },
+    
+    cle.h2("Test Dynamic Signal"),
+    
+    cle.div({
+      let_latest_counter_value: undefined,
+
+      onInit: $ => {
+        $.parent.subscribe("counterChanged", $.this, (val)=>{
+          console.log("arrived:", val);
+          $.this.latest_counter_value = val // there is no other way to renderize a value other than in a property. this will be renderized in a div
+        })
+      },
+      onDestroy: $ => {
+        $.parent.unsubscribe("counterChanged", $.this)
+      }
+    }, 
+      "Counter (deliverd by dynamic Signal): ", $ => $.scope.latest_counter_value
+    )
+  ))
+}
+
 const appDemoGetCleElByDomEl = async ()=>{
 
   RenderApp(document.body, cle.root({
@@ -5768,6 +5828,175 @@ const appDemoLazyRuntimeRender = async ()=>{
   ))
 }
 
+const appDemoParentChildsInteraction = async ()=>{
+  // in questo modo posso ragionare a segnali e proprietà anche con gli le-for..senza sporcare i figli!
+
+  RenderApp(document.body, cle.root({
+
+    let_inputs: [1,2,3,4,5],
+
+    let_inputsRefs: [],
+    let_activeInputValue: undefined,
+    let_setActiveInputValue: undefined,
+
+    def_setupChildCommunication: $ => {
+      $.this.inputsRefs = $.u.getCleElementsByDom("input")
+
+      $.this.inputsRefs.forEach(ipt=>{
+        ipt.subscribe("focus", $.this, (focused)=>{
+          const textProp = ipt.getAsExternalProperty("text")
+          $.this.activeInputValue = useExternal(textProp) // smart shortcuts! equals to: useExternal([textProp], $=>textProp.value). ancora meglio: useExternal(ipt.getAsExternalProperty("text"))
+          $.this.setActiveInputValue = $=>v=>{ textProp.value = v } // solo per eivtare di salvare textProp a parte..perchè non posso fare 
+        })
+        ipt.subscribe("blur", $.this, (blured)=>{
+          $.this.activeInputValue = undefined
+        })
+      })
+    },
+
+    afterChildsInit: $ => $.this.setupChildCommunication()
+
+  },
+
+    cle.h2("Test Get Cle El By Dom El"),
+
+    cle.input({ meta: {forEach: "ipt", of: f`@inputs`},
+
+      s_focus: "stream => bool",
+      s_blur: "stream => bool",
+
+      let_focused: false,
+
+      let_text: "",
+      ha_value: Bind(f`@text`),
+
+      h_onfocus: $ => $.this.focus.emit(true),
+      h_onblur: $ => $.this.blur.emit(true),
+    }),
+
+    cle.div({}, "Selected Value Text: ", f`@activeInputValue`),
+    cle.button({ h_onclick: $=>{ $.scope.setActiveInputValue("")} }, "Reste Selected")
+    
+    
+  ))
+}
+
+
+const appDemoSCSS = async ()=>{
+
+  const MyComponent = cle.div({
+    let_text: "original style",
+
+    a_class: "demo-root",
+
+    s_css: {
+      
+      ".demo-root": [$=>({
+        width: "200px",
+        height: "200px",
+        backgroundColor: $.scope.darkTheme ? "black":"#cdcdcd",
+        padding: "25px",
+      })],
+
+      ".my-input": [{
+        color: "red",
+        border: "1px solid red",
+        width: "100px"
+      }]
+
+    }
+  }, 
+    cle.input({a_class: "my-input", ha_value: f`@text`})
+  )
+
+  const ExtendedMyComponent = Extended(MyComponent, {s_css: {".my-input": [ExtendSCSS, {color: "black", border: "none"}]}, let_text:"extended"})
+
+  const ExtendedExtendedMyComponent = Extended(ExtendedMyComponent,{s_css: {".my-input": [ExtendSCSS, {color: "orange"}]}, let_text:"doble extended"})
+
+  const OverwriteMyComponent = Extended(ExtendedMyComponent,{s_css: {".my-input": []}, let_text:"overwrite"}) // clear extend! (full overwite)
+
+  const Extended$FuncMyComponent = Extended(MyComponent, {s_css: {".demo-root": [ExtendSCSS, $=>({backgroundColor: !$.scope.darkTheme ? "black" : "#cdcdcd"})]}, let_text: "original + inverted!"}) //inverted theme!
+
+
+  const Nested = cle.div({ meta: { forEach: "x", of: [1,2]}, // test also foreach!
+    a_class: "demo-nested",
+
+    s_css: {
+      ".demo-nested": [$=>({
+        width: "50px",
+        height: "50px",
+        backgroundColor: !$.scope.darkTheme ? "black":"#cdcdcd",
+      })],
+    }
+  })
+  const MyComponentWithNested = cle.div({
+    a_class: "demo-w-nested",
+
+    s_css: {
+      ".demo-w-nested": [$=>({
+        width: "100px",
+        height: "100px",
+        padding: "25px",
+        backgroundColor: $.scope.darkTheme ? "black":"#cdcdcd",
+      })],
+    }
+  }, 
+    Nested
+  )
+
+  const RedefineNestedOnly = Extended(MyComponentWithNested, { s_css: {".demo-nested": [ExtendSCSS, { backgroundColor: "green"}]}})
+  
+  const RedefineNestedOnlyWithModifier = Extended(MyComponentWithNested, { s_css: {".demo-nested:hover": [ExtendSCSS, { backgroundColor: "green"}], ".demo-w-nested:hover": [ExtendSCSS, {backgroundColor: "#eeeeee"}] }})
+
+  RenderApp(document.body, cle.root({
+    let_darkTheme: false
+  },
+    
+    cle.h2("Test SCSS"),
+
+    cle.button({h_onclick: $=>($.scope.darkTheme = !$.scope.darkTheme)}, "change theme"), cle.br(), cle.br(),
+    
+    cle.input({a_class: "my-input", ha_value: "no style (is scoped!)"}), cle.br(), cle.br(),
+
+    cle.div({a_style:"display: flex; gap: 15px"},
+        
+
+      MyComponent,
+
+      // cle.br(),
+
+      ExtendedMyComponent,
+
+      // cle.br(),
+      
+      ExtendedExtendedMyComponent,
+
+      // cle.br(),
+      
+      OverwriteMyComponent,
+
+      // cle.br(),
+
+      Extended$FuncMyComponent,
+    ),
+
+    cle.h2("Test SCSS Nested"),
+
+    cle.div({a_style:"display: flex; gap: 15px"},
+      MyComponentWithNested,
+
+      RedefineNestedOnly,
+      
+      RedefineNestedOnlyWithModifier,
+      cle.div({},"Hover me!"),
+    ),
+
+    // cle.div({meta: {forEach: "y", of: [...Array(1000).keys()]}}, MyComponentWithNested),
+
+  ))
+}
+
+
 // app0()
 // test2way()
 // appTodolist()
@@ -5801,9 +6030,21 @@ const appDemoLazyRuntimeRender = async ()=>{
 // appDemoTodoCard()
 // appRxJs()
 // appDemoDynamicDbusSignal()
-appDemoGetCleElByDomEl()
+// appDemoDynamicSignal()
+// appDemoGetCleElByDomEl()
 // appDemoLazyRuntimeRender()
+// appDemoParentChildsInteraction()
+appDemoSCSS()
 
+
+// todo nuove definizioni: "input_" un alias di let_ e "output_" un alias di signal
+// todo callback: nuova "property like" a cui non bisogna bindarsi, in sostanza qualcosa che ci permetta di passare una funzione as property..tendenzialmente in realtà basterebbe definirla come funzione, in particolare si userebbe come Callback($=>blablabla). nella pratica questa fa la return di Callback(cback)=>($=>cback($)). per il meccanismo delle deps NON troverò dipendenze, e quindi sarà passata senza problemi..
+// todo: un nuovo nome per alias, perchè deve essere passato ai componenti già fatti magari per binding, e non si capisce..magari "bindable". alternativa: se si passa un Bind a una property diventa un alias..senza estrazione del .value, quindi ho già tutto per fare il bind al di sotto
+
+
+// todo: BUGFIX, in getCleElementByDom deve essere necessario poter scegliere se è body.querySelector oppure this.hmtl_el.querySelector..
+
+// todo: in lazyRender necessario poter scegliere se appendere su o giù..al momento solo giù, ma per robe alla facebook può servire appendere su!
 
 // todo: capire se estendere $.xxx con qualcosa tipo: $.query(""), ovvero usare la logica di $.u.getCleElementByDom etc, per trovare gli elementi le anche in props etc. basterebbe migliorare static parser per aggiungere le parentesi e apici..problema: porta un tema non indifferente, ovvero che le persone devono sapere che NON verrà aggiornata la deps cambiando proprietà "querybili" (ovvero cose native HTML), a meno di: observer su quella roba li, oppure (più semplice) funzione disponibile lato dev "recompute_XXXpropXXX_deps" necessaria per ricompilare le deps (anche se in realtà basta un nuovo "set value" come lambda identico per riaggiornare le deps..)
 
@@ -5825,6 +6066,8 @@ appDemoGetCleElByDomEl()
 //                    un nome migliore sarebbe $.view.xxx proprio perchè è la view del component. oppure $.lle. (locals le) oppure ancora $.local.
 //                    !!! molto importante che (per rispettare anche la natura dynamic by design) che questa volta tengo conto che un figlio può vivere e morire, e dunque devo raccogliere i riferimenti che appartengono a lui (come follow) ed eseguire dopo la create child (in timeout), ma anche dopo OGNI distruzione e creaizone del child: per farlo basta che l'autoaggancio da parte del child chiami una funione nel parent del tipo "connectChildDeps(child)" ed è nella logica del padre avere questa cosa.
 //                    -- resta obbligatorio ragionare ancora bene sul tema che non è detto che il child sia univoco..potrebbero essercene N (classico quando è in un lefor). dovrei cioè avere o non avere un array. questo funziona coi segnali (registrarsi a N segnali), ma poco coi valori (devo avere l'array?). il secondo lo risolvo con gli alias. devo comunque mantere una var nel parent dei named child per andare con l'imperativo,e devo sapere che PUO essere un array.. AKA: parto sempre senza array, se poi mi sto registrando e c'è già allora DEVO convertirlo in array..questo risolve il problema in maneira definitiva ll'interno degli LE FOR, basta che il root che cicla dichiara il child, e quindi si registrerà LOCALMENTE, e tutti i sub potranno usarlo..la risoluzione resta DINAMICA (come scope)
+//                    - forse per risolvere il problema che se imposto il nome in un certo root, poi in un figlio le-for (che magari lo definisce) non posso usare questo meccanismo perchè dovrebbe LUI impostrae chi è il named, e quindi nel parent non può risalire. anche se questo comportamneto è coerente con ciò che fa angular: in un ng-for non puoi usarlo esternamente..AKA: a prescindere non puoi usare il named al di fuori di un le-for, quindi o trovo uno che lo definisce prima o lo metto nel primo le-for, altrimenti sto in un array!
+//                    - e per i casi in cui il name è se stesso? ..forse questa cosa non funziona bene com in angular..
 
 // todo: altra cosa carina nella Use e Extend è quella di aggiungere un parametro "viewRedefinition", che accetta un dict e come value una func che ha questa signature: (requestedSubView, fullView)=>return undefined || obj
 //       es: { "0/div/1": (span)=>{return {...span, p1: "redefined!"} }}
