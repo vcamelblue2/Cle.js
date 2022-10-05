@@ -94,7 +94,8 @@ export const Table = {
                 { div: {
                     a_style: $=>({ 
                       backgroundColor: "#dddddd", borderBottom: "1px solid gray",
-                      color: $.meta.data_col.column === $.scope.latest_sorted_by_col ? 'green' : 'unset'
+                      color: $.meta.data_col.column === $.scope.latest_sorted_by_col ? 'green' : 'unset',
+                      fontWeight: "600"
                     }),
 
                     text: [
