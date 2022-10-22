@@ -2341,10 +2341,10 @@ class Component {
   // }
   // regenerate(){}
   destroy(){
+    this.hooks.onDestroy !== undefined && this.hooks.onDestroy()
     this.childs?.forEach(child=>child.destroy())
     this.destroyDynamicChilds(undefined, true, true)
 
-    this.hooks.onDestroy !== undefined && this.hooks.onDestroy()
     
     this.html_pointer_element?.remove()
     this.css_html_pointer_element?.remove()
