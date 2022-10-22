@@ -388,6 +388,8 @@ class UseComponentDeclaration{
         const first_lvl_special = ["s_css"] // first lvl direct + eventual overwrite
         const second_lvl = ["on", "on_s", "on_a"]
         const first_or_second_lvl = ["def", "private:def"] // check for function (may exist "first lvl namespace")
+
+        const merge_no_warning_starts_with = ['let_', 'on_'] // todo: mettere anche le altre shortcuts
  
         Object.entries(this.redefinitions).forEach(([k,v])=>{
           if (direct_lvl.includes(k)){
@@ -481,6 +483,10 @@ class UseComponentDeclaration{
           else if (impossible_to_redefine.includes(k)){
             _warning.log("CLE - WARNING!", k, "cannot be redefined!")
           }
+          else if (merge_no_warning_starts_with.map(mval=>k.startsWith(mval)).includes(true)){
+            // merge and do not warn
+            resolved[k] = v
+          }
           else {
             _warning.log("CLE - WARNING! ACTUALLY", k, "is not supported in merge strategy! i simply FULL override it! assuming you can control the amount of override..")
             resolved[k] = v
@@ -496,45 +502,49 @@ class UseComponentDeclaration{
     
     // now check for injections!
     let injections = this.inject || {}
-    let childs_def_typology = ["childs", "contains", "text", "view", ">>", "=>", "_", '']
-    const recursive_check_injection = (resolved_component, lvl=0) =>{
-
+    let childs_def_typology = ['', "=>", "text", "_", ">>", "view", "contains", "childs"] // reverse più probabilità..
+    const get_childs_def_typology = (component_def => {
+      for (let t of childs_def_typology) {
+        if (t in component_def){
+          return t
+        }
+      }
+      return null
+    })
+    const recursive_check_childs_injection = (resolved_component, lvl=0) =>{
       // _debug.log("Level: ", lvl, resolved_component)
 
       if (typeof resolved_component === "function" || typeof resolved_component === "string" || (resolved_component instanceof UseComponentDeclaration) ){
+        // _debug.log("Level: ", lvl, "not a component")
         return resolved_component
       }
-
-      // salvo il rif al componente
-      let oj_resolved_component = resolved_component
-
-      if (lvl > 0){ // per i lvl successivi allo 0 devo estrarre la def dal componente
-        resolved_component = resolved_component[getComponentType(resolved_component)]
-      }
-  
-      // _debug.log("Not blocked, level: ", lvl, resolved_component)
-
-      childs_def_typology.forEach( childs_def_key => {
-        let childs_def = resolved_component[childs_def_key] 
+      else {
+        let ctype = getComponentType(resolved_component)
+        let cdef = Object.assign({}, resolved_component[ctype]) // shallow copy def
+        let childs_def_key = get_childs_def_typology(cdef)
         
-        if (childs_def !== undefined ){
-          if (Array.isArray(childs_def)){ // multi child
-            resolved_component[childs_def_key] = childs_def.map(child=> child instanceof PlaceholderDeclaration ? child.getCheckedComponent(injections[child.name]) : recursive_check_injection(child, lvl++)).filter(c=>c!==undefined)
+        // _debug.log("Level: ", lvl, "Is a component: ", resolved_component)
+
+        if (childs_def_key !== null){
+          if (Array.isArray(cdef[childs_def_key])){
+            cdef[childs_def_key] = [...cdef[childs_def_key]] // shallow copy childs
           }
-          else{
-            let child = childs_def // monochild, not null
-            resolved_component[childs_def_key] = child instanceof PlaceholderDeclaration ? child.getCheckedComponent(injections[child.name]) : recursive_check_injection(child, lvl++)
+          else {
+            cdef[childs_def_key] = [cdef[childs_def_key]] // define always as array! also if monochild
           }
+
+          cdef[childs_def_key] = cdef[childs_def_key].map(
+            child => child instanceof PlaceholderDeclaration ? child.getCheckedComponent(injections[child.name]) : recursive_check_childs_injection(child, lvl+1)
+          ).filter(c=>c!==undefined)
+
         }
-      })
 
-      return oj_resolved_component
-    
+        return {[ctype]: cdef }
+      }
+
     }
-
-    recursive_check_injection(resolved)
     
-    return { [componentType]: resolved }
+    return recursive_check_childs_injection({ [componentType]: resolved })
   }
 
   cloneWithoutMeta(){
@@ -592,8 +602,8 @@ class PlaceholderDeclaration{
       }
       return this.default_component
     }
-
-    if (typeof component === "function" || typeof component === "string" || (component instanceof UseComponentDeclaration) ){ // todo: è giusto che passi liscia una use?
+    // _debug.log("ho una inject!!", component)
+    if ((typeof component === "function") || (typeof component === "string") || (component instanceof UseComponentDeclaration) ){ // todo: è giusto che passi liscia una use?
       return component
     }
 
@@ -1255,7 +1265,7 @@ class Component {
         return Object.values(this.$le).find(component=>(component instanceof Component) && component.html_pointer_element === dom_el).$this.this
       },
       getCleElementsByDom: (...dom_els)=>{
-        console.log(dom_els)
+        // console.log(dom_els)
         if (dom_els.length === 1 && typeof dom_els[0] === 'string'){
           dom_els = [...document.querySelectorAll(dom_els)]
         }
