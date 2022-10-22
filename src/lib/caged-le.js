@@ -918,7 +918,7 @@ class ComponentsTreeRoot {
 
   $le // ComponentsContainerProxy
   $dbus
-  $cssEngine
+  $cssEngine // todo: una classe che tiene i css definiti e tiene il "counting" (riferimenti attivi) e che è responsabile degli N css (al posto di ogni componente per se..), però mantiene 1 style per ogni componente. in pratica evita duplicazioni di regole inutili..
 
   // step 1: build
   constructor(html_root, definition){
@@ -2506,6 +2506,11 @@ class Component {
           dash_shortucts_keys.on_dbus[k.substring(8)] = val
         }
       }
+      
+      else if (['class', 'style'].includes(k)){ // Extreme shortcuts for style & class
+        dash_shortucts_keys.attrs[k] = definition[k]
+      }
+
     })
 
     if (Object.keys(dash_shortucts_keys.attrs).length > 0){
