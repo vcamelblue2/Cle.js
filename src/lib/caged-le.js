@@ -81,6 +81,9 @@ const SmartAlias = (getterAndSetterStr, cachingComparer)=>{
     cachingComparer
   )
 }
+// export
+/** Better Naming for "SmartAlias"*/
+const PropertyBinding = SmartAlias
 
 // export
 const ExternalProp = (value, onSet) => {
@@ -813,15 +816,28 @@ class ComponentsContainerProxy {
 }
 
 // TODO: manually specify the remap event, throttling, lazy..
-class Binding {
+class HAttrBinding {
   constructor(bindFunc, remap, event){
     this.bindFunc = bindFunc
     this.remap = remap
     this.event = event
   }
 }
+const HAttrBind = (bindFunc, {remap=undefined, event=undefined}={}) => new HAttrBinding(bindFunc, remap, event)
+
 // export 
-const Bind = (bindFunc, {remap=undefined, event=undefined}={}) => new Binding(bindFunc, remap, event)
+/** may be:
+ * - HAttrBind, for ha_value etc, signature: (bindFunc, {remap=undefined, event=undefined) => 
+ * - PropertyBinding, signature: (getterAndSetterStr, cachingComparer)
+ */
+const Bind = (bindigDefinition, ...args) => {
+  if (isFunction(bindigDefinition)){
+    return HAttrBind(bindigDefinition, ...args)
+  }
+  else if (typeof bindigDefinition === 'string'){
+    return PropertyBinding(bindigDefinition, ...args)
+  }
+}
 
 
 
@@ -1621,8 +1637,8 @@ class Component {
                 setupValue()
 
             }
-            else if (v instanceof Binding){ 
-              _info.log("Found Binding attr: ", k,v, this)
+            else if (v instanceof HAttrBinding){ 
+              _info.log("Found HAttrBinding attr: ", k,v, this)
 
               const _binding = v;
               v = v.bindFunc
@@ -1843,7 +1859,7 @@ class Component {
               setupValue()
 
             }
-            else if (v instanceof Binding){ 
+            else if (v instanceof HAttrBinding){ 
               _info.log("Found binding hattr: ", k,v, this)
 
               const _binding = v;
@@ -1964,7 +1980,7 @@ class Component {
               setupValue()
 
           }
-          else if (v instanceof Binding){ 
+          else if (v instanceof HAttrBinding){ 
             _info.log("Found binding hattr: ", k,v, this)
 
             const _binding = v;
@@ -3607,6 +3623,9 @@ const str_ = new Proxy({}, { get: (_, prop, __)=>{ return prop.replaceAll("_", "
 const input = (def, val) => ({['let_'+def]:val})
 // export
 const output = (sig_name, def='stream => void') =>({['s_'+sig_name]:def})
+
+// export // lang utils to chain class using condition, eg: class: "cls1" + clsIf($.this.condition, 'cls2', 'cls3')
+const clsIf = (condition, clsTrue, clsFalse='')=>condition ? ' '+clsTrue : clsFalse
 // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // 
 
-export { pass, none, smart, smartFunc as f, smartFuncWithCustomArgs as fArgs, Use, Extended, Placeholder, Bind, Alias, SmartAlias, ExternalProp, useExternal, Switch, Case, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock, cle, str, str_, input, output, ExtendSCSS }
+export { pass, none, smart, smartFunc as f, smartFuncWithCustomArgs as fArgs, Use, Extended, Placeholder, Bind, Alias, SmartAlias, PropertyBinding, ExternalProp, useExternal, Switch, Case, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock, cle, str, str_, input, output, ExtendSCSS, clsIf }
