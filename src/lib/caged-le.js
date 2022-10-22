@@ -681,6 +681,20 @@ const analizeDepsStatically = (f, isUseExt=false)=>{
   let $meta_deps = to_inspect.match(/\$.meta\.([_$a-zA-Z]+[0-9]*[.]?)+/g)
   $meta_deps = $meta_deps?.map(d=>d.replace("$.meta.", "").split(".")[0]) // fix sub access!
 
+  let $full_deps = to_inspect.match(/\$.([_$a-zA-Z]+[0-9]*[.]?)+/g)
+  $full_deps?.map(d=>d.split(".").filter(x=>x!=='$')).forEach(els=>{
+    if (['this', 'parent', 'scope', 'le', 'ctx', 'meta', 'u'].includes(els[0])){ pass }
+    else {
+      // console.log("aaaa push!!", $scope_deps, els, $full_deps)
+      if($scope_deps !== undefined){
+        $scope_deps.push(els[0])
+      }
+      else {
+        $scope_deps = [els[0]]
+      }
+    }
+  })
+
   let $external_deps
   if (isUseExt){
     $external_deps = [...f.externalDeps]
@@ -752,6 +766,60 @@ const ComponentProxy = (context, lvl=0)=>{
       }
   })
 }
+// on - off veloce
+// const ComponentProxyBasev2 = ComponentProxy
+
+// $this proxy like ComponentProxy, specific to expose $.scope.xxx as $.xxx 
+const ComponentProxyBase = (context, lvl=0)=>{
+
+  return new Proxy(context, {
+
+      // todo: il secondo if potrebbe non avere senso..o meglio potrei già sapere se sono in un proxybase (settando qualche prop da testare) e testando che la prop cercata non è this, scope, le meta, ctx etc, potrei già sapere se provare con l'estrazione value, andare nello scope o valore diretto..questo per evitare la prima in, che di fatto ricerca nello scope prima della get, e quindi duplicando la ricerca a run time "costosa"
+      
+      get: (target, prop, receiver)=>{
+        if (prop in target){
+          let prop_or_value_target = target[prop];
+          if (prop_or_value_target instanceof Property){
+            return prop_or_value_target.value
+          }
+          return prop_or_value_target
+        }
+        // new: is a pure scope call?? ($.myvar)
+        else if(target.scope !== undefined && prop in target.scope){
+          let prop_or_value_target = target.scope[prop]
+
+          // this condition will never be true, because of the scope-proxy..when you get from proxy this will be the .value and not hte Property!
+          // if (prop_or_value_target instanceof Property){
+          //   return prop_or_value_target.value
+          // }
+          return prop_or_value_target
+        }
+        else{
+          throw Error("Property Not Found")
+        }
+      },
+
+      set: function(target, prop, value) {
+
+        if (prop in target){
+          let prop_or_value_target = target[prop];
+
+          if (prop_or_value_target instanceof Property){
+            prop_or_value_target.value = value
+            return true
+          }
+        }
+        else if(target !== undefined && prop in target.scope){
+          // re-assign! ( use the scope-proxy..so it's a simple remap on $.scope.xxx)
+          target.scope[prop] = value
+          return true
+        }
+        else{
+          throw Error("Property Not Found")
+        }
+      }
+  })
+}
 
 // $scope proxy..dynamically resolve 
 const ComponentScopeProxy = (context)=>{
@@ -768,7 +836,7 @@ const ComponentScopeProxy = (context)=>{
       return findComponentPropHolder(component.parent, prop, search_depth+1, noMetaInScope)
     }
 
-    if (prop in (component.$this?.this || {})){ // fix IterableViewComponent, cannot habe $this..
+    if (prop in (component.properties || {})){ // fix IterableViewComponent, cannot habe $this..
       return component.properties
     }
     if (!noMetaInScope && prop in (component.meta || {})){ // fix IterableViewComponent, cannot habe $this..
@@ -783,6 +851,12 @@ const ComponentScopeProxy = (context)=>{
   }
 
   return new Proxy({}, {
+
+      // has is required now! to find the prop holder and return the real result of "xxx in scope"
+      has(target, key) {
+        target = findComponentPropHolder(context, key)
+        return key in target //|| target.hasItem(key);
+      },
 
       get: (_target, prop, receiver)=>{
         let target = findComponentPropHolder(context, prop)
@@ -1231,7 +1305,7 @@ class Component {
     // todo: parent and le visible properties only..
     this.$parent = (this.parent instanceof Component) ? ComponentProxy(this.parent.properties) : undefined
     this.$scope = ComponentScopeProxy(this)
-    this.$this = ComponentProxy(/*new ComponentProxySentinel(*/{this: ComponentProxy(this.properties), parent: this.$parent, scope: this.$scope,  le: this.$le.proxy, ctx: this.$ctx.proxy, dbus: this.$dbus.proxy, meta: this.$meta, u: this.getUtilsProxy() } /*)*/ ) //tmp, removed ComponentProxySentinel (useless)
+    this.$this = ComponentProxyBase(/*new ComponentProxySentinel(*/{this: ComponentProxy(this.properties), parent: this.$parent, scope: this.$scope,  le: this.$le.proxy, ctx: this.$ctx.proxy, dbus: this.$dbus.proxy, meta: this.$meta, u: this.getUtilsProxy() } /*)*/ ) //tmp, removed ComponentProxySentinel (useless)
 
     // mettere private stuff in "private_properties" e "private_signal", a quel punto una strada potrebbe essere quella di avere un "private_this" qui su..ma in teoria dovrebbe essere qualcosa di context, e non solo in me stesso..
   }
@@ -3398,7 +3472,7 @@ class IterableViewComponent{
 
     this.$parent = (this.parent instanceof Component) ? ComponentProxy(this.parent.properties) : undefined
     this.$scope = ComponentScopeProxy(this)
-    this.$this = ComponentProxy({parent: this.$parent, le: this.$le.proxy, scope: this.$scope, ctx: this.parent.$ctx.proxy, meta: this.parent.$meta }) // qui $.u nonha senso di esister, visto che viene valutato usato solo per valutare la "of", quindi per cercare le deps. utils non serve!
+    this.$this = ComponentProxyBase({parent: this.$parent, le: this.$le.proxy, scope: this.$scope, ctx: this.parent.$ctx.proxy, meta: this.parent.$meta }) // qui $.u nonha senso di esister, visto che viene valutato usato solo per valutare la "of", quindi per cercare le deps. utils non serve!
   }
 
 
