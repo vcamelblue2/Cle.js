@@ -5918,7 +5918,7 @@ const appDemoSCSS = async ()=>{
   const Extended$FuncMyComponent = Extended(MyComponent, {s_css: {".demo-root": [ExtendSCSS, $=>({backgroundColor: !$.scope.darkTheme ? "black" : "#cdcdcd"})]}, let_text: "original + inverted!"}) //inverted theme!
 
 
-  const Nested = cle.div({ meta: { forEach: "x", of: [1,2]}, // test also foreach!
+  const Nested = cle.div({ meta: { forEach: "x", of: f`@testArr`}, handle_onclick: $=>{$.scope.testArr = [1,2,3]}, // test also foreach!
     a_class: "demo-nested",
 
     s_css: {
@@ -5927,9 +5927,9 @@ const appDemoSCSS = async ()=>{
         height: "50px",
         backgroundColor: !$.scope.darkTheme ? "black":"#cdcdcd",
       })],
-    }
+    },
   })
-  const MyComponentWithNested = cle.div({
+  const MyComponentWithNested = cle.div({ let_testArr: [1,2],
     a_class: "demo-w-nested",
 
     s_css: {
@@ -5997,6 +5997,167 @@ const appDemoSCSS = async ()=>{
 }
 
 
+const appDemoFirebase = async ()=>{
+
+  // Import the functions you need from the SDKs you need
+  // import { initializeApp } from "https://www.gstatic.com/firebasejs/9.10.0/firebase-app.js";
+  // TODO: Add SDKs for Firebase products that you want to use
+  // https://firebase.google.com/docs/web/setup#available-libraries
+  const { initializeApp: fb_initializeApp } = await import("https://www.gstatic.com/firebasejs/9.10.0/firebase-app.js");
+  const { getDatabase: fb_getDatabase, ref: fb_ref, get: fb_get, onValue: fb_onValue, child: fb_child, set: fb_set } = await import("https://www.gstatic.com/firebasejs/9.10.0/firebase-database.js");
+
+  // Your web app's Firebase configuration
+  const { dbus_firebaseConfig } = await import("./env.js")
+
+
+  RenderApp(document.body, cle.root({
+
+    props: {
+      salesFilesVersion: undefined,
+    },
+
+    onInit: async $=>{
+
+      // // Initialize Firebase
+      // const fb_app = fb_initializeApp(dbus_firebaseConfig);
+      // const db = fb_getDatabase(fb_app);
+    
+      // fb_onValue(fb_ref(db, 'projects/salesFilesVersion'), (snapshot) => {
+      //   const data = snapshot.val();
+      //   console.log("observer!", data)
+      //   $.this.salesFilesVersion = data
+      // });
+    
+      // fb_get(fb_child(fb_ref(db), `projects/salesFilesVersion`)).then((snapshot) => {
+      //   if (snapshot.exists()) {
+      //     console.log(snapshot.val());
+
+      //     $.this.salesFilesVersion = snapshot.val()
+
+      //     setTimeout(() => {
+      //       fb_set(fb_ref(db, 'projects/salesFilesVersion'), snapshot.val()+1);
+      //     }, 1000);
+
+      //   } else {
+      //     console.log("No data available");
+      //   }
+      // }).catch((error) => {
+      //   console.error(error);
+      // });
+
+    }
+
+  },
+    
+    cle.h2("Test Firebase"),
+
+    cle.div({meta: {if:f`@salesFilesVersion !== undefined`}}, f`'value: ' + @salesFilesVersion`),
+    
+  ))
+}
+
+
+const appDemoCellSelection = async ()=>{
+
+  RenderApp(document.body, cle.root({ 
+    let_inSelection: false, 
+    let_start_pointer:undefined, 
+    let_end_pointer: undefined, 
+    
+    css: [`
+      
+      .unselectable {
+        -webkit-user-select: none;
+        -webkit-touch-callout: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+      }
+      
+    `]},
+      cle.div({ meta: {forEach:"cell", of: [...new Array(100).keys()], define: {index: "i"}}, 
+        let_selected: $ => ($.scope.i >= $.scope.start_pointer && $.scope.i <= $.scope.end_pointer) || ($.scope.i <= $.scope.start_pointer && $.scope.i >= $.scope.end_pointer),
+        a_style: $=>({display: "inline-block", width: "100px", height: "60px", border: $.this.selected ? "1px solid red" : "1px solid black", color: $.this.selected ? "red" : "black"}),
+        a_class: "unselectable",
+        h_onmouseup: $=>{
+          console.log($.meta.cell, "up")
+          $.scope.inSelection = false
+          $.scope.start_pointer = undefined
+          $.scope.end_pointer = undefined
+        },
+        h_onmousedown: $=>{
+          console.log($.meta.cell, "down")
+          $.scope.start_pointer = $.scope.i
+          $.scope.end_pointer = $.scope.i
+          $.scope.inSelection = true
+        },
+        h_onmouseleave: $=>{
+          console.log($.meta.cell, "leave")
+        },
+        h_onmouseover: $=>{
+          console.log($.meta.cell, "over")
+          if($.scope.inSelection){
+            $.scope.end_pointer = $.scope.i
+          }
+        }
+      }, f`@cell`)
+    )  
+  )
+}
+
+
+const appDemoDefault$Scope = async ()=>{
+
+  // ragonare su come ho implementato sta roba..perchè in realtà sarebbe meglio fare in modo che il $this sia un $scope che parte da un obj di pertenza con {this, parent, le...etc} definiti come al solito..e metto un po di eccezioni li, piuttosto che il meccanismo attuale. questo però implica un cambiamento enorme!
+
+  RenderApp(document.body, cle.root({ 
+    let_inSelection: false, 
+    let_start_pointer:undefined, 
+    let_end_pointer: undefined, 
+    
+    css: [`
+      
+      .unselectable {
+        -webkit-user-select: none;
+        -webkit-touch-callout: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+      }
+      
+    `]},
+      cle.div({ meta: {forEach:"cell", of: [...new Array(50).keys()], define: {index: "i"}}, 
+        let_selected: $ => ($.i >= $.start_pointer && $.i <= $.end_pointer) || ($.i <= $.start_pointer && $.i >= $.end_pointer),
+        a_style: $=>({display: "inline-block", width: "100px", height: "60px", border: $.this.selected ? "1px solid red" : "1px solid black", color: $.this.selected ? "red" : "black"}),
+        a_class: "unselectable",
+        h_onmouseup: $=>{
+          console.log($.cell, "up")
+          $.inSelection = false
+          $.start_pointer = undefined
+          $.end_pointer = undefined
+        },
+        h_onmousedown: $=>{
+          console.log($.cell, "down")
+          $.start_pointer = $.i
+          $.end_pointer = $.i
+          $.inSelection = true
+        },
+        h_onmouseleave: $=>{
+          console.log($.cell, "leave")
+        },
+        h_onmouseover: $=>{
+          console.log($.cell, "over")
+          if($.inSelection){
+            $.end_pointer = $.i
+          }
+        }
+      }, f`@cell`)
+    )  
+  )
+}
+
+
+
 // app0()
 // test2way()
 // appTodolist()
@@ -6034,15 +6195,28 @@ const appDemoSCSS = async ()=>{
 // appDemoGetCleElByDomEl()
 // appDemoLazyRuntimeRender()
 // appDemoParentChildsInteraction()
-appDemoSCSS()
+// appDemoSCSS()
+// appDemoFirebase()
+// appDemoCellSelection()
+appDemoDefault$Scope()
 
+
+// todo: idea per funzioni "at most once" da usare a giro nel framework: in pratica siccome mi paasano una funzione, aka oggetto, potrei settargli un attributo tipo x.__cle__exec_counter__ e controllare se > 1. problema: come fare per le funzioni che sono delle const dentro una funzione? o in generale funzioni passate e create dentro una funzione? li forse solo una roba diversa es dynamicAtMostOnce, che ti fa il toString della funzione..
+//       - quando può servire sta roba? es in una onhover su un pulsante potrei mettere la import dinamica di un altro pezzo di app, per creare app "parziali" senza dare lagg agli utenti. ovviamnete nel mobile non ha senso :D
+
+// todo: passare a $.myVar direttamente, facendo in modo che punti a scope automagicamente..come? in analyze satic deps cerco i $.qualcosa e tolgo tutti quelli noti ($.scope, $.le, $.this etc) e i rimanenti assegno a scope automaticamente! ps: ricordarsi di escludere $.utils e altre cose che non hanno props.
+//       lato codice di esecuzione vero basta solo che il $this come proxy faccia la try / except e provi a restituire $.scope.xxx automagicamente..in teoria fattible!
+
+// todo: setWithoutChangeDetection("container", "prop", value), funzion un utils (u) che permette di settare una variabile bypassando il meccanismo della change detection..molto utile in diversi contesti! basta fare una funzione "setWithoutChange" in Prooperty
 
 // todo nuove definizioni: "input_" un alias di let_ e "output_" un alias di signal
 // todo callback: nuova "property like" a cui non bisogna bindarsi, in sostanza qualcosa che ci permetta di passare una funzione as property..tendenzialmente in realtà basterebbe definirla come funzione, in particolare si userebbe come Callback($=>blablabla). nella pratica questa fa la return di Callback(cback)=>($=>cback($)). per il meccanismo delle deps NON troverò dipendenze, e quindi sarà passata senza problemi..
 // todo: un nuovo nome per alias, perchè deve essere passato ai componenti già fatti magari per binding, e non si capisce..magari "bindable". alternativa: se si passa un Bind a una property diventa un alias..senza estrazione del .value, quindi ho già tutto per fare il bind al di sotto
 
+// todo: possibilità di passare alle handle_xxx un oggetto per configurare diverse cose, es: {if: $=>$.condition, handler: $=>..., , else_handler?: $=>...}, oppure {throttle: 300ms, handler: $=>...} per avere i binding solo quando vogliamo! es questa cosa è perfetta per i meccanismi di "disabled"
 
 // todo: BUGFIX, in getCleElementByDom deve essere necessario poter scegliere se è body.querySelector oppure this.hmtl_el.querySelector..
+// todo: introdurre il concetto di name nei componenti (una proprietà di Component..) e avere una getCleElementByName che ti permette di fare la stessa roba della byDom, ma il "bug" che se manipolano html mi cambiano la logica applicativa! perchè controllerei solo nel mio albero cle e non anche nel dom
 
 // todo: in lazyRender necessario poter scegliere se appendere su o giù..al momento solo giù, ma per robe alla facebook può servire appendere su!
 
