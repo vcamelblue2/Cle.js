@@ -16,14 +16,14 @@ export const AutoCompleteField = cle.div({
 
     s_css: {
       
-      // ".cle-autocomplete-wrapper": [{}],
-      
+      ".cle-autocomplete-wrapper": [{position: "relative"}],
+
       ".cle-autocomplete-input": [{
         width: '100%'
       }],
 
       ".cle-autocomplete-value-list-wrapper": [{
-        border: '1px solid black'
+        border: '1px solid black', position: "absolute", width: "100%", verflowY: 'auto', background: "white", zIndex: "2"
       }],
 
       ".cle-autocomplete-value-list-value": [{
@@ -31,10 +31,6 @@ export const AutoCompleteField = cle.div({
       }],
 
     },
-
-    onInit: $=>{
-      console.log($.this.el.classList.add($.this.comp_id))
-    }
   }, 
 
     cle.input({
