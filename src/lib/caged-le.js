@@ -987,6 +987,7 @@ class Component {
   
   signalsHandlerRemover = []
   attrHattrRemover = []
+  handlerRemover = []
 
   // todo: def dependency mechanism
   // typeOfPropertiesRegistry = { // todo: registry to identify the type of an exposed properties, for now only def will be here
@@ -1310,7 +1311,82 @@ class Component {
     // html event in the form of obj.onxxx = ()=>...
     if (this.convertedDefinition.handle !== undefined){
       Object.entries(this.convertedDefinition.handle).forEach(([k,v])=>{
-        this.html_pointer_element[k] = (...e)=>v.bind(undefined, this.$this, ...e)()
+        if (isFunction(v)){
+          this.html_pointer_element[k] = (...e)=>v.bind(undefined, this.$this, ...e)()
+          this.handlerRemover.push(()=>{ this.html_pointer_element[k] = undefined })
+        }
+        else if (typeof v === 'object'){
+          
+          let condition = v.if
+          let if_true_handler = v.use
+          let if_false_handler = v.else_use
+
+          if(condition !== undefined){
+            const setupThenElseHandler = (condition_val)=>{
+              if (condition_val){
+                this.html_pointer_element[k] = (...e)=>if_true_handler.bind(undefined, this.$this, ...e)()
+              }
+              else {
+                this.html_pointer_element[k] = (...e)=>if_false_handler.bind(undefined, this.$this, ...e)()
+              }
+            }
+            const setupThenOnlyHandler = (condition_val)=>{
+              if (condition_val){
+                this.html_pointer_element[k] = (...e)=>if_true_handler.bind(undefined, this.$this, ...e)()
+              }
+              else {
+                this.html_pointer_element[k] = undefined
+              }
+            }
+            const handler_remover = ()=>{ this.html_pointer_element[k] = undefined }
+
+            const selected_handler = if_false_handler === undefined ? setupThenOnlyHandler : setupThenElseHandler
+
+            const P = new Property(pass, pass, pass, pass, ()=>this.$this, (thisProp, deps)=>{
+
+              let depsRemover = []
+
+              // deps connection logic
+              deps.$this_deps?.forEach(d=>{
+                let depRemover = this.properties[d]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+                depRemover && depsRemover.push(()=>{depRemover(); handler_remover()})
+              })
+
+              deps.$parent_deps?.forEach(d=>{
+                let depRemover = this.parent.properties[d]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+                depRemover && depsRemover.push(()=>{depRemover(); handler_remover()})
+              })
+
+              deps.$scope_deps?.forEach(d=>{
+                let [propsOwner, isPropertiesProp] = this.get$ScopedPropsOwner(d);
+                let depRemover = (isPropertiesProp ? propsOwner.properties[d] : propsOwner.meta[d])?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() );
+                depRemover && depsRemover.push(()=>{depRemover(); handler_remover()})
+              })
+
+              deps.$le_deps?.forEach(d=>{ // [le_id, property]
+                let depRemover = this.$le[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+                depRemover && depsRemover.push(()=>{depRemover(); handler_remover()})
+              })
+
+              deps.$ctx_deps?.forEach(d=>{ // [le_id, property]
+                let depRemover = this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+                depRemover && depsRemover.push(()=>{depRemover(); handler_remover()})
+              })
+
+              return depsRemover
+            }, false)
+
+            this.handlerRemover.push(()=>P.destroy(true))
+
+            setTimeout(() => {
+
+              P.init( condition, none, selected_handler )
+
+              P.markAsChanged()
+
+            }, 10);
+          }
+        }
       })
     }
     // html event in the form of event listener (declared with the "when")
@@ -2281,6 +2357,9 @@ class Component {
     try { if(this.isA$ctxComponent){ delete this.$ctx["_ctxroot_"] } } catch {}
     delete this.$le[this.id]
 
+    this.handlerRemover?.forEach(remover=>{
+      try{remover()} catch{}
+    })
     this.attrHattrRemover?.forEach(remover=>{
       try{remover()} catch{}
     })
