@@ -28,7 +28,7 @@ const toInlineStyle = /** @param {CSSStyleDeclaration | ()=>CSSStyleDeclaration}
 
   Object.keys(styles).forEach(s=>{
       if (s.startsWith("::")){
-          style += s+":"+styles[s]+";"
+          style += s.substring(2)+":"+styles[s]+";"
       }
       else {
           style += s.split(/(?=[A-Z])/).join('-').toLowerCase()+":"+styles[s]+";"
