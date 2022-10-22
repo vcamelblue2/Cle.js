@@ -19,6 +19,7 @@ export const Tabs = (extradef={}, ...tabs) => {
       a_style: $ => ({ 
         display: "inline-block", 
         borderBottom: $.this.isActive ? '1px solid black' : 'unset',
+        cursor: "pointer",
         padding: "5px 10px", ...$.this.restyle($)
       }), 
       a_class: $=> "tab-header" + ( $.this.isActive ? " tab-header-active" : ''),
