@@ -50,6 +50,24 @@ const recursiveAccessor = (pointer, toAccess)=>{
   }
 }
 
+// exponential retry utils..should be a promise, instead use some "return obj" or function
+const exponentialRetry = (func, args=[], customResAsFunc=undefined, resultObj={expRetryObj: true}, msgonerr="", maxNumRetry=maxNumRetry, num_retry=0)=>{
+
+  try{
+    resultObj.result = func(...args)
+  }
+  catch (e){
+    if (num_retry < maxNumRetry) {
+      setTimeout(()=>exponentialRetry(func, args, customResAsFunc, resultObj, msgonerr, maxNumRetry, num_retry+1), Math.min(10*(num_retry+1), maxNumRetry))
+    }
+    else{
+      _warning.log("CLE - WARNING! unable to execute after 5 retry! "+msgonerr)
+      _warning.log(e)
+    }
+  }
+  return customResAsFunc !== undefined ? (customResAsFunc(()=>resultObj.result)) : resultObj
+}
+
 const cloneDefinitionWithoutMeta = (definition)=>{
   let componentType = getComponentType(definition)
     
@@ -678,12 +696,15 @@ const analizeDepsStatically = (f, isUseExt=false)=>{
   let $ctx_deps = to_inspect.match(/\$.ctx\.([_$a-zA-Z]+[0-9]*[.]?)+/g)
   $ctx_deps = $ctx_deps?.map(d=>d.replace("$.ctx.", "").split(".").slice(0,2)) 
 
+  let $ref_deps = to_inspect.match(/\$.ref\.([_$a-zA-Z]+[0-9]*[.]?)+/g)
+  $ref_deps = $ref_deps?.map(d=>d.replace("$.ref.", "").split(".").slice(0,2)) 
+
   let $meta_deps = to_inspect.match(/\$.meta\.([_$a-zA-Z]+[0-9]*[.]?)+/g)
   $meta_deps = $meta_deps?.map(d=>d.replace("$.meta.", "").split(".")[0]) // fix sub access!
 
   let $full_deps = to_inspect.match(/\$.([_$a-zA-Z]+[0-9]*[.]?)+/g)
   $full_deps?.map(d=>d.split(".").filter(x=>x!=='$')).forEach(els=>{
-    if (['this', 'parent', 'scope', 'le', 'ctx', 'meta', 'u'].includes(els[0])){ pass }
+    if (['this', 'parent', 'scope', 'le', 'ctx', 'ref', 'meta', 'u'].includes(els[0])){ pass }
     else {
       // console.log("aaaa push!!", $scope_deps, els, $full_deps)
       if($scope_deps !== undefined){
@@ -716,6 +737,9 @@ const analizeDepsStatically = (f, isUseExt=false)=>{
 
     $ctx_deps: $ctx_deps, 
     // $pure_ctx_deps: $ctx_deps.length === 1 && $ctx_deps[0]==="", 
+
+    $ref_deps: $ref_deps, 
+    // $pure_ref_deps: $ref_deps.length === 1 && $ref_deps[0]==="", 
 
     $meta_deps: $meta_deps, 
     // $pure_meta_deps: $meta_deps.length === 1 && $meta_deps[0]==="", 
@@ -883,6 +907,41 @@ const ComponentScopeProxy = (context)=>{
   })
 }
 
+
+// $ref proxy..dynamically resolve 
+const ComponentRefProxy = (context)=>{
+
+  const findChildsRefHolder = (component, ref, search_depth=0)=>{
+    if (component === undefined){
+      return {}
+    }
+
+    if (ref in (component.convertedDefinition?.childsRef || {})){ // fix IterableViewComponent, cannot habe $ref..
+      return component.childsRefPointers
+    }
+    else {
+      return findChildsRefHolder(component.parent, ref, search_depth+1)
+    }
+  }
+
+  return new Proxy({}, {
+
+      // // useless ? 
+      // has(target, ref) {
+      //   target = findChildsRefHolder(context, ref)
+      //   return ref in target //|| target.hasItem(ref);
+      // },
+
+      get: (_target, ref, receiver)=>{
+        let target = findChildsRefHolder(context, ref)[ref]
+        return Array.isArray(target) ? target.map(t=>t.$this.this) : target.$this.this
+      },
+
+      set: function(_target, prop, value) {
+        return undefined // disable set
+      }
+  })
+}
 
 class ComponentsContainerProxy {
   // public proxy
@@ -1080,6 +1139,9 @@ class Component {
   // $bind // ComponentProoxy -> contains the property as "binding"..a sort of "sentinel" that devs can use to signal "2WayBinding" on a property declaration/definition, visible to the dev as $.bind, usefull also to define intra-property "alias"
   $dbus 
   $meta // ComponentProxy => contains all "meta", local and from parents, in the same Component
+
+  $ref // ComponentRefProxy => contains childsRefPointers  as Proxy, visible to dev as $.ref
+  childsRefPointers = {} // { refName: Component}
 
 
   htmlElementType
@@ -1329,10 +1391,14 @@ class Component {
     // todo: qualcosa del genere per gli attr
     // this.properties.attr = ComponentProxy(this.attrProperties)
 
+    // rigester in a parent (if a name was given)
+    this.registerAsChildsRef()
+
     // todo: parent and le visible properties only..
     this.$parent = (this.parent instanceof Component) ? ComponentProxy(this.parent.properties) : undefined
     this.$scope = ComponentScopeProxy(this)
-    this.$this = ComponentProxyBase(/*new ComponentProxySentinel(*/{this: ComponentProxy(this.properties), parent: this.$parent, scope: this.$scope,  le: this.$le.proxy, ctx: this.$ctx.proxy, dbus: this.$dbus.proxy, meta: this.$meta, u: this.getUtilsProxy() } /*)*/ ) //tmp, removed ComponentProxySentinel (useless)
+    this.$ref = ComponentRefProxy(this)
+    this.$this = ComponentProxyBase(/*new ComponentProxySentinel(*/{this: ComponentProxy(this.properties), parent: this.$parent, scope: this.$scope,  le: this.$le.proxy, ctx: this.$ctx.proxy, dbus: this.$dbus.proxy, meta: this.$meta, ref: this.$ref, u: this.getUtilsProxy() } /*)*/ ) //tmp, removed ComponentProxySentinel (useless)
 
     // mettere private stuff in "private_properties" e "private_signal", a quel punto una strada potrebbe essere quella di avere un "private_this" qui su..ma in teoria dovrebbe essere qualcosa di context, e non solo in me stesso..
   }
@@ -1377,6 +1443,52 @@ class Component {
         return Object.values(this.$le).filter(component=>(component instanceof Component) && dom_els.includes(component.html_pointer_element)).map(el=>el.$this.this)
       },
 
+      // alias for $.ref.xxx
+      getChildsRef: (name)=>{
+        const owner = this.getChildsRefOwner(name)
+        return Array.isArray(owner.childsRefPointers[name]) ? owner.childsRefPointers[name].map(c=>c.$this.this) : owner.childsRefPointers[name].$this.this
+      },
+      getSubChildRef: (name)=>{ //serach only DOWN, breadth first algo
+        let toInspect = [...this.childs]
+        for (let c of toInspect){
+          try {
+            // console.log(c)
+            if ((c instanceof Component)) {
+              if (c.convertedDefinition.name === name){
+                return c.$this.this
+              }
+              else {c.childs.forEach(sc=>toInspect.push(sc))}
+            } else if (c instanceof IterableViewComponent) {
+              c.childs.forEach(sc=>toInspect.push(sc))
+            }
+          }
+          catch {}
+        }
+        return null
+      },
+      getSubChildsRef: (name, limit=0)=>{ //serach only DOWN, breadth first algo, return all match or limit
+        let toInspect = [...this.childs]
+        let results = []
+        for (let c of toInspect){
+          try {
+            // console.log(c)
+            if ((c instanceof Component)) {
+              if (c.convertedDefinition.name === name){
+                results.push(c.$this.this)
+                if (limit > 0 && results.length >= limit){
+                  break;
+                }
+              }
+              else {c.childs.forEach(sc=>toInspect.push(sc))}
+            } else if (c instanceof IterableViewComponent) {
+              c.childs.forEach(sc=>toInspect.push(sc))
+            }
+          }
+          catch {}
+        }
+        return results
+      },
+
       // Lazy Render: dynamic create, get and render template at run time!
       /**definition_as_func signature:  (parent.$this.this, state, ...args) => obj || obj[] */
       lazyRender: (definition_as_func, {afterCreate=undefined, beforeDestroy=undefined, afterDestroy=undefined, auto=false}={}, ...args)=>{
@@ -1404,6 +1516,48 @@ class Component {
         this.destroyDynamicChilds(generatedDynComp, clearState, clearDestroyHook)
       }
     })
+  }
+
+
+  getChildsRefOwner(name){
+    if (name in (this.convertedDefinition.childsRef || {})){
+      return this
+    }
+    else if (!this.isMyParentHtmlRoot){
+      return this.parent.getChildsRefOwner(name)
+    }
+    // todo: raise exception if on root..
+  }
+  registerAsChildsRef(){
+    let name = this.convertedDefinition.name
+    if (name !== undefined){
+      const owner = this.getChildsRefOwner(name)
+      if( owner != undefined ){
+        if (owner.childsRefPointers[name] === undefined){
+          owner.childsRefPointers[name] = owner.convertedDefinition.childsRef[name] === "multi" ? [this] : this
+        }
+        else {
+          owner.childsRefPointers[name] = Array.isArray(owner.childsRefPointers[name]) ? [...owner.childsRefPointers[name], this] : this
+        }
+      }
+      else (
+        _warning.log("CLE Warning - Cannot find a ref owner")
+      )
+    }
+  }
+  unregisterAsChildsRef(){
+    let name = this.convertedDefinition.name
+    if (name !== undefined){
+      const owner = this.getChildsRefOwner(name)
+      if(owner !== undefined){
+        if (owner.childsRefPointers[name] !== undefined){
+          owner.childsRefPointers[name] = Array.isArray(owner.childsRefPointers[name])  ? owner.childsRefPointers[name].filter(e=>e!==this) : undefined
+        }
+      }
+      else {
+        _warning.log("CLE Warning - Cannot find a ref owner")
+      }
+    }
   }
 
   // step 3: create and renderize
@@ -1532,8 +1686,15 @@ class Component {
 
 
           deps.$le_deps?.forEach(d=>{ // [le_id, property]
+            // let depRemover;
+            // exponentialRetry(()=>{
+            //   depRemover = this.$le[d[0]].properties[d[1]].addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+            // }, pass, pass, pass, "Cannot connect to CLE Obj by ID", 5)
+            // depsRemover.push(()=>depRemover())
+
             let depRemover = this.$le[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
             depRemover && depsRemover.push(depRemover)
+
             // let registerAction = ()=>{
             //   let depRemover = this.$le[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
             //   depRemover && depsRemover.push(depRemover)
@@ -1551,6 +1712,20 @@ class Component {
           deps.$ctx_deps?.forEach(d=>{ // [le_id, property]
             let depRemover = this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
             depRemover && depsRemover.push(depRemover)
+          })
+
+          deps.$ref_deps?.forEach(d=>{ // [refName, property]
+            // _debug.log("try match", d, this.getChildsRefOwner([d[0]]));
+
+            let depRemover;
+            exponentialRetry(()=>{
+              // _debug.log("try match", d, this.getChildsRefOwner([d[0]]), this.getChildsRefOwner([d[0]])?.childsRefPointers, this.getChildsRefOwner([d[0]])?.childsRefPointers?.[d[0]]?.properties[d[1]]);
+              const owner = this.getChildsRefOwner([d[0]]).childsRefPointers[d[0]]
+              if (Array.isArray(owner)){ throw Error("Cannot Bind to multi-ref child") }
+              depRemover = owner.properties[d[1]].addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+            }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5)
+            
+            depsRemover.push(()=>depRemover())
           })
 
           externalDeps?.forEach(extDep=>{
@@ -2457,6 +2632,8 @@ class Component {
     try { if(this.isMyParentHtmlRoot){ delete this.$le["_root_"] } } catch {}
     try { if(this.isA$ctxComponent){ delete this.$ctx["_ctxroot_"] } } catch {}
     delete this.$le[this.id]
+    
+    this.unregisterAsChildsRef()
 
     this.handlerRemover?.forEach(remover=>{
       try{remover()} catch{}
@@ -2523,7 +2700,8 @@ class Component {
       "beforeInit", "onInit", "afterInit", "afterChildsInit", "onUpdate", "onDestroy", 
       "signals", "dbus_signals", "on", "on_s", "on_a", 
       "alias", "handle", "when", "css", "s_css", 
-      "states", "stateChangeStrategy", "onState"
+      "states", "stateChangeStrategy", "onState",
+      "name", "childsRef"
     ])
 
 

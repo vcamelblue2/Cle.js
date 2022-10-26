@@ -9,6 +9,8 @@ const component = {
 
     "private:"? id: "compoent_id",
 
+    "name": "refName",
+
     constructor: ($, {param1, param2, param3 ...}) => { // costruttore, quando viene generato il componente
       $.this.blabla = blilbi
     },
@@ -6108,7 +6110,6 @@ const appDemoCellSelection = async ()=>{
 
 const appDemoDefault$Scope = async ()=>{
 
-  // ragonare su come ho implementato sta roba..perchè in realtà sarebbe meglio fare in modo che il $this sia un $scope che parte da un obj di pertenza con {this, parent, le...etc} definiti come al solito..e metto un po di eccezioni li, piuttosto che il meccanismo attuale. questo però implica un cambiamento enorme!
 
   RenderApp(document.body, cle.root({ 
     let_inSelection: false, 
@@ -6157,6 +6158,99 @@ const appDemoDefault$Scope = async ()=>{
 }
 
 
+const appDemoChildRefByName = async ()=>{
+
+  RenderApp(document.body, cle.root({ 
+
+    // must be after to subscribe without problems (signal will exists)
+    afterChildsInit: $=>{
+      const myInput = $.u.getSubChildRef("myInput") // ricerca verso il basso by name.. qui impossibile usare $.ref.myInput, oppure $.u.getChildsRef perchè non ho mai dichiarto un owner! (childsRef property)
+      console.log(myInput, myInput.text)
+      myInput.subscribe("textChanged", $.this, (t)=>{
+        console.log("text changed!", t)
+      })
+
+      const myInputs = $.u.getSubChildsRef("myInputMulti", 2) // ricerca verso il basso by name.. qui impossibile usare $.ref.myInput, oppure $.u.getChildsRef come prima
+      console.log(myInputs)
+      myInputs.forEach(i=>{
+        i.text = "Hello - rep (selected)"
+      })
+      myInputs.forEach((i, idx)=>i.subscribe("textChanged", $.this, (t)=>{
+        console.log(idx, " - multi - text changed!", t)
+      }))
+    }
+  },
+    cle.h3("Demo Get Child By Name"),
+
+    cle.div({
+      name: "myInput",
+
+      let_text: "Hello",
+
+    }, cle.input({ ha_value: Bind(f`@text`) })),
+
+    cle.hr(),
+
+    cle.div({ meta: { forEach: "xx", of: [1,2,3]},
+      name: "myInputMulti",
+
+      let_text: "Hello - rep (ignored)",
+
+    }, cle.input({ ha_value: Bind(f`@text`) }))
+
+  ))
+
+  RenderApp(document.body, cle.root({}, 
+    cle.br(), cle.br(), cle.h2("Testing $.ref"))
+  )
+
+
+  RenderApp(document.body, cle.root({ 
+    
+    childsRef: {
+      myInput: "single",
+      myInputMulti: "multi"
+    },
+
+    afterChildsInit: $=>{
+      console.log($.ref.myInput)
+    }
+  },
+    cle.h3("Demo Get Child By Name"),
+
+    cle.div({}, 
+
+      cle.div({
+        name: "myInput",
+
+        let_text: "Hello",
+
+      }, cle.input({ ha_value: Bind(f`@text`) })),
+
+      cle.hr(),
+
+      cle.div({ meta: { forEach: "xx", of: [1,2,3]},
+        name: "myInputMulti",
+
+        let_text: "Hello - rep",
+
+      }, cle.input({ ha_value: Bind(f`@text`) })),
+
+      cle.div({
+        let_follower: $=>$.ref.myInput.text,
+
+        onInit: $=>{
+          console.log($.ref.myInputMulti)
+          setTimeout(() => {
+            $.ref.myInputMulti.forEach(i=>i.text =  "Hello - rep (changed!)")
+          }, 3000);
+        }
+      }, $=>$.this.follower, "... TODO: necessario portare anche per le non Property!")
+    )
+
+  ))
+}
+
 
 // app0()
 // test2way()
@@ -6198,7 +6292,8 @@ const appDemoDefault$Scope = async ()=>{
 // appDemoSCSS()
 // appDemoFirebase()
 // appDemoCellSelection()
-appDemoDefault$Scope()
+// appDemoDefault$Scope()
+appDemoChildRefByName()
 
 
 // todo: idea per funzioni "at most once" da usare a giro nel framework: in pratica siccome mi paasano una funzione, aka oggetto, potrei settargli un attributo tipo x.__cle__exec_counter__ e controllare se > 1. problema: come fare per le funzioni che sono delle const dentro una funzione? o in generale funzioni passate e create dentro una funzione? li forse solo una roba diversa es dynamicAtMostOnce, che ti fa il toString della funzione..
