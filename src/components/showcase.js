@@ -8,6 +8,7 @@ import { Checkbox } from "./checkbox.component/checkbox.js"
 import { RadioButton, RadioButtonsGroup } from "./radio-button.component/radio-button.js"
 import { SelectButtons } from "./select-buttons.component/select-buttons.js"
 import { BootstrapIcon } from "./vendor-dependent/bootstrap-icon.component/bootstrap-icon.js"
+import { MatInput } from "./input.component/mat-input.js"
 
 const useMilligram = false
 
@@ -191,6 +192,13 @@ const DemoSelectButtons = [
   }, {inject: { valueTemplate: Use(BootstrapIcon, {let_icon: f`@value.icon`}) }})
 ]
 
+const DemoMatInput = cle.div({ 
+  let_ipt: "", 
+  on_this_iptChanged: $=>console.log("ipt changed!!"), 
+  style: "margin-top: 10px; margin-bottom: 10px"
+},
+  Use(MatInput, {let_text: Bind("@ipt")}),
+)
 
 
 LE_InitWebApp(async ()=>{
@@ -232,6 +240,9 @@ LE_InitWebApp(async ()=>{
     cle.h3("Select Buttons"),
     ...DemoSelectButtons,
 
+    cle.hr({}),
+    DemoMatInput,
+    cle.br({}),
 
   ]}})
 })
