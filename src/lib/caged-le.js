@@ -2658,6 +2658,9 @@ class Component {
         else if (k.startsWith('on_dbus_')){
           dash_shortucts_keys.on_dbus[k.substring(8)] = val
         }
+        else if (k.startsWith('on_')){ // ultra shortcuts! use scope
+          dash_shortucts_keys.on_scope[k.substring(3)] = val
+        }
       }
       
       else if (['class', 'style'].includes(k)){ // Extreme shortcuts for style & class
