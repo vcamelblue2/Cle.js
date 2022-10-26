@@ -86,3 +86,7 @@ package-lock.json
 .terserrc
 dontuseterserrc
 /dist
+
+**/env.js
+**/env.test.js
+**/env.prod.js
