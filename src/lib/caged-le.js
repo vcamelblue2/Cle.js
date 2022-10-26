@@ -1293,6 +1293,33 @@ class Component {
         throw Error("Signal does not exists")
       }
     }
+    this.properties.subscribeAsync = async (name, who, handler) => {
+      return new Promise((resolve, reject)=>{
+
+        const subscribeHandler = (num_retry=0)=>{
+          try{
+            // if (name in this.signals){
+              let remover = this.signals[name].addHandler(who, handler) // return remover
+              resolve(remover)
+            // }
+            // else {
+            //   throw Error("Signal does not exists")
+            // }
+          }
+          catch{
+            if (num_retry < 5) {
+              setTimeout(()=>subscribeHandler(num_retry++), Math.min(1*(num_retry+1), 5))
+            }
+            else{
+              _warning.log("CLE - WARNING! unable to subscribe to the signal!")
+              reject("Signal does not exists")
+            }
+          }
+        }
+
+        subscribeHandler()
+      })
+    }
     this.properties.unsubscribe = (name, who) => {
       // if (who instanceof Proxy){ throw Error("Must Be $.this!") } NON è FATTIBILE! non si può sapere se è un proxy o no, a meno di nonn modificare la get della Proxy con una if prop === "isProxy" return true
       this.signals[name].removeHandler(who)
