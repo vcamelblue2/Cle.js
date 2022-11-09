@@ -1,4 +1,4 @@
-import { Bind, Extended, f, fArgs, LE_BackendApiMock, LE_LoadCss, LE_LoadScript, pass, Placeholder, RenderApp, smart, Alias, SmartAlias, ExternalProp, useExternal, toInlineStyle, Use, cle, Switch, Case, str, str_ , ExtendSCSS} from "../lib/caged-le.js"
+import { Alias, Bind, Case, cle, Extended, ExtendSCSS, ExternalProp, f, fArgs, LE_BackendApiMock, LE_LoadCss, LE_LoadScript, pass, Placeholder, RenderApp, smart, SmartAlias, str, Switch, toInlineStyle, Use, useExternal } from "../lib/caged-le.js"
 import { NavSidebarLayout } from "../layouts/layouts.js"
 
 /*
@@ -6216,7 +6216,7 @@ const appDemoChildRefByName = async ()=>{
       console.log($.ref.myInput)
     }
   },
-    cle.h3("Demo Get Child By Name"),
+    cle.h3("Demo Get Child By Name (Using Ref)"),
 
     cle.div({}, 
 
@@ -6236,6 +6236,13 @@ const appDemoChildRefByName = async ()=>{
 
       }, cle.input({ ha_value: Bind(f`@text`) })),
 
+
+      cle.hr(),
+      cle.div({ meta: { forEach: "xx", of: [1,2,3]},
+        name: "myInputMultiClone",
+
+      }, cle.input({ ha_value: Bind(f`$.ref.myInput.text`) })),
+
       cle.div({
         let_follower: $=>$.ref.myInput.text,
 
@@ -6245,7 +6252,7 @@ const appDemoChildRefByName = async ()=>{
             $.ref.myInputMulti.forEach(i=>i.text =  "Hello - rep (changed!)")
           }, 3000);
         }
-      }, $=>$.this.follower, "... TODO: necessario portare anche per le non Property!")
+      }, $=>$.this.follower, " --- ", $=>$.ref.myInput.text, cle.br())
     )
 
   ))

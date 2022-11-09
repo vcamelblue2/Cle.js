@@ -1628,6 +1628,16 @@ class Component {
                 depRemover && depsRemover.push(()=>{depRemover(); handler_remover()})
               })
 
+              deps.$ref_deps?.forEach(d=>{ // [refName, property]
+                let depRemover;
+                exponentialRetry(()=>{
+                  const owner = this.getChildsRefOwner(d[0]).childsRefPointers[d[0]]
+                  if (Array.isArray(owner)){ throw Error("Cannot Bind to multi-ref child") }
+                  depRemover = owner.properties[d[1]].addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+                }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5)
+                depsRemover.push(()=>{depRemover(); handler_remover()})
+              })
+
               return depsRemover
             }, false)
 
@@ -1695,18 +1705,6 @@ class Component {
             let depRemover = this.$le[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
             depRemover && depsRemover.push(depRemover)
 
-            // let registerAction = ()=>{
-            //   let depRemover = this.$le[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
-            //   depRemover && depsRemover.push(depRemover)
-            // }
-            // if(this.$le[d[0]].properties[d[1]] !== undefined){
-            //   registerAction()
-            // }
-            // else {
-            //   setTimeout(() => {
-            //     registerAction()
-            //   }, 1);
-            // }
           })
 
           deps.$ctx_deps?.forEach(d=>{ // [le_id, property]
@@ -1715,16 +1713,14 @@ class Component {
           })
 
           deps.$ref_deps?.forEach(d=>{ // [refName, property]
-            // _debug.log("try match", d, this.getChildsRefOwner([d[0]]));
-
+            // _debug.log("try match", d, this.getChildsRefOwner(d[0]));
             let depRemover;
             exponentialRetry(()=>{
-              // _debug.log("try match", d, this.getChildsRefOwner([d[0]]), this.getChildsRefOwner([d[0]])?.childsRefPointers, this.getChildsRefOwner([d[0]])?.childsRefPointers?.[d[0]]?.properties[d[1]]);
-              const owner = this.getChildsRefOwner([d[0]]).childsRefPointers[d[0]]
+              // _debug.log("try match", d, this.getChildsRefOwner(d[0]), this.getChildsRefOwner(d[0])?.childsRefPointers, this.getChildsRefOwner(d[0])?.childsRefPointers?.[d[0]]?.properties[d[1]]);
+              const owner = this.getChildsRefOwner(d[0]).childsRefPointers[d[0]]
               if (Array.isArray(owner)){ throw Error("Cannot Bind to multi-ref child") }
               depRemover = owner.properties[d[1]].addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
             }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5)
-            
             depsRemover.push(()=>depRemover())
           })
 
@@ -1865,6 +1861,41 @@ class Component {
               })
             })
           }
+          // todo: fattorizzare con le, se possibile!
+          else if (typologyNamespace === "ref"){
+
+            Object.entries(defs).forEach(([refName, refSignal])=>{ // get requested element name
+              Object.entries(refSignal).forEach(([s, fun])=>{
+
+                // exponential retry to handle signal
+                const setUpSignalHandler = (num_retry=0)=>{
+                  try{
+                    // _info.log("provo ad agganciare signal", leItem, s)
+                    const pointer = this.getChildsRefOwner(refName).childsRefPointers[refName]
+                    if (Array.isArray(pointer)){
+                      pointer.forEach(ptr=>{
+                        let remover = ptr.signals[s].addHandler(this, (...args)=>fun.bind(undefined, this.$this, ...args)())
+                        this.signalsHandlerRemover.push(remover)
+                      })
+                    }
+                    else {
+                      let remover = this.getChildsRefOwner(refName).childsRefPointers[refName].signals[s].addHandler(this, (...args)=>fun.bind(undefined, this.$this, ...args)())
+                      this.signalsHandlerRemover.push(remover)
+                    }
+                  }
+                  catch{
+                    if (num_retry < 5) {
+                      setTimeout(()=>setUpSignalHandler(num_retry++), Math.min(1*(num_retry+1), 5))
+                    }
+                    else{
+                      _warning.log("CLE - WARNING! unable to connect to the signal! -> ", this, defs,)
+                    }
+                  }
+                }
+                setUpSignalHandler()
+              })
+            })
+          }
         })
       }
     })
@@ -1947,6 +1978,15 @@ class Component {
                   deps && this.attrHattrRemover.push(deps)
                 })
 
+                staticDeps.$ref_deps?.forEach(d=>{ // [refName, property]
+                  let depRemover;
+                  exponentialRetry(()=>{
+                    const owner = this.getChildsRefOwner(d[0]).childsRefPointers[d[0]]
+                    if (Array.isArray(owner)){ throw Error("Cannot Bind to multi-ref child") }
+                    depRemover = owner.properties[d[1]].addOnChangedHandler([this, "attr", k],  ()=>setupStyle(v) )
+                  }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5)
+                  this.attrHattrRemover.push(()=>depRemover())
+                })
               }
               else {
 
@@ -1994,6 +2034,16 @@ class Component {
                 staticDeps.$ctx_deps?.forEach(d=>{ // [ctx_id, property]
                   let deps = this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
                   deps && this.attrHattrRemover.push(deps)
+                })
+
+                staticDeps.$ref_deps?.forEach(d=>{ // [refName, property]
+                  let depRemover;
+                  exponentialRetry(()=>{
+                    const owner = this.getChildsRefOwner(d[0]).childsRefPointers[d[0]]
+                    if (Array.isArray(owner)){ throw Error("Cannot Bind to multi-ref child") }
+                    depRemover = owner.properties[d[1]].addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
+                  }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5)
+                  this.attrHattrRemover.push(()=>depRemover())
                 })
 
                 setupValue()
@@ -2052,6 +2102,17 @@ class Component {
                 let deps = this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
                 deps && this.attrHattrRemover.push(deps)
                 _2WayPropertyBindingToHandle[k] = ()=>this.$ctx[d[0]].properties[d[1]]
+              })
+
+              staticDeps.$ref_deps?.forEach(d=>{ // [refName, property]
+                let depRemover;
+                exponentialRetry(()=>{
+                  const owner = this.getChildsRefOwner(d[0]).childsRefPointers[d[0]]
+                  if (Array.isArray(owner)){ throw Error("Cannot Bind to multi-ref child") }
+                  depRemover = owner.properties[d[1]].addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
+                }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5)
+                this.attrHattrRemover.push(()=>depRemover())
+                _2WayPropertyBindingToHandle[k] = ()=>this.getChildsRefOwner(d[0]).childsRefPointers[d[0]].properties[d[1]]
               })
 
               // now manually configure the binding
@@ -2218,6 +2279,16 @@ class Component {
                 deps && this.attrHattrRemover.push(deps)
               })
 
+              staticDeps.$ref_deps?.forEach(d=>{ // [refName, property]
+                let depRemover;
+                exponentialRetry(()=>{
+                  const owner = this.getChildsRefOwner(d[0]).childsRefPointers[d[0]]
+                  if (Array.isArray(owner)){ throw Error("Cannot Bind to multi-ref child") }
+                  depRemover = owner.properties[d[1]].addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
+                }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5)
+                this.attrHattrRemover.push(()=>depRemover())
+              })
+
               setupValue()
 
             }
@@ -2276,6 +2347,16 @@ class Component {
                 _2WayPropertyBindingToHandle[k] = ()=>this.$ctx[d[0]].properties[d[1]]
               })
 
+              staticDeps.$ref_deps?.forEach(d=>{ // [refName, property]
+                let depRemover;
+                exponentialRetry(()=>{
+                  const owner = this.getChildsRefOwner(d[0]).childsRefPointers[d[0]]
+                  if (Array.isArray(owner)){ throw Error("Cannot Bind to multi-ref child") }
+                  depRemover = owner.properties[d[1]].addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
+                }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5)
+                this.attrHattrRemover.push(()=>depRemover())
+                _2WayPropertyBindingToHandle[k] = ()=>this.getChildsRefOwner(d[0]).childsRefPointers[d[0]].properties[d[1]]
+              })
 
               // now manually configure the binding
               _info.log("Exec 2 way bidning", k, this)
@@ -2339,6 +2420,16 @@ class Component {
                 deps && this.attrHattrRemover.push(deps)
               })
 
+              staticDeps.$ref_deps?.forEach(d=>{ // [refName, property]
+                let depRemover;
+                exponentialRetry(()=>{
+                  const owner = this.getChildsRefOwner(d[0]).childsRefPointers[d[0]]
+                  if (Array.isArray(owner)){ throw Error("Cannot Bind to multi-ref child") }
+                  depRemover = owner.properties[d[1]].addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
+                }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5)
+                this.attrHattrRemover.push(()=>depRemover())
+              })
+
               setupValue()
 
           }
@@ -2396,6 +2487,18 @@ class Component {
               deps && this.attrHattrRemover.push(deps)
               _2WayPropertyBindingToHandle[k] = ()=>this.$ctx[d[0]].properties[d[1]]
             })
+
+            staticDeps.$ref_deps?.forEach(d=>{ // [refName, property]
+              let depRemover;
+              exponentialRetry(()=>{
+                const owner = this.getChildsRefOwner(d[0]).childsRefPointers[d[0]]
+                if (Array.isArray(owner)){ throw Error("Cannot Bind to multi-ref child") }
+                depRemover = owner.properties[d[1]].addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
+              }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5)
+              this.attrHattrRemover.push(()=>depRemover())
+              _2WayPropertyBindingToHandle[k] = ()=>this.getChildsRefOwner(d[0]).childsRefPointers[d[0]].properties[d[1]]
+            })
+
 
 
             // now manually configure the binding
@@ -2485,6 +2588,17 @@ class Component {
               let depRemover = this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
               depRemover && depsRemover.push(depRemover)
             })
+
+            deps.$ref_deps?.forEach(d=>{ // [refName, property]
+              let depRemover;
+              exponentialRetry(()=>{
+                const owner = this.getChildsRefOwner(d[0]).childsRefPointers[d[0]]
+                if (Array.isArray(owner)){ throw Error("Cannot Bind to multi-ref child") }
+                depRemover = owner.properties[d[1]].addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+              }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5)
+              depsRemover.push(()=>depRemover())
+            })
+
             return depsRemover
           }, true)
         )
@@ -2602,7 +2716,19 @@ class Component {
               let depRemover = this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
               depRemover && depsRemover.push(depRemover)
             })
+
+            deps.$ref_deps?.forEach(d=>{ // [refName, property]
+              let depRemover;
+              exponentialRetry(()=>{
+                const owner = this.getChildsRefOwner(d[0]).childsRefPointers[d[0]]
+                if (Array.isArray(owner)){ throw Error("Cannot Bind to multi-ref child") }
+                depRemover = owner.properties[d[1]].addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+              }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5)
+              depsRemover.push(()=>depRemover())
+            })
+
             return depsRemover
+
           }, true)]
         )})
       })
@@ -3358,6 +3484,22 @@ class TextNodeComponent {
       }
     })
 
+    this.staticAnDeps.$ref_deps?.forEach(d=>{// [refName, property]
+
+      let depRemover;
+      exponentialRetry(()=>{
+        const owner = this.parent.getChildsRefOwner(d[0]).childsRefPointers[d[0]]
+        if (Array.isArray(owner)){ throw Error("Cannot Bind to multi-ref child") }
+        if ("addOnChangedHandler" in owner.properties[d[1]]){
+          depRemover = owner.properties[d[1]].addOnChangedHandler(this, ()=>this._renderizeText())
+        }
+        else { _warning.log("CLE Warning - function in ref in text as deps not supported at this time")}
+      }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5)
+      
+      this.depsRemover.push(()=>depRemover())
+
+    })
+
     this.staticAnDeps.$external_deps?.forEach(extProp=>{
       if (extProp !== undefined && "addOnChangedHandler" in extProp){
         this.depsRemover.push(extProp.addOnChangedHandler(this, ()=>this._renderizeText()))
@@ -3478,6 +3620,20 @@ class ConditionalComponent extends Component{
         let depRemover = this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
         depRemover && depsRemover.push(depRemover)
       })
+
+
+      deps.$ref_deps?.forEach(d=>{ // [refName, property]
+
+        let depRemover;
+        exponentialRetry(()=>{
+          const owner = this.getChildsRefOwner(d[0]).childsRefPointers[d[0]]
+          if (Array.isArray(owner)){ throw Error("Cannot Bind to multi-ref child") }
+          depRemover = owner.properties[d[1]].addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+        }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5)
+        
+        depsRemover.push(()=>depRemover())
+      })
+
       
       externalDeps?.forEach(extDep=>{
         let depRemover = extDep?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
@@ -3766,6 +3922,21 @@ class IterableViewComponent{
 
           this.real_pointed_iterable_property.markAsChanged = ()=>{this.$ctx[d[0]].properties[d[1]]?.markAsChanged()}
         })
+
+
+        deps.$ref_deps?.forEach(d=>{ // [refName, property]
+
+          let depRemover;
+          exponentialRetry(()=>{
+            const owner = this.getChildsRefOwner(d[0]).childsRefPointers[d[0]]
+            if (Array.isArray(owner)){ throw Error("Cannot Bind to multi-ref child") }
+            depRemover = owner.properties[d[1]].addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+          }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5)
+          depsRemover.push(()=>depRemover())
+
+          this.real_pointed_iterable_property.markAsChanged = ()=>{this.getChildsRefOwner(d[0]).childsRefPointers[d[0]].properties[d[1]].markAsChanged()}
+        })
+
 
         externalDeps?.forEach(extDep=>{
           let depRemover = extDep?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
