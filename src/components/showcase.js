@@ -9,6 +9,7 @@ import { RadioButton, RadioButtonsGroup } from "./radio-button.component/radio-b
 import { SelectButtons } from "./select-buttons.component/select-buttons.js"
 import { BootstrapIcon } from "./vendor-dependent/bootstrap-icon.component/bootstrap-icon.js"
 import { MatInput } from "./input.component/mat-input.js"
+import { TreeNav } from "./treenav.component/treenav.js"
 
 const useMilligram = false
 
@@ -200,6 +201,21 @@ const DemoMatInput = cle.div({
   Use(MatInput, {let_text: Bind("@ipt")}),
 )
 
+const DemoTreeNav = Use(TreeNav, {...input("elements", [
+  {label: "Element 1", isOpen: true, childs: [
+    { label: "Element 1.1", isOpen: true, childs: [
+      { label: "Element 1.1.1", isOpen: true, childs: [] }
+    ]},
+    { label: "Element 1.2", isOpen: false, childs: [
+      { label: "Element 1.3.1", isOpen: false, childs: [] }
+    ]}
+  ]},
+
+  {label: "Element 2", isOpen: true, childs: [
+    { label: "Element 2.1", isOpen: true, childs: []},
+  ]}
+])})
+
 
 LE_InitWebApp(async ()=>{
 
@@ -241,7 +257,13 @@ LE_InitWebApp(async ()=>{
     ...DemoSelectButtons,
 
     cle.hr({}),
+    cle.h3("Mat Input"),
     DemoMatInput,
+    cle.br({}),
+
+    cle.hr({}),
+    cle.h3("Tree Nav"),
+    DemoTreeNav,
     cle.br({}),
 
   ]}})
