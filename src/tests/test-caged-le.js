@@ -39,6 +39,12 @@ const component = {
 
     },
 
+    deps: { // check a runtime dell'esistenza delle deps
+      scope: ["myTextProp", "myFunc"],
+      parent: ["myParentDepsProp"],
+      ...
+    },
+
     signals: {
       counterReset: "stream => (void)" // definiamo il tipo di segnale (es: stream [per indicare chi c'è c'è], observable [per indicare che chi non c'è riceverà tutti i next e poi stream]) "=>" una descrizione dei params (es il tipo dei parametry, la signature etc etc..è solo testo che documenta!)
     },
@@ -6259,6 +6265,52 @@ const appDemoChildRefByName = async ()=>{
 }
 
 
+const appDemoCheckedDeps = async ()=>{
+
+  const MyH3 = cle.h3({
+    deps: { 
+      scope: ["h3_text"] 
+    }
+  }, $=>$.scope.h3_text)
+
+
+  // SUCCESS
+  RenderApp(document.body, cle.root({ 
+    let_h3_text: "Demo Checked Deps"
+  },
+
+    Use(MyH3),
+
+    cle.div({}, "Hello World! Deps Check Passed!"),
+    
+    cle.br({}),
+    cle.br({}),
+    cle.div({}, "Checking second test..(should fail)"),
+  ))
+
+  // FAIL
+  try{
+    RenderApp(document.body, cle.root({},
+
+      Use(MyH3),
+
+      cle.div({}, "Hello World! Second Deps Check Passed!"),
+
+    ))
+  }
+  catch (e){
+
+    RenderApp(document.body, cle.root({},
+
+      cle.div({}, "Second Deps Check FAILED!"),
+
+    ))
+    
+    throw e
+  }
+
+}
+
 // app0()
 // test2way()
 // appTodolist()
@@ -6300,8 +6352,8 @@ const appDemoChildRefByName = async ()=>{
 // appDemoFirebase()
 // appDemoCellSelection()
 // appDemoDefault$Scope()
-appDemoChildRefByName()
-
+// appDemoChildRefByName()
+appDemoCheckedDeps()
 
 // todo: idea per funzioni "at most once" da usare a giro nel framework: in pratica siccome mi paasano una funzione, aka oggetto, potrei settargli un attributo tipo x.__cle__exec_counter__ e controllare se > 1. problema: come fare per le funzioni che sono delle const dentro una funzione? o in generale funzioni passate e create dentro una funzione? li forse solo una roba diversa es dynamicAtMostOnce, che ti fa il toString della funzione..
 //       - quando può servire sta roba? es in una onhover su un pulsante potrei mettere la import dinamica di un altro pezzo di app, per creare app "parziali" senza dare lagg agli utenti. ovviamnete nel mobile non ha senso :D

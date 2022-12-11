@@ -1563,6 +1563,17 @@ class Component {
   // step 3: create and renderize
   create(){
 
+    // check dependencies
+    if (this.convertedDefinition.checked_deps !== undefined) {
+      Object.entries(this.convertedDefinition.checked_deps).forEach(([kind,deps])=>{
+        for(let depName of deps){
+          if (!(depName in this.$this[kind])){
+            throw Error(`Unsatisfied Dep! ${kind}: ${depName}`)
+          }
+        }
+      })
+    }
+
     // html event in the form of obj.onxxx = ()=>...
     if (this.convertedDefinition.handle !== undefined){
       Object.entries(this.convertedDefinition.handle).forEach(([k,v])=>{
@@ -2829,6 +2840,9 @@ class Component {
       "states", "stateChangeStrategy", "onState",
       "name", "childsRef"
     ])
+
+    // renamed def
+    unifiedDef.checked_deps = definition.deps
 
 
 
