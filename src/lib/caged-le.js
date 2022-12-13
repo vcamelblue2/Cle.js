@@ -3684,13 +3684,14 @@ class ConditionalComponent extends Component{
 
 class IterableComponent extends Component{
   
-  constructor(parent, definition, $le, $dbus, parentIterableView, iterableIndex, meta_config, meta_options){
+  constructor(parent, definition, $le, $dbus, parentIterableView, iterableIndex, meta_config, meta_options, is_full_rebuild){
     super(parent, definition, $le, $dbus)
 
     this.parentIterableView = parentIterableView
     this.iterableIndex = iterableIndex
     this.meta_config = meta_config
     this.meta_options = meta_options
+    this.is_full_rebuild = is_full_rebuild
 
     // now with the onSet it's possible to sync back to the original array the value!
     this.meta[this.meta_config.iterablePropertyIdentifier] = new Property(this.meta_config.value, none, 
@@ -3727,11 +3728,20 @@ class IterableComponent extends Component{
   // @overwrite, delegate html el construction to the Iterable View Hanlder (real parent)
   buildHtmlPointerElement(){
 
-    this.parentIterableView.buildChildHtmlPointerElement(this, this.iterableIndex)
+    this.parentIterableView.buildChildHtmlPointerElement(this, this.iterableIndex, this.is_full_rebuild)
 
   }
   // la destroy funziona già bene, perchè rimuoverò me stesso (pointer)..!
 
+  updateDataRerencesAndMeta(newIterableIdx, newMetaConfig, skip_identifier_value=true){
+    this.iterableIndex = newIterableIdx
+    this.meta_config = newMetaConfig
+    Object.entries(this.meta).forEach(([k,v])=>{
+      if ( !(skip_identifier_value && k === this.meta_config.iterablePropertyIdentifier)){
+        (v instanceof Property) && v?.markAsChanged() // force update
+      }
+    })
+  }
 }
 
 class IterableViewComponent{
@@ -3817,13 +3827,25 @@ class IterableViewComponent{
     }
   }
 
-  buildChildHtmlPointerElement(child, childIndex){
-
+  buildChildHtmlPointerElement(child, childIndex, is_full_rebuild){
+    // create
     child.html_pointer_element = document.createElement(child.htmlElementType)
+    
+    // check insert position
+    if (is_full_rebuild){
+      this.html_end_pointer_element_anchor.before(child.html_pointer_element) 
+    }
+    else { 
+      // child index to insert in right position
+      if(childIndex === 0){
+        this.html_pointer_element_anchor.after(child.html_pointer_element)
+      }
+      else {
+        this.childs[childIndex-1].html_pointer_element.after(child.html_pointer_element)
+      }
+    }
 
-    this.html_end_pointer_element_anchor.before(child.html_pointer_element)
-    // todo, child index to insert in right position
-
+    // setup uid
     child.html_pointer_element.setAttribute(child.t_uid, "")
   }
 
@@ -3853,19 +3875,95 @@ class IterableViewComponent{
     this.$this = ComponentProxyBase({parent: this.$parent, le: this.$le.proxy, scope: this.$scope, ctx: this.parent.$ctx.proxy, meta: this.parent.$meta }) // qui $.u nonha senso di esister, visto che viene valutato usato solo per valutare la "of", quindi per cercare le deps. utils non serve!
   }
 
+  detectChangesAndRebuildChilds(currentItems, oldItems){
+    // keep track of wich items in the list have changed
+    const changedItems = {}
+    const currentChilds = this.childs
+
+    const childComparer = this.meta_def.idComparer !== undefined && isFunction(this.meta_def.idComparer) ? this.meta_def.idComparer : (_new, _old)=> _new !== _old;
+
+    // Compare each item in the current state with the corresponding item in the DOM
+    for (let i = 0; i < currentItems.length; i++) {
+      const item = currentItems[i];
+
+      // check for new or changed
+      if (currentChilds[i] === undefined || childComparer(item, currentChilds[i].meta_config.value)) {
+        // If the item is new or has changed, add it to the list of changed items
+        changedItems[i] = item;
+      }
+    }
+
+    // Update the changed items in the DOM
+    const iterableComponentsToInit = []
+    
+    for (const idx in changedItems) {
+      const index = parseInt(idx)
+
+      let newChild = new IterableComponent(
+        this.parent, 
+        this.real_iterable_definition, 
+        this.$le, 
+        this.$dbus, 
+        this, 
+        index, 
+        {realPointedIterableProperty: this.real_pointed_iterable_property, iterablePropertyIdentifier: this.iterablePropertyIdentifier, value: currentItems[index], define: this.meta_def.define, define_helper: {index: index, first: index === 0, last: index === currentItems.length-1, length: currentItems.length, iterable: currentItems}}, 
+        this.meta_options,
+        false
+      )
+
+      if (currentChilds[index] === undefined) {
+        // If the item is new, create a new element in the DOM and append it to the list
+        currentChilds[index] = newChild
+        newChild.buildSkeleton()
+        iterableComponentsToInit.push(newChild)
+      } else {
+        // If the item has changed, recreate the element
+        currentChilds[index].destroy()
+
+        currentChilds[index] = newChild
+        newChild.buildSkeleton()
+        iterableComponentsToInit.push(newChild)
+      }
+    }
+
+
+    // Check for deleted items in the DOM
+    // _debug.log("new, old", currentItems, oldItems)
+    if (currentItems.length < oldItems.length) {
+      // If there are more items in the DOM than in the current state, remove the excess items from the DOM
+      for (let i = currentItems.length; i < oldItems.length; i++) {
+        currentChilds[i].destroy()
+        currentChilds.splice(i,1)
+      }
+    }
+
+    iterableComponentsToInit.forEach(i=>i.create())
+
+    // _debug.log(this.childs)
+
+    // update all childs meta (array, index, islast, etc)
+    this.iterableProperty.value?.forEach((arrValue, idx, arr)=>{
+      this.childs[idx].updateDataRerencesAndMeta(idx, {realPointedIterableProperty: this.real_pointed_iterable_property, iterablePropertyIdentifier: this.iterablePropertyIdentifier, value: arrValue, define: this.meta_def.define, define_helper: {index: idx, first: idx === 0, last: idx === arr.length-1, length: arr.length, iterable: arr}}, true)
+    })
+
+  }
 
   //@override, per utilizzare nella Factory this.parent come parent e non this. inoltre qui in realtà parlo dei children come entità replicate, e non i child del template..devo passare una versione del template senza meta alla component factory! altrimenti errore..
   // in realtà dovrebbe essere un "build child skeleton and create child"
-  buildChildsSkeleton(){
-    this._destroyChilds()
-
-    // todo, algoritmo reale euristico, che confronta itmet per item (via this.iterableProperty.value._latestResolvedValue[idx] !== arrValue)
-    this.childs = (this.iterableProperty.value?.map((arrValue, idx, arr)=>new IterableComponent(this.parent, this.real_iterable_definition, this.$le, this.$dbus, this, idx, {realPointedIterableProperty: this.real_pointed_iterable_property, iterablePropertyIdentifier: this.iterablePropertyIdentifier, value: arrValue, define: this.meta_def.define, define_helper: {index: idx, first: idx === 0, last: idx === arr.length-1, length: arr.length, iterable: arr}}, this.meta_options)) || [] )
-
-    // devo sicuramente fare una roba come per il conditional..un componente che estende component, perchè devo per forza gestire meglio la parte di append all'html pointer..
-
-    this.childs.forEach(child=>child.buildSkeleton())
-    this.childs.forEach(child=>child.create())
+  buildChildsSkeleton(rebuild_for_changes=false, latestResolvedValue=undefined){
+    if (rebuild_for_changes && this.meta_def.optimized){
+      this.detectChangesAndRebuildChilds(this.iterableProperty.value, latestResolvedValue)
+    }
+    else {
+      this._destroyChilds()
+  
+      this.childs = (this.iterableProperty.value?.map((arrValue, idx, arr)=>new IterableComponent(this.parent, this.real_iterable_definition, this.$le, this.$dbus, this, idx, {realPointedIterableProperty: this.real_pointed_iterable_property, iterablePropertyIdentifier: this.iterablePropertyIdentifier, value: arrValue, define: this.meta_def.define, define_helper: {index: idx, first: idx === 0, last: idx === arr.length-1, length: arr.length, iterable: arr}}, this.meta_options, true)) || [] )
+  
+      // devo sicuramente fare una roba come per il conditional..un componente che estende component, perchè devo per forza gestire meglio la parte di append all'html pointer..
+  
+      this.childs.forEach(child=>child.buildSkeleton())
+      this.childs.forEach(child=>child.create())
+    }
 
   }
 
@@ -3877,9 +3975,9 @@ class IterableViewComponent{
   }
 
   // real "create", wrapped in the conditional system
-  _create(){
+  _create(rebuild_for_changes=false, latestResolvedValue=undefined){
     _info.log("start recreating: ", this)
-    this.buildChildsSkeleton()
+    this.buildChildsSkeleton(rebuild_for_changes, latestResolvedValue)
   }
 
   // @overwrite
@@ -3895,11 +3993,11 @@ class IterableViewComponent{
         _info.log("set iterable", v, _, prop); 
         if (this.meta_def.comparer !== undefined){
           if (this.meta_def.comparer(v, prop._latestResolvedValue)) { 
-              this._create()
+              this._create(true, prop._latestResolvedValue) // rebuild_for_changes, latestResolvedValue
             }
         }
         else if (v !== prop._latestResolvedValue) { 
-          this._create()
+          this._create(true, prop._latestResolvedValue) // rebuild_for_changes, latestResolvedValue
         } 
       }, 
       pass, 
@@ -3967,7 +4065,7 @@ class IterableViewComponent{
     _info.log("last of condition: ", this, this.meta_def.of)
     
     // try {
-    this.iterableProperty.value.length > 0 && this._create()
+    this.iterableProperty.value.length > 0 && this._create(false, undefined) // rebuild_for_changes, latestResolvedValue
     // }
     // catch {
     // }

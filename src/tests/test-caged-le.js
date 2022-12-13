@@ -330,6 +330,8 @@ const TodoList = { // automatic root div!
 
     { div: { meta: { forEach:"todo",  of: $ => $.parent.todolist,  define:{ index:"idx", first:"isFirst", last:"isLast", length:"len", iterable:"arr",    ...CUSTOM_PROP_NAME: value | ($: "parent" $this (same as meta), $child: real $this of the child)=> ... }, define_alias:{ // my_var_extracted_with_meta_identifier..easy alias! //, todo_label: $ => $.this.todo_label_mapping[$.meta.todo]},  key,comparer: el=>... extractor/converter: $=> // opzionale, per fare es Obj.keys --> extractor:($, blabla)=>Object.keys(blabla) e i comparer per identificare i changes // 
                      ,comparer: (_new, _old)=>_new !== _old
+                     ,idComparer: (_new, _old)=>_new !== _old // comparer for leFor Elements
+                     ,optimized: true // enable leFor optimization
                      ,newScope: bool, noThisInScope: bool, noMetaInScope: bool, hasViewChilds: bool, metaPushbackAutomark: bool}], (le ultime sono le "scope options") 
       
       "=>": [
@@ -6311,6 +6313,78 @@ const appDemoCheckedDeps = async ()=>{
 
 }
 
+
+const appDemoOptimizedLeFor = async ()=>{
+
+  // SUCCESS
+  RenderApp(document.body, cle.root({
+
+    let_values: [...new Array(10).keys()],// [1,2,3,4,5,6,7,8,9,10],
+
+    def_swap: ($, idx)=>{
+      console.log("APP: new, old", 
+        [...$.values.slice(0, idx), $.values[idx+1], $.values[idx], ...$.values.slice(idx+2, $.values.length)],
+        $.values
+      )
+      if (idx+1 <= $.values.length){
+        $.values = [...$.values.slice(0, idx), $.values[idx+1], $.values[idx], ...$.values.slice(idx+2, $.values.length)]
+      }
+    },
+    
+    def_add: $=>{
+      $.values = [...$.values, $.values.length]
+    },
+    
+    def_addOnTop: $=>{
+      $.values = [$.values.length, ...$.values]
+    },
+    
+    def_removeFirst: $=>{
+      let [first, ...others] = $.values
+      $.values = others
+    },
+    
+    def_removeMiddle: $=>{
+      let middle = Math.round($.values.length/2)
+      $.values = [...$.values.slice(0, middle), ...$.values.slice(middle+1)]
+    },
+    
+    def_removeLast: $=>{
+      let [last, ...others] = $.values.reverse()
+      $.values = others.reverse()
+    },
+
+    onInit: $=>{
+      setTimeout(() => {
+        $.swap(1)
+      }, 5000);
+    },
+  
+  },
+
+    cle.h3("CLE Optimized LeFor"),
+
+    // "optimize" is the key to enable the enhancement. "idComparer" can be used to compare elments changes. standard "comparer" can be used to modify the array change detection
+    cle.div({meta: { forEach:"val", of: $=>$.values, define: {index: "idx"}, optimized: true},
+      h_onclick: $=> $.swap($.idx)
+    },
+      cle.div({}, 
+        cle.span({}, "The Number Is: "), cle.span({}, $=>$.val)
+      ) 
+    ),
+
+    cle.button({h_onclick: $=>$.add()}, "Add"),
+    cle.button({h_onclick: $=>$.addOnTop()}, "Add On Top"),
+    cle.button({h_onclick: $=>$.removeFirst()}, "Remove First"),
+    cle.button({h_onclick: $=>$.removeMiddle()}, "Remove Middle"),
+    cle.button({h_onclick: $=>$.removeLast()}, "Remove Last"),
+
+
+
+  ))
+
+}
+
 // app0()
 // test2way()
 // appTodolist()
@@ -6353,7 +6427,8 @@ const appDemoCheckedDeps = async ()=>{
 // appDemoCellSelection()
 // appDemoDefault$Scope()
 // appDemoChildRefByName()
-appDemoCheckedDeps()
+// appDemoCheckedDeps()
+appDemoOptimizedLeFor()
 
 // todo: idea per funzioni "at most once" da usare a giro nel framework: in pratica siccome mi paasano una funzione, aka oggetto, potrei settargli un attributo tipo x.__cle__exec_counter__ e controllare se > 1. problema: come fare per le funzioni che sono delle const dentro una funzione? o in generale funzioni passate e create dentro una funzione? li forse solo una roba diversa es dynamicAtMostOnce, che ti fa il toString della funzione..
 //       - quando può servire sta roba? es in una onhover su un pulsante potrei mettere la import dinamica di un altro pezzo di app, per creare app "parziali" senza dare lagg agli utenti. ovviamnete nel mobile non ha senso :D
