@@ -3003,6 +3003,9 @@ class Component {
         else if (k.startsWith('on_dbus_')){
           dash_shortucts_keys.on_dbus[k.substring(8)] = val
         }
+        else if (k.startsWith('on_s_')){ // ultra shortcuts! use scope (ideally for signals..)
+          dash_shortucts_keys.on_scope[k.substring(5)] = val
+        }
         else if (k.startsWith('on_')){ // ultra shortcuts! use scope
           dash_shortucts_keys.on_scope[k.substring(3)] = val
         }
@@ -4287,4 +4290,215 @@ const output = (sig_name, def='stream => void') =>({['s_'+sig_name]:def})
 const clsIf = (condition, clsTrue, clsFalse='')=>condition ? ' '+clsTrue : clsFalse
 // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // 
 
-export { pass, none, smart, smartFunc as f, smartFuncWithCustomArgs as fArgs, Use, Extended, Placeholder, Bind, Alias, SmartAlias, PropertyBinding, ExternalProp, useExternal, Switch, Case, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock, cle, str, str_, input, output, ExtendSCSS, clsIf }
+// EXPERIMENTAL: from html-like template!
+function stringWithOnlySpaces(str) {
+  return /^\s*$/.test(str);
+}
+const htmlConverterHookRemap = {
+  beforeinit: 'beforeInit',
+  oninit: 'onInit',
+  afterchildsinit: 'afterChildsInit',
+  afterinit: 'afterInit',
+  ondestroy: 'onDestroy',
+  constructor: 'constructor',
+}
+const resolveAndConvertHtmlElement = (element, tagReplacers, extraDefs )=>{
+  // console.log("parsing: ", element)
+  if (element.nodeType === 8){ // is a comment, skip
+    return undefined
+  }
+
+  if (element.nodeName === "#text"){
+    let text = element.textContent
+    
+    if (stringWithOnlySpaces(text)){
+      return undefined
+    }
+
+    if (text.startsWith("{{")){
+      return smartFunc(text.replace("{{", "").replace("}}", ""), true)
+    } 
+    else {
+      return text
+    }
+  }
+  else {
+    let tag = element.tagName.toLowerCase()
+
+    const properties = {}
+    const signals = {}
+    const on_handlers = {}
+    const attributes = {}
+    const dynamic_attributes = {}
+    const hattributes = {}
+    const dynamic_hattributes = {}
+    const handlers = {}
+    const meta = {}
+    const hooks = {}
+
+    let extra_def_id = undefined
+
+    for (let attr of element.attributes || []){
+      
+      // extra/external def
+      if (attr.name === "extra-defs"){
+        extra_def_id = attr.value
+      }
+      // meta
+      else if (attr.name.startsWith("meta-")){
+        let name = attr.name.substring(5)
+        if (name === "foreach"){
+          let [foreach_var, of_clausole] = attr.value.split(" of ")
+          meta.forEach = foreach_var
+          meta.of = smartFunc(of_clausole, true)
+        }
+        else if (name === "if"){
+          meta.if = smartFunc(attr.value, true)
+        }
+        else if (name === "optimized"){
+          meta.optimized = attr.value==='true'
+        }
+        else if (name.startsWith("define-")){
+          name = name.substring(7)
+          if (meta.define === undefined){
+            meta.define = {}
+          }
+          meta.define[name] = attr.value
+        }
+        else {
+          console.log("UNSUPPORTED AT THIS TIME: ", attr)
+        }
+      }
+      // hooks
+      else if (attr.name.startsWith("hook-")){
+        // todo, risolvere problema per cui gli attr arrivano lowercase
+        let name = htmlConverterHookRemap[attr.name.substring(5)]
+        hooks[name] = smartFunc(attr.value, true)
+      }
+      // standard signal definition
+      else if (attr.name.startsWith("signal-")){
+        let name = attr.name.substring(7)
+        signals["signal_"+name] = attr.value || "stream => void"
+      }
+      // signals handlers 
+      else if (attr.name.startsWith("(on-") && attr.name.endsWith("-changed)")){
+        let name = attr.name.substring(4, attr.name.length-9) // for property changes..always dash-case
+        let value = smartFuncWithCustomArgs("newValue", "oldValue")(attr.value, true)
+        // console.log(attr, name, value, "on_scope_"+name+"Changed")
+        on_handlers["on_"+name+"Changed"] = value
+      }
+      // dbus handlers
+      else if (attr.name.startsWith("(on-dbus-")){
+        let name = attr.name.substring(9, attr.name.length-1)
+        let value = smartFuncWithCustomArgs("$val", "$val1", "$val2", "$val3", "$val4", "$val5", "$val6", "$val7", "$val8", "$val9")(attr.value, true)
+        // console.log(attr, name, value)
+        on_handlers["on_dbus_"+name] = value
+      }
+      // properties change handlers 
+      else if (attr.name.startsWith("(on-")){
+        let name = attr.name.substring(4, attr.name.length-1)
+        let value = smartFuncWithCustomArgs("$val", "$val1", "$val2", "$val3", "$val4", "$val5", "$val6", "$val7", "$val8", "$val9")(attr.value, true)
+        // console.log(attr, name, value)
+        on_handlers["on_"+name] = value
+      }
+      // handlers (onclick)
+      else if (attr.name.startsWith("(")){
+        let name = attr.name.substring(1, attr.name.length-1)
+        let value = smartFuncWithCustomArgs("evt")(attr.value, true)
+        handlers["h_"+name] = value
+      }
+      // standard properties
+      else if (attr.name.startsWith("let-") || attr.name.startsWith("set-")){
+        let name = attr.name.substring(4)
+        properties["let_"+name] = attr.value
+      }
+      // evaluable properties
+      else if (attr.name.startsWith("[let-") || attr.name.startsWith("[set-")){
+        // todo, risolvere problema per cui gli attr arrivano lowercase
+        let name = attr.name.substring(5, attr.name.length-1)
+        properties["let_"+name] = smartFunc(attr.value, true)
+      }
+      // dynamc hattrs [ha-style.color]="$.xxx + 'px'" or camel case properties using dash-case
+      else if (attr.name.startsWith("[ha-")){
+        let name = attr.name.substring(4, attr.name.length-1)
+        if (name.includes("-")){ // specific for subproperties where camel case should be mantained: [ha-style.font-size]="$.xxx + 'px'". (must convert dash-case to camelCase)
+          name = name.split(".").map(subname=>subname.split("-").map((word, i)=> i===0 ? word : word.charAt(0).toUpperCase()+word.substring(1)).join("")).join(".") // convert in camelCase, each .xxx-yyy subproperty in .xxxYyy
+        }
+        let value = smartFunc(attr.value, true)
+        dynamic_hattributes["ha_"+name] = value
+      }
+      // standard hattributes
+      else if (attr.name.startsWith("ha-")){
+        let name = attr.name.substring(3)
+        hattributes["ha_"+name] = attr.value
+      }
+      // dynamc attrs [style]="$.xxx + 'px'"
+      else if (attr.name.startsWith("[")){
+        let name = attr.name.substring(1, attr.name.length-1)
+        let value = smartFunc(attr.value, true)
+        dynamic_attributes["a_"+name] = value
+      }
+      // standard attributes
+      else {
+        attributes["a_"+attr.name] = attr.value
+      }
+    }
+
+    const parsedDef = {
+      ...attributes, 
+      ...dynamic_attributes, 
+      ...hattributes, 
+      ...dynamic_hattributes, 
+      ...handlers, 
+      ...hooks, 
+      ...properties, 
+      ...signals, 
+      ...on_handlers,
+      ...(meta? {meta: meta} : {}),
+
+      ...(extra_def_id !== undefined && extra_def_id in extraDefs ? extraDefs[extra_def_id] : {})
+    }
+    
+    if (tag.startsWith("use-") && tag.substring(4) in tagReplacers){
+      return Use(tagReplacers[tag.substring(4)], {...parsedDef})
+    }
+    else if (tag.startsWith("extended-") && tag.substring(9) in tagReplacers){
+      return Extended(tagReplacers[tag.substring(9)], {...parsedDef})
+    }
+    else {
+      const children = Array.from(element.childNodes).map(c=>resolveAndConvertHtmlElement(c, tagReplacers, extraDefs)).filter(c=>c !== undefined)
+      return { [tag]: {...parsedDef, "=>": children}}
+    }
+  }
+}
+// export - convert and generate cle components from html string and a definition and component tag-replacer. extraDefs to add xtra definition vai obj, using a template id in template and as key in extraDefs
+const fromHtml = (text, definition={}, tagReplacers={}, extraDefs={})=>{
+  const dp = new DOMParser()
+
+  let elements = dp.parseFromString(text, 'text/html').body
+  // console.log(elements)
+
+  let root = {}
+
+  if (elements.childNodes.length === 0){
+    throw Error("No html found")
+  }
+  else{
+    let children = Array.from(elements.childNodes).map(c=>resolveAndConvertHtmlElement(c, tagReplacers, extraDefs)).filter(c=>c !== undefined) 
+    // console.log("child", children)
+    if (children.length === 1){
+      let tag = Object.keys(children[0])[0]
+      root = { [tag] : {...definition, ...children[0][tag]}}
+    }
+    else{
+      root = { 'multi': {...definition, "=>": children }}
+    }
+  }
+
+  return root
+}
+
+
+// // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // 
+
+export { pass, none, smart, smartFunc as f, smartFuncWithCustomArgs as fArgs, Use, Extended, Placeholder, Bind, Alias, SmartAlias, PropertyBinding, ExternalProp, useExternal, Switch, Case, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock, cle, str, str_, input, output, ExtendSCSS, clsIf, fromHtml as html }

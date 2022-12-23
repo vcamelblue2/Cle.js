@@ -1,4 +1,4 @@
-import { Alias, Bind, Case, cle, Extended, ExtendSCSS, ExternalProp, f, fArgs, LE_BackendApiMock, LE_LoadCss, LE_LoadScript, pass, Placeholder, RenderApp, smart, SmartAlias, str, Switch, toInlineStyle, Use, useExternal } from "../lib/caged-le.js"
+import { Alias, Bind, Case, cle, Extended, ExtendSCSS, ExternalProp, f, fArgs, LE_BackendApiMock, LE_LoadCss, LE_LoadScript, pass, Placeholder, RenderApp, smart, SmartAlias, str, Switch, toInlineStyle, Use, useExternal, html } from "../lib/caged-le.js"
 import { NavSidebarLayout } from "../layouts/layouts.js"
 
 /*
@@ -8,6 +8,8 @@ const component = {
   component_name: { meta: { if: $ => some.condition },
 
     "private:"? id: "compoent_id",
+    
+    "ctx_id: "ctx_compoent_id",
 
     "name": "refName",
 
@@ -6385,6 +6387,109 @@ const appDemoOptimizedLeFor = async ()=>{
 
 }
 
+
+const appDemoFromHtmlTemplate = async ()=>{
+
+  const myspan = html(`
+      <span>
+        hello world
+      </span>`
+    )
+  
+  const myh3 = cle.h3({
+    let_alias: "",
+    on_parent_numbersChanged: $=>{
+      console.log("n chan")
+    }
+  }, "hi baby!! ", f`@alias ? "(alias: "+@alias+")" : @alias`, " ", myspan)
+
+  const app = html(`
+    <div class="myclass" [style]="({color: @color})" [ha-style.font-size]="@fontSize+'px'" (onclick)="@el_clicked()" signal-some_el_clicked="stream => el" >
+      
+      Hi <b>{{@user}}</b> (<i let-role="ADMIN">{{@role}}</i>)
+
+      <use-myh3 set-alias="vivi"></use-myh3> <!-- passed variable. or [set-alias]="@user" for evaluable. can be also used Extended: extended-myh3></extended-myh3 -->
+
+      <ul (onclick)="@addNum()" hook-onInit="console.log($.numbers)" (on-parent_numbers-changed)="console.log('numbers changed!', @numbers)">
+        <li meta-foreach="num of @numbers" meta-define-index="idx">{{@idx+ ') '+@num}}</li>
+      </ul>
+
+      <div meta-if="@numbers.length % 2 === 0">Pari!</div>
+
+      <div (on-some_el_clicked)="console.log('handlig a signal!', $val)" extra-defs="myDivExtraDef">from extra def</div>
+
+    </div>`, 
+    {
+      // please, also if is it possible do not declare variable or signal inside template..use only to pass variable
+
+      let_user: "vins",
+      let_color: "red",
+      let_numbers: [1,2,3],
+      let_fontSize: 24,
+
+      def_el_clicked: $=>{
+        console.log("el clicked!")
+        $.color = $.color === "red" ? "green" : "red"
+        $.some_el_clicked.emit("passed val")
+      },
+
+      def_addNum($){
+        $.numbers = [...$.numbers, $.numbers.length+1]
+      },
+
+      // onInit: $=>{
+      //   console.log($.this, $.scope, $.numbers, $.scope.numbers)
+      // },
+      // afterChildsInit: $=>{
+      //   console.log("after", $.u.getCleElementByDom("ul"))
+      // }
+
+
+    }, {myh3}, { myDivExtraDef: { style: "color: orange"} })
+
+  console.log(app)
+
+  // SUCCESS
+  RenderApp(document.body, cle.root({},
+
+    app,
+
+    html(`
+      <h2>Radio Buttons</h2>
+
+      <p>Choose your favorite Web language:</p>
+
+      <form 
+        (onchange)="{ $.dbus.radioSelected.emit(evt) }" 
+        hook-onInit="{ console.log('Form Init!', $); $.u.getCleElementsByDom('input')[2].el.checked = true }"
+      >
+        <input type="radio" id="html" name="fav_language" value="HTML">
+        <label for="html">HTML</label><br>
+
+        <input type="radio" id="css" name="fav_language" value="CSS">
+        <label for="css">CSS</label><br>
+
+        <input type="radio" id="javascript" name="fav_language" value="JavaScript">
+        <label for="javascript">JavaScript</label>
+      </form> 
+    `),
+
+    { Controller: {
+      
+      dbus_signal_radioSelected: "stream => $event",
+
+      on_dbus_radioSelected: ($, e)=>{
+        console.log(e, e.target.value)
+      },
+      onInit: $=>{
+        console.log("dbus", $.dbus)
+      }
+    }}
+    
+  ))
+
+}
+
 // app0()
 // test2way()
 // appTodolist()
@@ -6428,7 +6533,8 @@ const appDemoOptimizedLeFor = async ()=>{
 // appDemoDefault$Scope()
 // appDemoChildRefByName()
 // appDemoCheckedDeps()
-appDemoOptimizedLeFor()
+// appDemoOptimizedLeFor()
+appDemoFromHtmlTemplate()
 
 // todo: idea per funzioni "at most once" da usare a giro nel framework: in pratica siccome mi paasano una funzione, aka oggetto, potrei settargli un attributo tipo x.__cle__exec_counter__ e controllare se > 1. problema: come fare per le funzioni che sono delle const dentro una funzione? o in generale funzioni passate e create dentro una funzione? li forse solo una roba diversa es dynamicAtMostOnce, che ti fa il toString della funzione..
 //       - quando può servire sta roba? es in una onhover su un pulsante potrei mettere la import dinamica di un altro pezzo di app, per creare app "parziali" senza dare lagg agli utenti. ovviamnete nel mobile non ha senso :D
