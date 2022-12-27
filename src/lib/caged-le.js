@@ -300,7 +300,7 @@ class Signal {
   }
 
   // proxy dei signal esposto agli user, che possono fare solo $.this.signalName.emit(...)
-  static getSignalProxy = (realSignal)=> ( {emit: (...args)=>realSignal.emit(...args), emitLazy: (t=1, ...args)=>setTimeout(() => {realSignal.emit(...args)}, t)} )
+  static getSignalProxy = (realSignal)=> ( {emit: (...args)=>realSignal.emit(...args), emitLazy: (t=1, ...args)=>setTimeout(() => {realSignal.emit(...args)}, t), subscribe: (who, handler) => realSignal.addHandler(who, handler), unsubscribe: (who) => realSignal.removeHandler(who) })
 
 }
 
@@ -1255,6 +1255,28 @@ class Component {
 
   }
 
+  get$ScopedSignalOwner(sign, search_depth=0){ // utility per la dynamic subscribe e unsub da un segnale..
+
+    if (this.parent === undefined || !(this.parent instanceof Component)){ // || this.parent instanceof IterableViewComponent)){
+      return [this, /*isPropertiesProp = */ true]
+    }
+
+    if (search_depth === 0 && this.meta_options.noThisInScope){ // salta il this e vai a parent..
+      return this.parent.get$ScopedSignalOwner(sign, search_depth+1)
+    }
+
+    if (sign in this.signals){
+      return [this, true]
+    }
+    else if (this.meta_options.isNewScope){
+      throw Error("Signal cannot be found in this scope..blocked scope?")
+    }
+    else {
+      return this.parent.get$ScopedSignalOwner(sign, search_depth+1)
+    }
+
+  }
+
   defineAndRegisterId(){
 
     this.id = this.convertedDefinition.id
@@ -1346,10 +1368,14 @@ class Component {
     this.properties.getAsExternalProperty = (prop_name)=>{let found = this.properties[prop_name]; if (found instanceof Property){return found}} // stupid utils to retrive the real Property behind the $.this proxy..useful to be used as "external" deps in a dynamic context.. (via set value as useExternal([extractedProp], $=>extractedProp.value))
     
     // dynamic signals
-    this.properties.subscribe = (name, who, handler) => {
+    this.properties.subscribe = (name, who, handler, upsearch=false) => {
       // if (who instanceof Proxy){ throw Error("Must Be $.this!") } NON è FATTIBILE! non si può sapere se è un proxy o no, a meno di nonn modificare la get della Proxy con una if prop === "isProxy" return true
       if (name in this.signals){
         return this.signals[name].addHandler(who, handler) // return remover
+      }
+      else if (upsearch){
+        const [ref, _] = this.get$ScopedSignalOwner(name)
+        return ref.signals[name].addHandler(who, handler)
       }
       else {
         throw Error("Signal does not exists")
@@ -1382,9 +1408,18 @@ class Component {
         subscribeHandler()
       })
     }
-    this.properties.unsubscribe = (name, who) => {
+    this.properties.unsubscribe = (name, who, upsearch=false) => {
       // if (who instanceof Proxy){ throw Error("Must Be $.this!") } NON è FATTIBILE! non si può sapere se è un proxy o no, a meno di nonn modificare la get della Proxy con una if prop === "isProxy" return true
-      this.signals[name].removeHandler(who)
+      if (name in this.signals) {
+        this.signals[name].removeHandler(who)
+      }
+      else if (upsearch){
+        const [ref, _] = this.get$ScopedSignalOwner(name)
+        return ref.signals[name].removeHandler(who)
+      }
+      else {
+        throw Error("Signal does not exists")
+      }
     }
 
 
