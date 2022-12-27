@@ -6490,6 +6490,63 @@ const appDemoFromHtmlTemplate = async ()=>{
 
 }
 
+
+const appDemoCSSInJSWithCSZ = async ()=>{
+  // FINAL CSS PROBLEM SOLUTION
+
+  // use this lib. simply create at runtime css class from css strings, and reuse it in cache!
+  // https://github.com/lukejacksonn/csz
+  // https://rajasegar.github.io/csz-slides
+
+  const css = (await import('https://unpkg.com/csz')).default;
+  
+  const globalStyle = css`
+  :global(body){
+    padding: 10px; margin: 0px; width: 100% 
+  }
+  :global(*){
+    box-sizing: border-box !important;
+  }
+  
+  `// global selector does not require to be inserted in cle etc..
+
+  const highlightOnHover = css`&:hover{ transform: scale(1.05)}`
+
+  // SUCCESS
+  RenderApp(document.body, cle.root({},
+
+    cle.h3({}, "Hello World from CSZ!"),
+    cle.wrapper( { class: css`display: flex; justify-content: space-between; align-items: center;` +" "+ highlightOnHover},
+      cle.button({}, "a standard btn"),
+      cle.button({class: "waves-effect waves-light btn"}, "a standard btn (using materialize classes)"),
+      cle.button({ a: {type:"button", class:"btn btn-primary"}}, "a standard btn (using bootstrap classes)"),
+    ),
+
+    cle.hr(),
+    
+    cle.materializecss({ class: css`https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css`, onInit: async ()=>{setTimeout(async() => {await LE_LoadScript('https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js'); window.M?.init()}, 2000); }}, cle.html({}, cle.body({}, 
+      cle.h3({}, "Hello World from CSZ! (using Materialize CSS)"),
+      cle.wrapper( { class: css`display: flex; justify-content: space-between; align-items: center;` +" "+ highlightOnHover},
+        cle.a({ class: "waves-effect waves-light btn"}, "a materialize btn"),
+        cle.a({ class: "waves-effect waves-light btn"}, "a materialize btn"),
+        cle.a({ class: "waves-effect waves-light btn"}, "a materialize btn"),
+      )
+    ))),
+    
+    cle.hr(),
+    // to use bootstrap 5 isolated in some component you need to attach as shadowDom
+    cle.bootstrap({ class: css`https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css`  }, cle.html({}, cle.body({}, 
+      cle.h3({}, "Hello World from CSZ! (using Bootstrap)"),
+      cle.wrapper( { class: css`display: flex; justify-content: space-between; align-items: center;` +" "+ highlightOnHover},
+        cle.button({ a: {type:"button", class:"btn btn-primary"}}, "a bootstrap btn"),
+        cle.button({ a: {type:"button", class:"btn btn-primary"}}, "a bootstrap btn"),
+        cle.button({ a: {type:"button", class:"btn btn-primary"}}, "a bootstrap btn"),
+      )
+    ))),
+  ))
+
+}
+
 // app0()
 // test2way()
 // appTodolist()
@@ -6534,7 +6591,8 @@ const appDemoFromHtmlTemplate = async ()=>{
 // appDemoChildRefByName()
 // appDemoCheckedDeps()
 // appDemoOptimizedLeFor()
-appDemoFromHtmlTemplate()
+// appDemoFromHtmlTemplate()
+appDemoCSSInJSWithCSZ()
 
 // todo: idea per funzioni "at most once" da usare a giro nel framework: in pratica siccome mi paasano una funzione, aka oggetto, potrei settargli un attributo tipo x.__cle__exec_counter__ e controllare se > 1. problema: come fare per le funzioni che sono delle const dentro una funzione? o in generale funzioni passate e create dentro una funzione? li forse solo una roba diversa es dynamicAtMostOnce, che ti fa il toString della funzione..
 //       - quando può servire sta roba? es in una onhover su un pulsante potrei mettere la import dinamica di un altro pezzo di app, per creare app "parziali" senza dare lagg agli utenti. ovviamnete nel mobile non ha senso :D
