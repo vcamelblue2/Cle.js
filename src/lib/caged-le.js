@@ -3756,6 +3756,8 @@ class IterableComponent extends Component{
     }
     let manualMarkSignalName = "_mark_"+this.meta_config.iterablePropertyIdentifier+"_as_changed"
     this.meta[manualMarkSignalName] = ()=>this.meta[this.meta_config.iterablePropertyIdentifier].markAsChanged()
+    let signalName = this.meta_config.iterablePropertyIdentifier+"Changed"
+    this.signals[signalName] = new Signal(signalName, "stream => (newValue: any, oldValue: any) - property change signal")
 
     _info.log("before meta: ", this.$meta, this.parent.$meta, this.meta, this.parent.meta, this.parent)
     this.$meta = this.getMy$meta() // rebuild
