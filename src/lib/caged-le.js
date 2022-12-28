@@ -3737,6 +3737,7 @@ class IterableComponent extends Component{
         _info.log("META: push back value edit!"); 
         this.meta_config.define_helper.iterable[this.meta_config.define_helper.index]=v; 
         this.meta_options.metaPushbackAutomark && this.meta_config.realPointedIterableProperty.markAsChanged(); 
+        this.signals[this.meta_config.iterablePropertyIdentifier+"Changed"].emit(v, this.meta[this.meta_config.iterablePropertyIdentifier]._latestResolvedValue); // NEW FOR REACT MASHUP: force to emit a xxxChanged also for meta vars..
       }, none, ()=>this.$this, none, true
     )
     if (this.meta_config.define !== undefined){
