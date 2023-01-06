@@ -1167,7 +1167,7 @@ class Component {
     this.oj_definition = definition
 
     this.htmlElementType = getComponentType(definition)
-    this.isObjComponent = ["Model", "Controller", "Component", "Connector", "Signals", "Style", "Css"].includes(this.htmlElementType)
+    this.isObjComponent = ["Model", "Controller", "Service", "Component", "Connector", "Signals", "Style", "Css"].includes(this.htmlElementType)
     this.convertedDefinition = Component.parseComponentDefinition( (definition instanceof UseComponentDeclaration ? definition.computedTemplate : definition) [this.htmlElementType])
     this.meta_options = {
       isNewScope: this.convertedDefinition.meta?.newScope,
