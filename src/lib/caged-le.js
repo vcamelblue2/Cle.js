@@ -1549,6 +1549,15 @@ class Component {
       getLazyRenderState: () => this.dynamicChildsState,
       clearLazyRender: (generatedDynComp, clearState=false, clearDestroyHook=false)=>{
         this.destroyDynamicChilds(generatedDynComp, clearState, clearDestroyHook)
+      },
+
+      // UTILS PER SUB - SUB APP NESTING! necessario che oj_definition sia una definition standard! { xxx: {yyy}} 
+      // called on $.u.new... use the $ as parent, but a specific html element as mount point (maybe a react element..)
+      newConnectedSubRenderer: (html_mount_point, oj_definition, lazy=false)=>{
+        if (html_mount_point === undefined){
+          html_mount_point = this.html_pointer_element
+        }
+        return SubRendererComponent.SubRendererComponentFactory(this, html_mount_point, oj_definition, lazy)
       }
     })
   }
@@ -3575,6 +3584,34 @@ class TextNodeComponent {
 
 }
 
+// Special Component for ConnectedSubRenderer (submount a cle app to anoother cle app, but with a different mount point (html elemnt))
+class SubRendererComponent extends Component{
+
+  // intermediate step!
+  setupMountPoint(html_mount_point){
+    this.html_mount_point = html_mount_point
+  }
+
+  // @override step 2: DO NOT CREATE HTML EL ON PARENT, use mount point instead!
+  buildHtmlPointerElement(){
+    this.html_pointer_element = document.createElement(this.htmlElementType)
+
+    this.html_mount_point.appendChild(this.html_pointer_element)
+
+    this.html_pointer_element.setAttribute(this.t_uid, "")
+  }
+
+  static SubRendererComponentFactory($parent, html_mount_point, oj_definition, lazy=false){
+    const maybeLazy = ()=>{
+      const components_root = new SubRendererComponent($parent, oj_definition, $parent.$le, $parent.$dbus)
+      components_root.setupMountPoint(html_mount_point)
+      components_root.buildSkeleton()
+      components_root.create()
+      return components_root
+    }
+    return lazy ? maybeLazy : maybeLazy()
+  }
+}
 
 
 class ConditionalComponent extends Component{

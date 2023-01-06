@@ -2,7 +2,7 @@
 import * as cle_lib from "../../lib/caged-le-module-to-global.js";
 
 // Import cle-react mashup utils
-import { ReactInCle, UseReact, UseReactMixin, useCleProp, useCleProps } from './react-in-cle.js';
+import { ReactInCle, UseReact, UseReactMixin, useCleProp, useCleProps, fReact } from './react-in-cle.js';
 import { CleInReact, UseCle, UseDumbCle } from './cle-in-react.js';
 
 // Import css-in-js via csz
@@ -258,6 +258,34 @@ RenderApp(document.getElementById("root"), cle.root({
     );
   }), // pure binding without $.update..
 
+
+	// SUBNESTING EXAMPLE
+	// UseReact(({$})=>{
+	// 	useCleProps($, "$.le.likeService.numEdits")
+
+	// 	// with UseCle you cannot follow a parent cle from a nested react..the renderer is different!
+	// 	return <>
+	// 		<UseCle def={ cle.div({}, 
+			
+	// 			UseReact(({$$})=>{
+	// 				useCleProps($, "$.le.likeService.numEdits")
+	// 				return <button onClick={$.le.likeService.resetData}>Reset Data (#Edits: {$.le.likeService.numEdits}) (shoud be always 0..)</button>
+	// 			})
+	// 		)}/>
+			
+	// 		{/* Solution: with UseSubCle now you can follow a parent cle from a nested react..the cle renderer is reused! */}
+	// 		<UseSubCle $={$} def={ cle.div({}, 
+				
+	// 			UseReact(({$})=>{
+	// 				useCleProps($, "$.le.likeService.numEdits")
+	// 				return <button onClick={$.le.likeService.resetData}>Reset Data (#Edits: {$.le.likeService.numEdits})</button>
+	// 			})
+	// 		)}/>
+
+	// 		<button onClick={$.le.likeService.resetData}>Reset Data (#Edits: {$.le.likeService.numEdits})</button>
+	// 	</>
+	// }),
+
 ))
 }
 
@@ -329,8 +357,6 @@ const APP_4_TODOLIST_ROOT_IS_CLE = async ()=>{
 	// 	LE_LoadCss('https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.css'),
 	// 	LE_LoadCss('https://cdnjs.cloudflare.com/ajax/libs/milligram/1.4.1/milligram.min.css'),
 	// ])
-
-	const fReact = ($, ...otherArgs)=>( (code, funcCall=false)=>(()=>f(code, funcCall, ...otherArgs)($)) )
 
 	RenderApp(document.body, cle.div({
 

@@ -15,7 +15,7 @@ const ReactInCle = {
     cle: window.cle_lib
   },
 
-  manualSetup: (React, cle_lib )=>{
+  manualSetup: (React, ReactDOM, cle_lib )=>{
     if (React !== undefined){
       ReactInCle.deps.react.React = React
       ReactInCle.deps.react.ReactDOM = ReactDOM
@@ -61,6 +61,9 @@ const UseReact = (Def=()=>{}, props={}, changeDetectionVars=[], extraDefinitions
 	})
 	return { 'nested-react': definition }
 }
+
+// F smartfunc declarations in react elements 
+const fReact = ($, ...otherArgs)=>( (code, funcCall=false)=>(()=>ReactInCle.deps.cle.f(code, funcCall, ...otherArgs)($)) )
 
 // to replace react in a EXISTING cle component wrapper eg: <nested-react></nested-react>
 const UseReactMixin = (Def=()=>{}, props={}, mountElQuery="nested-react", oninit=($)=>{}, ondestroy=($)=>{})=>{
@@ -126,4 +129,4 @@ const useCleProps = ($, ...propsName)=>{
 	return [_, lrid, rerenderize]
 }
 
-export { ReactInCle, UseReact, UseReactMixin, useCleProp, useCleProps }
+export { ReactInCle, UseReact, UseReactMixin, fReact, useCleProp, useCleProps }
