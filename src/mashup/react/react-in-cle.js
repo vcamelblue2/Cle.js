@@ -140,4 +140,4 @@ const onCleSignal = ($, signal, handler, upsearch=false)=>{
 	}, []) // oninit, return ondestroy
 }
 
-export { ReactInCle, UseReact, UseReactMixin, fReact, useCleProp, useCleProps }
+export { ReactInCle, UseReact, UseReactMixin, fReact, useCleProp, useCleProps, onCleSignal }
