@@ -1373,13 +1373,35 @@ class Component {
       if (name in this.signals){
         return this.signals[name].addHandler(who, handler) // return remover
       }
+      else if (name.includes(".")){
+        if (name.startsWith("dbus.")){
+          return this.$dbus.addSignalHandler(name.slice(5), who, handler)
+        }
+        else if (name.startsWith("le.")){
+          const [_, leItem, leSignal] = name.split(".")
+          return this.$le[leItem].signals[leSignal].addHandler(who, handler)
+        }
+        else if (name.startsWith("ctx.")){
+          const [_, leItem, leSignal] = name.split(".")
+          return this.$ctx[leItem].signals[leSignal].addHandler(who, handler)
+        }
+        else if (name.startsWith("ref.")){
+          const [_, refName, leSignal] = name.split(".")
+          const pointer = this.getChildsRefOwner(refName).childsRefPointers[refName]
+          if (Array.isArray(pointer)){
+            return pointer.map(ptr=> ptr.signals[leSignal].addHandler(who, handler) )
+          }
+          else {
+            return pointer.signals[leSignal].addHandler(who, handler)
+          }
+        }
+      }
       else if (upsearch){
         const [ref, _] = this.get$ScopedSignalOwner(name)
         return ref.signals[name].addHandler(who, handler)
       }
-      else {
-        throw Error("Signal does not exists")
-      }
+      
+      throw Error("Signal does not exists")
     }
     this.properties.subscribeAsync = async (name, who, handler) => {
       return new Promise((resolve, reject)=>{
@@ -1413,13 +1435,36 @@ class Component {
       if (name in this.signals) {
         this.signals[name].removeHandler(who)
       }
+      else if (name.includes(".")){
+
+        if (name.startsWith("dbus.")){
+          return this.$dbus.signals[name.slice(5)].removeHandler(who)
+        }
+        else if (name.startsWith("le.")){
+          const [_, leItem, leSignal] = name.split(".")
+          return this.$le[leItem].signals[leSignal].removeHandler(who)
+        }
+        else if (name.startsWith("ctx.")){
+          const [_, leItem, leSignal] = name.split(".")
+          return this.$ctx[leItem].signals[leSignal].removeHandler(who)
+        }
+        else if (name.startsWith("ref.")){
+          const [_, refName, leSignal] = name.split(".")
+          const pointer = this.getChildsRefOwner(refName).childsRefPointers[refName]
+          if (Array.isArray(pointer)){
+            return pointer.map(ptr=> ptr.signals[leSignal].removeHandler(who) )
+          }
+          else {
+            return pointer.signals[leSignal].removeHandler(who)
+          }
+        }
+      }
       else if (upsearch){
         const [ref, _] = this.get$ScopedSignalOwner(name)
         return ref.signals[name].removeHandler(who)
       }
-      else {
-        throw Error("Signal does not exists")
-      }
+
+      throw Error("Signal does not exists")
     }
 
 

@@ -5,6 +5,8 @@
 const CleInReact = {
   DEBUG: { ENABLED: false },
 
+	nestedCleTag: "cleroot",
+
   deps: {
     react: {
       React: window.React,
@@ -89,7 +91,7 @@ const UseCle = ({def, alsoSetter=false, usedProps={}, autoDestroy=false})=>{
   }, [def, ...(alsoSetter ? Object.values(usedProps).map(up=>up[0]) : [...Object.values(usedProps)])])
 
   // return <cleroot ref={el}></cleroot>
-  return  CleInReact.deps.react.React.createElement('cleroot', {ref: el})
+  return  CleInReact.deps.react.React.createElement(CleInReact.nestedCleTag, {ref: el})
 }
 
 // To fullrefresh on eache react rendering
@@ -165,7 +167,7 @@ const UseSubCle = ({$, def, alsoSetter=false, usedProps={}, autoDestroy=false})=
   }, [def, ...(alsoSetter ? Object.values(usedProps).map(up=>up[0]) : [...Object.values(usedProps)])])
 
   // return <cleroot ref={el}></cleroot>
-  return  CleInReact.deps.react.React.createElement('cleroot', {ref: el})
+  return  CleInReact.deps.react.React.createElement(CleInReact.nestedCleTag, {ref: el})
 }
 
 export { CleInReact, UseCle, UseSubCle, UseDumbCle }
