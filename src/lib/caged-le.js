@@ -1466,6 +1466,17 @@ class Component {
 
       throw Error("Signal does not exists")
     }
+    // edit reference prop inline without manually mark as changed!
+    // use: $.this.editRefVal.myProp(p=>p.value=12)
+    this.properties.editRefVal = new Proxy({}, {
+      get: (_, prop)=>{ 
+        return (action)=>{
+          action(this.$this.this[prop])
+          this.properties["_mark_"+prop+"_as_changed"]() //better also if sacrify performance.. eg for Alias & co
+        }
+      },
+      set: function() {}
+    })
 
 
     // todo: qualcosa del genere per gli attr
@@ -4390,7 +4401,7 @@ class LE_BackendApiMock{ // base class for backend api mock -> purpose is to hav
 // export 
 /** Syntactic Sugar to define component using cle.div({ DEFINITION }, ...CHILDS), instead of normal object.*/
 const cle = new Proxy({}, {
-  get: (_target, prop, receiver)=>{ return (args_dict, ...childs)=>(  typeof args_dict === "string" || typeof args_dict ==="function" ? {[prop]: args_dict} : {[prop]:{...args_dict, ...(childs.length ? {'':childs} : {}) }}  ) },
+  get: (_target, prop, receiver)=>{ return (args_dict, ...childs)=>( args_dict===undefined && childs.length === 0 ? {[prop]: {}} : (typeof args_dict === "string" || typeof args_dict ==="function" ? {[prop]: args_dict} : {[prop]:{...args_dict, ...(childs.length ? {'':childs} : {}) }}) ) },
   set: function(_target, prop, value) {}
 })
 
