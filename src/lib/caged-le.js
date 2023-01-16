@@ -400,8 +400,8 @@ class UseComponentDeclaration{
       else if (this.strategy === "merge") {
 
         // throw new Error("Not Implemented Yet!")
-        const impossible_to_redefine = ["ctx_id"]
-        const direct_lvl = ["id", "constructor", "beforeInit", "onInit", "afterChildsInit", "afterInit", "onUpdate", "onDestroy"] // direct copy
+        const impossible_to_redefine = []
+        const direct_lvl = ["id", "ctx_id", "constructor", "beforeInit", "onInit", "afterChildsInit", "afterInit", "onUpdate", "onDestroy"] // direct copy
         const first_lvl = ["signals", "dbus_signals", "data", "private:data", "props", "private:props", "let", "alias", "handle", "when"] // on first lvl direct
         const first_lvl_special = ["s_css"] // first lvl direct + eventual overwrite
         const second_lvl = ["on", "on_s", "on_a"]
@@ -582,6 +582,51 @@ class UseComponentDeclaration{
 
 // export // utils per fare estensioni rapide senza dichiarare un nuovo meta..
 const Extended = (...args) => Use(...args).computedTemplate
+
+class _BindToPropInConstructor {
+  constructor(name){
+    // this.extractor
+    
+    if (name.includes(".")){
+      this.extractor = $=>{ 
+        let fqdnComponents = name.split(".") // $.le.item.prop
+        let root = $
+        name = ''
+        fqdnComponents.forEach((p, idx)=>{
+          // skip first and last
+          // console.log(root, p)
+          if (idx === 0){ }
+          else if (idx === (fqdnComponents.length-1)){
+            name = p
+          }
+          else if (idx < (fqdnComponents.length-1)){
+            root = root[p]
+          }
+        })
+        let prop = root.getAsExternalProperty(name); 
+        let signal = root.getAsExternalSignal(name+'Changed'); 
+        return {prop: prop, signal: signal}
+      }
+    }
+    else {
+      this.extractor = $=>{ 
+        let prop = $.getAsExternalProperty(name); 
+        let signal = $.getAsExternalSignal(name+'Changed'); 
+        return {prop: prop, signal: signal}
+      }
+    }
+    console.log("thiss", this)
+  }
+  build($context){
+    const {prop, signal} = this.extractor.bind(undefined, $context)()
+    return {getter: useExternal(prop), setter: $=>v=>{prop.value=v}, signal: signal}
+  }
+}
+
+// export
+/** utils to set props in component with Use and costructor. just set in init { componentPropName: BindToPropInConstructor('prop' || '$.le.xx.prop' ) } - namer in scope or full name
+*/
+const BindToPropInConstructor = (name)=>new _BindToPropInConstructor(name)
 
 // export: Symbol/utils per estendere s_css senza pippe strane..in pratica shortcuts per [*rule, bla bla]
 /**
@@ -1361,6 +1406,7 @@ class Component {
     this.properties.el = this.html_pointer_element // ha senso??? rischia di spaccare tutto..nella parte di sotto..
     this.properties.parent = this.parent?.$this?.this // ha senso??? rischia di spaccare tutto.. recursive this.parent.parent & parent.parent le.x.parent.. etc..
     this.properties.comp_id = this.id
+    this.properties.comp_ctx_id = this._id
     this.properties.t_uid = this.t_uid
     // Object.defineProperty( // dynamic get childs $this
     //   this.properties, 'childs', {get: ()=>this.childs.map(c=>c instanceof Component || c instanceof IterableViewComponent? c.$this.this : undefined).filter(c=>c!==undefined)}
@@ -2727,9 +2773,13 @@ class Component {
       let args = {}
       if (this.oj_definition.init !== undefined){
         Object.entries(this.oj_definition.init).forEach(([p, v])=>{
-          args[p] = isFunction(v) ? v.bind(undefined, this.parent.$this) : v // todo: questo è un mezzo errore..perchè in questo modo non ruisciro a parsare le dipendenze nel caso di set di una prop..perchè è già bindata! d'altro canto in realtà init nasce per passare valori, quindi è corretto!
-          // todo: forse la cosa migliore qui è abbandonare l'idea del constructor e andare con i passed args, ovvero lato declaration già indico a chi assegno cosa, mettendo una prop nel mezzo con punto di vista "parent" ma nel figlio, in modo da notifcare i changes!
-          // todo: o meglio, forse basta che creo una prop con exec context del parent in loop come questo (ma dedicato ai passed), e agganciarci alla onChange una semplicissima mark as changed della prop (this) che conterrà quella passata (del parent)
+          if (v instanceof _BindToPropInConstructor){
+            args[p] = v.build(this.parent.$this) // args will be: {getter: useExernal, setter:$=>..., signal}
+          } else {
+            args[p] = isFunction(v) ? v.bind(undefined, this.parent.$this) : v // todo: questo è un mezzo errore..perchè in questo modo non ruisciro a parsare le dipendenze nel caso di set di una prop..perchè è già bindata! d'altro canto in realtà init nasce per passare valori, quindi è corretto!
+            // todo: forse la cosa migliore qui è abbandonare l'idea del constructor e andare con i passed args, ovvero lato declaration già indico a chi assegno cosa, mettendo una prop nel mezzo con punto di vista "parent" ma nel figlio, in modo da notifcare i changes!
+            // todo: o meglio, forse basta che creo una prop con exec context del parent in loop come questo (ma dedicato ai passed), e agganciarci alla onChange una semplicissima mark as changed della prop (this) che conterrà quella passata (del parent)
+          }
         })
       }
       this.hooks.constructor = this.convertedDefinition.constructor.bind(undefined, this.$this, args)
@@ -4633,4 +4683,4 @@ const fromHtml = (text, definition={}, tagReplacers={}, extraDefs={})=>{
 
 // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // 
 
-export { pass, none, smart, smartFunc as f, smartFuncWithCustomArgs as fArgs, Use, Extended, Placeholder, Bind, Alias, SmartAlias, PropertyBinding, ExternalProp, useExternal, Switch, Case, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock, cle, str, str_, input, output, ExtendSCSS, clsIf, fromHtml as html }
+export { pass, none, smart, smartFunc as f, smartFuncWithCustomArgs as fArgs, Use, Extended, Placeholder, Bind, Alias, SmartAlias, PropertyBinding, ExternalProp, useExternal, BindToPropInConstructor as BindToProp, Switch, Case, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock, cle, str, str_, input, output, ExtendSCSS, clsIf, fromHtml as html }

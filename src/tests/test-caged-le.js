@@ -1,4 +1,4 @@
-import { Alias, Bind, Case, cle, Extended, ExtendSCSS, ExternalProp, f, fArgs, LE_BackendApiMock, LE_LoadCss, LE_LoadScript, pass, Placeholder, RenderApp, smart, SmartAlias, str, Switch, toInlineStyle, Use, useExternal, html } from "../lib/caged-le.js"
+import { Alias, Bind, BindToProp, Case, cle, Extended, ExtendSCSS, ExternalProp, f, fArgs, LE_BackendApiMock, LE_LoadCss, LE_LoadScript, pass, Placeholder, RenderApp, smart, SmartAlias, str, Switch, toInlineStyle, Use, useExternal, html } from "../lib/caged-le.js"
 import { NavSidebarLayout } from "../layouts/layouts.js"
 
 /*
@@ -4639,6 +4639,81 @@ const appDemoConstructor = async ()=>{
 
 
       Use(ShowText, { let_desc: "No Constructor..", let_text: $=>$.parent.root_text }),
+
+      { hr: {}}
+    ]
+
+  }})
+
+
+  //////////////////////////////////////////////
+  //////////////////////////////////////////////
+  //////////////////////////////////////////////
+  
+  // v2: better with use external!
+
+  const ShowText2 = { div: {
+    ctx_id: "show",
+
+    // @Input
+    let_desc: "",
+    let_text: "",
+    let_setText: undefined,
+    let_textChangedSignal: undefined,
+
+    def_onTextChangedSignal: ($, ...args)=>{
+      console.log("changed", $.comp_ctx_id, args)
+    },
+
+    constructor: ($, {text})=>{ // nota negativa: devo sempre passare una prop o testare cosa mi hanno passato
+      if (text){
+        console.log(text) // {getter, setter, signal}
+        $.this.text = text.getter
+        $.this.setText = text.setter
+        $.this.textChangedSignal = text.signal // { emit, emitLazy, subscribe, unsubscribe}
+        $.this.textChangedSignal.subscribe($, (...args)=>$.this.onTextChangedSignal($, ...args))
+      }
+    },
+    
+    h_onclick: $=>{
+      console.log("clicked")
+      $.this.setText("aa changeed")
+      $.this.desc="decs changeed. "
+    },
+
+    '': [  $=>$.this.desc, ": ", $=>$.this.text  ]
+  }}
+
+
+  const Input2 = { input: {
+    ha_value: Bind(f`@text`)
+  }}
+
+  RenderApp(document.body, { div: {
+    id: "app",
+    let_text: "hello",
+
+    // also ref works!
+    childsRef: {
+      show_1: "single",
+      show_2: "single"
+    },
+
+    on: { ref: {
+      show_1: { descChanged: $=>{
+        console.log("show 1 desc changed!")
+      }},
+      show_2: { descChanged: $=>{
+        console.log("show 2 desc changed!")
+      }},
+    }},
+
+    '': [
+      Input2,
+
+      // here we pass prop to a component that is in a new scope! encapsulated!
+      Use(ShowText2, {ctx_id: "show_1", name: "show_1", let_desc: "Binded Value: ", meta: {newScope: true} }, {init: {text: BindToProp("text") }}), // point of view dela parent! text si trova in scope..
+      Use(ShowText2, {ctx_id: "show_2", name: "show_2", let_desc: "Binded Value: ", meta: {newScope: true} }, {init: {text: BindToProp("$.le.app.text") }}), // full prop name, always point of view is parent.
     ]
 
   }})
@@ -6803,7 +6878,7 @@ const appDemoEditRefValAndStupidShortcuts = async ()=>{
 // appResolveMultiCssProblem()
 // appDemoNewShortcuts()
 // appDemoSocialNetworkReactStyle()
-// appDemoConstructor()
+appDemoConstructor()
 // appDemoNestedDataChangeDetection()
 // appDemoChachedWithAlias()
 // appDemoStackblitz()
@@ -6825,7 +6900,7 @@ const appDemoEditRefValAndStupidShortcuts = async ()=>{
 // appDemoOptimizedLeFor()
 // appDemoFromHtmlTemplate()
 // appDemoCSSInJSWithCSZ()
-appDemoEditRefValAndStupidShortcuts()
+// appDemoEditRefValAndStupidShortcuts()
 
 // todo: idea per funzioni "at most once" da usare a giro nel framework: in pratica siccome mi paasano una funzione, aka oggetto, potrei settargli un attributo tipo x.__cle__exec_counter__ e controllare se > 1. problema: come fare per le funzioni che sono delle const dentro una funzione? o in generale funzioni passate e create dentro una funzione? li forse solo una roba diversa es dynamicAtMostOnce, che ti fa il toString della funzione..
 //       - quando può servire sta roba? es in una onhover su un pulsante potrei mettere la import dinamica di un altro pezzo di app, per creare app "parziali" senza dare lagg agli utenti. ovviamnete nel mobile non ha senso :D

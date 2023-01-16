@@ -1034,15 +1034,16 @@ meta: {
 }
 ```
 
-# Bind, Alias, SmarAlias/PropertyBinding/CachedProp
+# More About Evaluable: Bind, Alias, SmarAlias/PropertyBinding/CachedProp
+
 
 # Html Element Reference
 
 # CLE Object
 
-# Childs Ref By Name
-
 # Component Templating, Extension & Use
+
+# Childs Ref By Name
 
 # Advanced: FromHtmlTemplate
 
@@ -1081,7 +1082,7 @@ meta: {
     let | data | props: {
       counter: 0 // a counter property
 
-      computedProp: $ => $.scope.myProp * 10 // computed props
+      computedProp: $ => $.scope.myProp * 10 // evaluable / computed props
 
       my_alias: Alias(getter $=>..., setter $,v=>..., caching(new, old)=>new!==old...) // Alias of a property, with custom op on set and get!
 
@@ -1298,6 +1299,7 @@ $ => {
         parent // parent $.this
         
         comp_id // user defined id via "id" keyword
+        comp_ctx_id // user defined id via "ctx_id" keyword
 
         t_uid // tecnical id, the cle unique id overall, setted as attr over html element. used for css hoist
 
