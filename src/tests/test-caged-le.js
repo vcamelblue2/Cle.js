@@ -6547,6 +6547,238 @@ const appDemoCSSInJSWithCSZ = async ()=>{
 
 }
 
+const appDemoEditRefValAndStupidShortcuts = async ()=>{
+
+  // $.this.editRefVal.xxx(=>): utility to edit an object/reference prop without makr as changed explicitly
+
+  // utils banale per ripetere un tag html cambiando solo il contenuto testuale.. es per fare 3 div uno dopo l'altro
+  const repeat = new Proxy({}, {
+    get: (_target, prop, receiver)=>{ 
+      return (args_dict, ...childs)=>childs.map(c=>({[prop]:{
+        ...args_dict, 
+        ...(c.length ? {'':c} : {}) } 
+      })) 
+    },
+    set: function(){}
+  })
+  
+
+  // utils per scrivere con una sintassi leggera i componenti! sintassi basata su tab yaml like..vedi in seguito..
+  class YAMLIZED_TAG{
+    constructor(tag){ this.tag = tag}
+    buildComponent(def, ...childs){
+      return {[this.tag]: {
+        ...(def === undefined ? {} : def), 
+        ...(childs.length ? {'':childs} : {}) 
+      }}
+    }
+  }
+  // declare tag. proxy a func to have vscode highlight!
+  const a = new Proxy(()=>{}, {
+    get: (_, tag)=>{ 
+      return new YAMLIZED_TAG(tag)
+    },
+    set: function() {}
+  })
+  // use this syntax
+  const yml = (...childs)=>{
+    let latestDef = undefined
+    let nextMastBeDefOrChilds = false
+
+    let finalComponents = []
+
+    const compactLatest = (reset=false)=>{
+      if (latestDef !== undefined){
+        finalComponents.push(latestDef.tag.buildComponent(latestDef.def, ...latestDef.childs))
+      }
+      if (reset){
+        latestDef = undefined
+      }
+    }
+
+    for (let x of childs){
+      if (x instanceof YAMLIZED_TAG){
+        if (latestDef !== undefined){
+          compactLatest(false)
+        }
+        latestDef = { tag: x, def: undefined, childs: [] }
+        nextMastBeDefOrChilds = true
+      }
+      else if (nextMastBeDefOrChilds && latestDef !== undefined){
+        if (x === pass){
+          if (latestDef !== undefined){
+            compactLatest(true)
+          }
+        }
+        else if (x === none) {
+          // NO OP
+        }
+        else if (typeof x === "function" || typeof x === "string" || Array.isArray(x) || x instanceof StandardCleComponent){
+          latestDef.childs = [...latestDef.childs, ...(Array.isArray(x) ? (x.map(c=>c instanceof StandardCleComponent ? c.component : c)) : [x])]
+        }
+        else {
+          latestDef.def = x
+        }
+      }
+      else {
+        throw Error("PARSER ERROR!!!")
+      }
+    }
+    
+    compactLatest(true)
+
+    return finalComponents
+  }
+  class StandardCleComponent{ constructor(component){ this.component = component }}
+  const std = (...components)=>components.map(c=>new StandardCleComponent(c))
+  const _ = yml
+
+  // VALID: Ω æ œ œ ø π å ß ƒ ª º µ
+  const ƒ = _
+  const µ = a 
+  const ø = a
+  
+  
+
+  RenderApp(document.body, cle.root({
+    let_calendarEvent: {
+      id: 0, dueTo: "2022-01-01", title: "Go to grocery store"
+    },
+
+    def_editTitle: $=>{
+      $.this.editRefVal.calendarEvent(cv=>cv.title = cv.title !== "Go to the mall!" ?  "Go to the mall!" : "Go to grocery store")
+    }
+  },
+
+    cle.h3("Demo EditRefVal"),
+
+    cle.div({}, "ID: ", f`@calendarEvent.id`),
+    cle.div({}, "Due To: ", f`@calendarEvent.dueTo`),
+    cle.div({}, "Title: ", f`@calendarEvent.title`),
+
+    cle.button({
+      h_onclick: $=>$.editTitle()
+    }, "Change Title"),
+  
+  
+  
+  
+  
+  
+
+    // OTHER STUPID SHORTCUTS
+  
+    cle.hr(),
+    cle.hr(),
+    cle.hr(),
+
+    cle.h3("OTHER TESTS"),
+
+
+    ...repeat.div({}, 
+      ["ID: ", f`@calendarEvent.id`],
+      ["Due To: ", f`@calendarEvent.dueTo`],
+      ["Title: ", f`@calendarEvent.title`],
+    ),
+
+    cle.hr(),
+
+
+
+    ..._(
+      a.div,
+        "ID: ", f`@calendarEvent.id`,
+      
+      a.div, { 
+        style: "color: red" 
+      },
+        "Due To: ", f`@calendarEvent.dueTo`, 
+
+      a.div,
+        "Title: ", f`@calendarEvent.title`,
+
+      /* HTML TEMPLATE VERSION COMPAISON
+      <div>
+        ID: {{@calendarEvent.id}}
+      </div>
+      
+      <div style="color: red">
+        Due To: {{@calendarEvent.dueTo}}
+      </div>
+
+      <div>
+        Title: {{@calendarEvent.title}}
+      </div>
+      */
+
+      
+      a.hr, //////////
+      
+      a.div, {
+        let_prop1: 123
+      },
+        "Lets try nesting!",
+
+        _(a.div, { style: "color: green" },
+            "- 1) Nested! Val: ", $=>$.prop1,
+            
+            _( a.div, { style: "color: red" },
+              "-- 1.1) Sub Nested! Val: ", f`@prop1`
+             )
+         ),
+
+        _(a.div, { style: "color: green" },
+          "- 2) Nested! Val: ",
+          
+          _( a.div, { style: "color: red" },
+            "-- 2.1) Sub Nested! Val: ", f`@prop1`
+           )
+        ),
+
+        std(
+          cle.br(),
+          cle.div("A Standard div"),
+          f`@prop1`
+        ),
+
+
+        // MAC SHORTCUT TEST //////////
+
+        ø.hr, 
+        
+        ø.div, {
+          let_prop1: 123
+        },
+          "Lets try nesting!",
+
+          ƒ(ø.div, { style: "color: green" },
+              "- 1) Nested! Val: ", $=>$.prop1,
+              
+              ƒ( ø.div, { style: "color: red" },
+                "-- 1.1) Sub Nested! Val: ", f`@prop1`
+              )
+          ),
+
+          ƒ(ø.div, { style: "color: green" },
+            "- 2) Nested! Val: ",
+            
+            _( ø.div, { style: "color: red" },
+              "-- 2.1) Sub Nested! Val: ", f`@prop1`
+            )
+          ),
+
+          std(
+            cle.br(),
+            cle.div("A Standard div"),
+            f`@prop1`
+          )
+    ),
+    
+  ))
+
+}
+
+
 // app0()
 // test2way()
 // appTodolist()
@@ -6592,7 +6824,8 @@ const appDemoCSSInJSWithCSZ = async ()=>{
 // appDemoCheckedDeps()
 // appDemoOptimizedLeFor()
 // appDemoFromHtmlTemplate()
-appDemoCSSInJSWithCSZ()
+// appDemoCSSInJSWithCSZ()
+appDemoEditRefValAndStupidShortcuts()
 
 // todo: idea per funzioni "at most once" da usare a giro nel framework: in pratica siccome mi paasano una funzione, aka oggetto, potrei settargli un attributo tipo x.__cle__exec_counter__ e controllare se > 1. problema: come fare per le funzioni che sono delle const dentro una funzione? o in generale funzioni passate e create dentro una funzione? li forse solo una roba diversa es dynamicAtMostOnce, che ti fa il toString della funzione..
 //       - quando può servire sta roba? es in una onhover su un pulsante potrei mettere la import dinamica di un altro pezzo di app, per creare app "parziali" senza dare lagg agli utenti. ovviamnete nel mobile non ha senso :D
