@@ -341,7 +341,7 @@ Riprendendo il nostro esempio del counter:
 
 $ => $.appUtils.capitalize("hello world!")
  ```
- 
+
 Infine, è anche possibile definire delle funzioni come costanti in una props utilizzando l'utils asFunc
 
 ```javascript
@@ -1292,7 +1292,39 @@ meta: {
 
       { Model | Controller | Service | Component | Connector | Signals | Style | Css : { // Pure Object, invisible, usefull for app logic and data manipulation. Using meta: { hasViewChilds: true } can be materialized into the view as <leobj></lepbj> and also is childs.
 
-      }}
+      }},
+
+      // Reusage / Componentizzation
+      Use( MyComponent, 
+        // redefinition / edit component
+        { 
+          let_prop1: 123 || $=>$.prop3 || Alias || Bind ...  // basic setup a property-value example!
+
+          handle: {
+            onclick: ...
+          }
+          on_s: { 
+            this: { 
+              mySignal: ($, ...args) => do whatever
+            }
+          } 
+          ...
+        }, 
+        // Options & init for constructor
+        {
+          strategy: "merge" | "override", // define redefinition strategy. Override will replace on 1st lvl
+          // constructor parametrer. the second option to pass data to child (specially for newScope components.)
+          init: { 
+            childPropToInitInConstructorByValue: $ => $.meta.idx // copy by value ONCE
+            childPropToInitInConstructor2WayBinded: BindToProp("text") || BindToProp("$.le.app.text")// pass & bind value to. search in scope or pass a full name. This require constructor to use .getter & .setter
+          },
+          // Placeholder Injection/Substitution
+          inject: {
+            placeholderName: cle-element 
+          }
+        }, 
+      ),
+
     ], // can also be a single compnent, avoiding the unecessary [].
 
     // define component as owner of the specified "named sub.childs components"
