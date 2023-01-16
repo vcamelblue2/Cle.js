@@ -1366,6 +1366,7 @@ class Component {
     //   this.properties, 'childs', {get: ()=>this.childs.map(c=>c instanceof Component || c instanceof IterableViewComponent? c.$this.this : undefined).filter(c=>c!==undefined)}
     // )
     this.properties.getAsExternalProperty = (prop_name)=>{let found = this.properties[prop_name]; if (found instanceof Property){return found}} // stupid utils to retrive the real Property behind the $.this proxy..useful to be used as "external" deps in a dynamic context.. (via set value as useExternal([extractedProp], $=>extractedProp.value))
+    this.properties.getAsExternalSignal = (signalName)=>{let found = this.signals[signalName]; if (found instanceof Signal){return Signal.getSignalProxy(found)}} // stupid utils to retrive the real Signal behind the $.this proxy..useful to be used as "external" deps in a dynamic context..
     
     // dynamic signals
     this.properties.subscribe = (name, who, handler, upsearch=false) => {

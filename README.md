@@ -390,7 +390,7 @@ Per emettere un segniale possiamo riferirci a lui con `$.xxxx.signalname` ed usa
  }}
 ```
 
-### Subscribe to segnals
+### Subscribe to Signals
 Per ascoltare un segnale è sufficiente dichiararne la gestione tramite keyword "`on_s`" oppure "`on`". Per esempio per agganciarsi ai due segnali precedenti
 
 ```javascript
@@ -443,14 +443,9 @@ in case of "scope" selector it can be omitted as it's the default:
 {
     ...
 
-    // "on"_"scope selector"_"signal": action
-    on_this_counterReset: $ => { ... },
-    on_this_counterEditedFromUser: ($, newVal) => { ... }
-
-    // on_counterReset: $ => { ... }
+    on_counterReset: $ => { ... }
+    on_counterEditedFromUser: ($, newVal) => { ... }
     
-    // exception for le, ctx and ref scopes:
-    // "on"_"le | ctx | ref"_"id"_"signal": $ => { ... }
     ...
  }
 ```
@@ -1292,3 +1287,31 @@ meta: {
   }
 }
  ```
+# Full Scope Selectors Standard Content Reference
+```javascript
+$ => {
+
+    $.this = {
+
+        el // renderized html element 
+
+        parent // parent $.this
+        
+        comp_id // user defined id via "id" keyword
+
+        t_uid // tecnical id, the cle unique id overall, setted as attr over html element. used for css hoist
+
+        getAsExternalProperty = (prop_name)=>{ return Property instance } // dumb utils to retrive the real Property behind the $.this proxy..useful to be used as "external" deps in a dynamic context.. (via set value as useExternal([extractedProp], $=>extractedProp.value))
+        getAsExternalSignal = (signal_name)=>{ return Signal instance } // dumb utils to retrive the real Signal behind the $.this proxy..useful to be used as "external" deps in a dynamic context.. 
+        
+        // dynamic signals subscribe & unsubscribe
+        subscribe = (name, who, handler, upsearch=false) => { return unsubscribe function } 
+        subscribeAsync = async (name, who, handler) => { return unsubscribe function } 
+        unsubscribe = (name, who, upsearch=false) => { void }
+        
+        // edit reference prop inline without manually mark as changed!
+        // use: $.this.editRefVal.myProp(p=>p.value=12)
+        editRefVal // Proxy with getter: .name(v => action function)
+    }
+}
+```
