@@ -140,4 +140,47 @@ const onCleSignal = ($, signal, handler, upsearch=false)=>{
 	}, []) // oninit, return ondestroy
 }
 
-export { ReactInCle, UseReact, UseReactMixin, fReact, useCleProp, useCleProps, onCleSignal }
+// export 
+/** Syntactic Sugar to define react component using cle.div({ PROPS }, ...CHILDS), instead of normal object.*/
+const r = new Proxy({}, {
+	get: (_, tag)=>{ 
+
+		return (props, ...childs)=>{
+			// solo figli child!
+			if (typeof props === 'string'){
+				return ReactInCle.deps.react.React.createElement(tag, null, props, ...childs)
+			}
+			else {
+				return ReactInCle.deps.react.React.createElement(tag, props === undefined ? null : props, ...childs)
+			}
+
+		}
+	},
+	set: function(_) {}
+})
+
+// used to  handle defined component & pass props to component. set now, call later
+const rc = (componentFunc=(()=>{}), passedProps, ...childs)=>{
+	return ReactInCle.deps.react.React.createElement(componentFunc, passedProps === undefined ? null : passedProps, ...childs)
+}
+
+// r and rc => Ract using CLE SYNTAX USAGE: 
+// const aReactComponent = ({text, setText})=>{
+// 	return r.div({},
+
+// 		r.h2("Hello World from REACT", ""),
+
+// 		r.div("text is: ", text),
+
+// 		r.button({onClick: () => {setText("Text edited!")} }, 
+// 			"Change Text!"
+// 		)
+// 	)
+// }
+// const reactComponentWithCleSyntax = ({$})=>{
+// 	const [text, setText] = useState("Hello From React with CLE Syntax!")
+
+// 	return rc(aReactComponent, {text, setText})
+// }
+
+export { ReactInCle, UseReact, UseReactMixin, fReact, useCleProp, useCleProps, onCleSignal, r, rc }

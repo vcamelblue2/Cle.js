@@ -2,7 +2,7 @@
 import * as cle_lib from "../../lib/caged-le-module-to-global.js";
 
 // Import cle-react mashup utils
-import { ReactInCle, UseReact, UseReactMixin, useCleProp, useCleProps, fReact } from './react-in-cle.js';
+import { ReactInCle, UseReact, UseReactMixin, useCleProp, useCleProps, fReact, r, rc } from './react-in-cle.js';
 import { CleInReact, UseCle, UseDumbCle } from './cle-in-react.js';
 
 // Import css-in-js via csz
@@ -562,11 +562,62 @@ const APP_4_TODOLIST_ROOT_IS_CLE = async ()=>{
 	))
 }
 
+// CLE AS ROOT
+const APP_5_REACT_WITH_CLE_SYNTAX_ROOT_IS_CLE = ()=>{
+	
+// Ract using CLE SYNTAX
+const reusableReactComponent = ({text, setText})=>{
+	return r.div({},
+
+		r.h2("Hello World from REACT", ""),
+
+		r.div("text is: ", text),
+
+		r.button({onClick: () => {setText("Text edited!")} }, 
+			"Change Text!"
+		)
+	)
+}
+const reactComponentWithCleSyntax = ({$})=>{
+	const [text, setText] = useState("Hello From React with CLE Syntax!")
+
+	return rc(reusableReactComponent, {text: text, setText: setText}, "un imbucato.. not working for now..")
+}
+
+
+
+RenderApp(document.getElementById("root"), cle.root({
+  let_number: 0,
+  let_squaredNum: $=>$.this.number * $.this.number,
+  let_demoTableData: demoTableData,
+
+  def_incNumber: $ => {
+    $.number+=1
+  }
+},
+  { h3: ["Hello From CLE!! The number is: ", cle.i($=>$.number)] },
+  
+  { button: {
+    class: "p-button p-component" ,
+    handle: { onclick: $=> $.number+=1 },
+    '': { span: {
+      class: "p-button-label p-c",
+      text: 'Inc Number'
+    }}
+  }},
+
+	// USE REACT WITH CLE LIKE SYNTAX:
+  UseReact(reactComponentWithCleSyntax)
+
+))
+}
+
 
 // APP_1_ROOT_IS_REACT()
 // APP_2_ROOT_IS_CLE()
 // APP_3_ROOT_IS_REACT_NO_CLE_REPAINT()
-APP_4_TODOLIST_ROOT_IS_CLE()
+// APP_4_TODOLIST_ROOT_IS_CLE()
+APP_5_REACT_WITH_CLE_SYNTAX_ROOT_IS_CLE()
 
 
 // // REQUIRED ONLY FOR BABEL (to parse as jsx instead of js)
