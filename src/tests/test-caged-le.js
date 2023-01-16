@@ -1,4 +1,4 @@
-import { Alias, Bind, BindToProp, Case, cle, Extended, ExtendSCSS, ExternalProp, f, fArgs, LE_BackendApiMock, LE_LoadCss, LE_LoadScript, pass, Placeholder, RenderApp, smart, SmartAlias, str, Switch, toInlineStyle, Use, useExternal, html } from "../lib/caged-le.js"
+import { Alias, Bind, BindToProp, Case, cle, Extended, ExtendSCSS, ExternalProp, f, fArgs,  asFunc, LE_BackendApiMock, LE_LoadCss, LE_LoadScript, pass, Placeholder, RenderApp, smart, SmartAlias, str, Switch, toInlineStyle, Use, useExternal, html } from "../lib/caged-le.js"
 import { NavSidebarLayout } from "../layouts/layouts.js"
 
 /*
@@ -55,7 +55,7 @@ const component = {
       iEmitThisGlobalSignal_UniqueName: "stream => (int: counter status)"
     }
 
-    "private:"? data | props: {
+    "private:"? let | data | props: {
       name: "counter 1",
       counter: 0,
       my_alias: Alias(getter $=>..., setter $,v=>..., caching(new, old)=>new!==old...),
@@ -6854,6 +6854,28 @@ const appDemoEditRefValAndStupidShortcuts = async ()=>{
 }
 
 
+const appDemoNoMoreLetAndAsFunc = async ()=>{
+
+  RenderApp(document.body, { div: {
+    // PROP no more reuire let etc. OBIUSLY CANNOT BE A RESERVED KEYWORD
+    myText: "Hello World From No More Let",
+
+    // FUNC AS PROPERTY easy declaration! no detection available, so is not suitable to be used where it's required (rendered text, binding etc..)
+    log: asFunc(($, ...what)=>{
+      console.log(...what)
+    }),
+
+
+    '': [
+      cle.h2($=>$.myText),
+      
+      cle.button({ handle_onclick: $ => $.log("the text is: ", $.myText) }, "Log To Console")
+    ]
+
+  }})
+}
+
+
 // app0()
 // test2way()
 // appTodolist()
@@ -6878,7 +6900,7 @@ const appDemoEditRefValAndStupidShortcuts = async ()=>{
 // appResolveMultiCssProblem()
 // appDemoNewShortcuts()
 // appDemoSocialNetworkReactStyle()
-appDemoConstructor()
+// appDemoConstructor()
 // appDemoNestedDataChangeDetection()
 // appDemoChachedWithAlias()
 // appDemoStackblitz()
@@ -6901,6 +6923,7 @@ appDemoConstructor()
 // appDemoFromHtmlTemplate()
 // appDemoCSSInJSWithCSZ()
 // appDemoEditRefValAndStupidShortcuts()
+appDemoNoMoreLetAndAsFunc()
 
 // todo: idea per funzioni "at most once" da usare a giro nel framework: in pratica siccome mi paasano una funzione, aka oggetto, potrei settargli un attributo tipo x.__cle__exec_counter__ e controllare se > 1. problema: come fare per le funzioni che sono delle const dentro una funzione? o in generale funzioni passate e create dentro una funzione? li forse solo una roba diversa es dynamicAtMostOnce, che ti fa il toString della funzione..
 //       - quando può servire sta roba? es in una onhover su un pulsante potrei mettere la import dinamica di un altro pezzo di app, per creare app "parziali" senza dare lagg agli utenti. ovviamnete nel mobile non ha senso :D

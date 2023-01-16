@@ -330,7 +330,7 @@ Riprendendo il nostro esempio del counter:
         increment: ($, incAmount=1) => {
             $.counter += incAmount
         },
-        utils: {
+        appUtils: {
             getRandomNum: $ => Math.random()
             capitalize: ($, str) => str[0].toUpperCase() + str.slice(1)
         }
@@ -339,8 +339,21 @@ Riprendendo il nostro esempio del counter:
 
 ...
 
-$ => $.utils.capitalize("hello world!")
+$ => $.appUtils.capitalize("hello world!")
  ```
+ 
+Infine, è anche possibile definire delle funzioni come costanti in una props utilizzando l'utils asFunc
+
+```javascript
+import {asFunc} from "lib/caged-le.js"
+
+{
+    myFunc: asFunc(($, ...args)=>{ ... }) // const/prop function 
+}
+
+// using standard usage: $ => $.scope.myFunc()
+```
+
 ## Signals
 I Segnali in CLE sono un meccanismo PUB/SUB like di tipo stream che i componenti possono definire e lanciare affinchè altri componenti (o essi stessi) possano decidere di ascoltare, al fine di reagire ad eventi ad esso collegati. I segnali, come gli Event in Angular possono inviare diversi tipi di dato, al fine di poter essere utilizzati non solo come notifica, ma come meccanismo di Input/Outut, disaccoppiando prodicer dal consumer, e dunque codice.
 
@@ -1089,6 +1102,8 @@ meta: {
       my_alias2: SmartAlias('@counter') // Same as alias but simple def
       
       my_alias3: Bind('@counter') //Same as Smart Alias, but more generic
+
+      myFunc: asFunc(($, ...args)=>{...}) // declare function costants as props (to be passed)
     },
     // shortcuts -> let_counter: 0
 
@@ -1286,6 +1301,8 @@ meta: {
       myNameMulti: "multi"
     },
   }
+  // any others unknonw key that cannot be deducted will become a props
+  // this way you can also declare myProp: ... without props/let etc.
 }
  ```
 # Full Scope Selectors Standard Content Reference

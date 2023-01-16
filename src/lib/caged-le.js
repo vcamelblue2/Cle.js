@@ -2969,6 +2969,9 @@ class Component {
 
   static parseComponentDefinition = (definition) => {
     let unifiedDef = { }
+    
+    let already_resolved = []
+    const addToAlreadyResolved = (...v)=>{already_resolved = [...already_resolved, ...v]}
 
 
     // multi choice def
@@ -2977,11 +2980,12 @@ class Component {
     unifiedDef.childs = childs || childs_contains || childs_text || childs_view || childs_ff || childs_arrow || childs_underscore || childs_empty
     if (unifiedDef.childs !== undefined && !Array.isArray(unifiedDef.childs)) {unifiedDef.childs = [unifiedDef.childs]}
     // can be: template | string | $ => string | array<template | string | $ => string>
-
+    addToAlreadyResolved('childs', 'contains', 'text', 'view', ">>", "=>", '_', '')
 
     // standard def
 
     unifiedDef.state = definition.state || "initial"
+    addToAlreadyResolved('state')
 
     copyObjPropsInplace(definition, unifiedDef, [
       "constructor", 
@@ -2991,9 +2995,19 @@ class Component {
       "states", "stateChangeStrategy", "onState",
       "name", "childsRef"
     ])
+    addToAlreadyResolved(
+      "constructor", 
+      "beforeInit", "onInit", "afterInit", "afterChildsInit", "onUpdate", "onDestroy", 
+      "signals", "dbus_signals", "on", "on_s", "on_a", 
+      "alias", "handle", "when", "css", "s_css", 
+      "states", "stateChangeStrategy", "onState",
+      "name", "childsRef"
+    )
 
     // renamed def
     unifiedDef.checked_deps = definition.deps
+    addToAlreadyResolved('deps')
+    
 
 
 
@@ -3007,6 +3021,13 @@ class Component {
       hattrs, "private:hattrs":_hattrs, 
       ha, "private:ha": _ha, 
     } = definition
+    addToAlreadyResolved('id', 'ctx_id',
+      'def', "private:def",
+      'attrs', "private:attrs",
+      'a', "private:a", 
+      'hattrs', "private:hattrs",
+      'ha', "private:ha"
+    )
 
     unifiedDef.id = id || ComponentRUUIDGen.generate()
     unifiedDef._id = _id || unifiedDef.id
@@ -3022,6 +3043,7 @@ class Component {
 
     // a/ha & attrs/hattrs 1st lvl shortcuts: (eg: a.style or attrs.style) -> only public for nuw!
     let attrs_shortcuts_key = Object.keys(definition).filter(k=>k.startsWith("a.") || k.startsWith("attrs."))
+    addToAlreadyResolved(...attrs_shortcuts_key)
 
     if (attrs_shortcuts_key.length > 0){
       let attrs_shortcuts_definition = {}
@@ -3035,6 +3057,7 @@ class Component {
     }
 
     let hattrs_shortcuts_key = Object.keys(definition).filter(k=>k.startsWith("ha.") || k.startsWith("hattrs."))
+    addToAlreadyResolved(...hattrs_shortcuts_key)
     if (hattrs_shortcuts_key.length > 0){
       let hattrs_shortcuts_definition = {}
       hattrs_shortcuts_key.forEach(sk=>{let new_sk = sk.split("."); new_sk.shift(); new_sk=new_sk.join("."); hattrs_shortcuts_definition[new_sk] = definition[sk] })
@@ -3046,7 +3069,13 @@ class Component {
       }
     }
 
+    // meta
+    let {meta} = definition
+    addToAlreadyResolved('meta')
+
+    unifiedDef.meta = meta
     
+
     // maybe private def and multichoice
 
     let { 
@@ -3054,6 +3083,11 @@ class Component {
       props, "private:props": _props, 
       "let": data_let, "private:let": _data_let, 
     } = definition
+    addToAlreadyResolved(
+      'data', "private:data", 
+      'props', "private:props", 
+      "let", "private:let"
+    )
 
     unifiedDef.data = data || props || data_let || {}
     unifiedDef._data = _data || _props || _data_let || {}
@@ -3074,6 +3108,7 @@ class Component {
       on_dbus: {},
       // on_le: {}, // TODO: support on le & ctx shortcuts!
       // on_ctx: {},
+      // on_ref: {},
     }
 
     // let has_dash_shortucts_keys = false // todo performance by skip next if series
@@ -3085,88 +3120,123 @@ class Component {
 
         if (k.startsWith('a_')){
           dash_shortucts_keys.attrs[k.substring(2)] = val
+          addToAlreadyResolved(k)
         }
         else if (k.startsWith('attr_')){
           dash_shortucts_keys.attrs[k.substring(5)] = val
+          addToAlreadyResolved(k)
         }
 
         else if (k.startsWith('ha_')){
           dash_shortucts_keys.hattrs[k.substring(3)] = val
+          addToAlreadyResolved(k)
         }
         else if (k.startsWith('hattr_')){
           dash_shortucts_keys.hattrs[k.substring(6)] = val
+          addToAlreadyResolved(k)
         }
         
         else if (k.startsWith('p_')){
           dash_shortucts_keys.data[k.substring(2)] = val
+          addToAlreadyResolved(k)
         }
         else if (k.startsWith('let_')){
           dash_shortucts_keys.data[k.substring(4)] = val
+          addToAlreadyResolved(k)
         }
         else if (k.startsWith('let ')){
           dash_shortucts_keys.data[k.substring(4)] = val
+          addToAlreadyResolved(k)
         }
 
         else if (k.startsWith('d_')){
           dash_shortucts_keys.def[k.substring(2)] = val
+          addToAlreadyResolved(k)
         }
         else if (k.startsWith('def_')){
           dash_shortucts_keys.def[k.substring(4)] = val
+          addToAlreadyResolved(k)
         }
 
         else if (k.startsWith('h_')){
           dash_shortucts_keys.handle[k.substring(2)] = val
+          addToAlreadyResolved(k)
         }
         else if (k.startsWith('handle_')){
           dash_shortucts_keys.handle[k.substring(7)] = val
+          addToAlreadyResolved(k)
         }
 
         else if (k.startsWith('w_')){
           dash_shortucts_keys.handle[k.substring(2)] = val
+          addToAlreadyResolved(k)
         }
         else if (k.startsWith('when_')){
           dash_shortucts_keys.when_event_listener[k.substring(5)] = val
+          addToAlreadyResolved(k)
         }
         
         else if (k.startsWith('s_')){
           dash_shortucts_keys.signals[k.substring(2)] = val
+          addToAlreadyResolved(k)
         }
         else if (k.startsWith('signal_')){
           dash_shortucts_keys.signals[k.substring(7)] = val
+          addToAlreadyResolved(k)
         }
         
         else if (k.startsWith('dbs_')){
           dash_shortucts_keys.dbus_signals[k.substring(4)] = val
+          addToAlreadyResolved(k)
         }
         else if (k.startsWith('dbus_signal_')){
           dash_shortucts_keys.dbus_signals[k.substring(12)] = val
+          addToAlreadyResolved(k)
         }
 
         else if (k.startsWith('on_this_')){
           dash_shortucts_keys.on_this[k.substring(8)] = val
+          addToAlreadyResolved(k)
         }
         else if (k.startsWith('on_parent_')){
           dash_shortucts_keys.on_parent[k.substring(10)] = val
+          addToAlreadyResolved(k)
         }
         else if (k.startsWith('on_scope_')){
           dash_shortucts_keys.on_scope[k.substring(9)] = val
+          addToAlreadyResolved(k)
         }
         else if (k.startsWith('on_dbus_')){
           dash_shortucts_keys.on_dbus[k.substring(8)] = val
+          addToAlreadyResolved(k)
         }
         else if (k.startsWith('on_s_')){ // ultra shortcuts! use scope (ideally for signals..)
           dash_shortucts_keys.on_scope[k.substring(5)] = val
+          addToAlreadyResolved(k)
         }
         else if (k.startsWith('on_')){ // ultra shortcuts! use scope
           dash_shortucts_keys.on_scope[k.substring(3)] = val
+          addToAlreadyResolved(k)
         }
       }
       
       else if (['class', 'style'].includes(k)){ // Extreme shortcuts for style & class
         dash_shortucts_keys.attrs[k] = definition[k]
+        addToAlreadyResolved(k)
       }
 
     })
+
+
+    // all done! now everithing NOT already_resolved is a prop!
+    Object.keys(definition).forEach(k=>{
+      if (!already_resolved.includes(k)){
+        dash_shortucts_keys.data[k] = definition[k]
+        _warning.log('CLE-INFO: unrecognized ', k, " converted into props!")
+      }
+    })
+
+    // now compact everithing
 
     if (Object.keys(dash_shortucts_keys.attrs).length > 0){
       if (unifiedDef.attrs !== undefined){ unifiedDef.attrs = { ...unifiedDef.attrs, ...dash_shortucts_keys.attrs } }
@@ -3248,10 +3318,6 @@ class Component {
       }
       else { unifiedDef.on = { dbus: dash_shortucts_keys.on_dbus }}
     }
-
-    let {meta} = definition
-
-    unifiedDef.meta = meta
 
 
     return unifiedDef
@@ -4399,6 +4465,10 @@ const smartFuncWithCustomArgs = (...oterArgs)=>{
   return (code, funcCall=false)=>smartFunc(code, funcCall, ...oterArgs)
 }
 
+/** define usable func into properties, without changes detection deps analyasis! not suitable to be used for change detection.. */
+const asFunc = (f)=>{
+  return $=>f.bind(undefined, $)
+}
 // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // 
 
 
@@ -4683,4 +4753,4 @@ const fromHtml = (text, definition={}, tagReplacers={}, extraDefs={})=>{
 
 // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // 
 
-export { pass, none, smart, smartFunc as f, smartFuncWithCustomArgs as fArgs, Use, Extended, Placeholder, Bind, Alias, SmartAlias, PropertyBinding, ExternalProp, useExternal, BindToPropInConstructor as BindToProp, Switch, Case, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock, cle, str, str_, input, output, ExtendSCSS, clsIf, fromHtml as html }
+export { pass, none, smart, smartFunc as f, smartFuncWithCustomArgs as fArgs, asFunc, Use, Extended, Placeholder, Bind, Alias, SmartAlias, PropertyBinding, ExternalProp, useExternal, BindToPropInConstructor as BindToProp, Switch, Case, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock, cle, str, str_, input, output, ExtendSCSS, clsIf, fromHtml as html }
