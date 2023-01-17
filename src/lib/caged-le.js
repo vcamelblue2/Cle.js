@@ -1272,7 +1272,7 @@ class Component {
   }
 
 
-  get$ScopedPropsOwner(prop, search_depth=0, noMetaInScope=false){
+  get$ScopedPropsOwner(prop, search_depth=0, noMetaInScope=false, searchInSignals=false){
     if(search_depth === 0){
       noMetaInScope = this.meta_options.noMetaInScope
     }
@@ -1282,10 +1282,10 @@ class Component {
     }
 
     if (search_depth === 0 && this.meta_options.noThisInScope){ // salta il this e vai a parent..
-      return this.parent.get$ScopedPropsOwner(prop, search_depth+1, noMetaInScope)
+      return this.parent.get$ScopedPropsOwner(prop, search_depth+1, noMetaInScope, searchInSignals)
     }
 
-    if (prop in this.properties){
+    if (prop in this.properties || (searchInSignals && prop in this.signals)){
       return [this, true]
     }
     else if (!noMetaInScope && prop in this.meta){
@@ -1295,7 +1295,7 @@ class Component {
       throw Error("Properties cannot be found in this scope..blocked scope?")
     }
     else {
-      return this.parent.get$ScopedPropsOwner(prop, search_depth+1, noMetaInScope)
+      return this.parent.get$ScopedPropsOwner(prop, search_depth+1, noMetaInScope, searchInSignals)
     }
 
   }
@@ -1962,7 +1962,7 @@ class Component {
           }
           else if (typologyNamespace === "scope"){
             Object.entries(defs).forEach(([s, fun])=>{
-              let remover = this.get$ScopedPropsOwner(s)[0].signals[s].addHandler(this, (...args)=>fun.bind(undefined, this.$this, ...args)())
+              let remover = this.get$ScopedPropsOwner(s, pass, pass, true)[0].signals[s].addHandler(this, (...args)=>fun.bind(undefined, this.$this, ...args)())
               this.signalsHandlerRemover.push(remover)
             })
           }
@@ -4008,6 +4008,7 @@ class IterableViewComponent{
   meta_def
 
   properties = {} // only for the "of" execution context, as child instead of parent!
+  signals = {} // useless, only for consisentcy
   $this
   $parent
 
@@ -4037,7 +4038,7 @@ class IterableViewComponent{
     this.real_pointed_iterable_property = {markAsChanged: ()=>{}}
   }
 
-  get$ScopedPropsOwner(prop, search_depth=0, noMetaInScope=false){
+  get$ScopedPropsOwner(prop, search_depth=0, noMetaInScope=false, searchInSignals=false){
     if(search_depth === 0){
       noMetaInScope = this.meta_options.noMetaInScope
     }
@@ -4047,17 +4048,17 @@ class IterableViewComponent{
     }
 
     if (search_depth === 0 && this.meta_options.noThisInScope){ // salta il this e vai a parent..
-      return this.parent.get$ScopedPropsOwner(prop, search_depth+1, noMetaInScope)
+      return this.parent.get$ScopedPropsOwner(prop, search_depth+1, noMetaInScope, searchInSignals)
     }
 
-    if (prop in this.properties){
+    if (prop in this.properties || (searchInSignals && prop in this.signals)){
       return [this, true]
     }
     else if (this.meta_options.isNewScope){
       throw Error("Properties cannot be found in this scope..blocked scope?")
     }
     else {
-      return this.parent.get$ScopedPropsOwner(prop, search_depth+1, noMetaInScope)
+      return this.parent.get$ScopedPropsOwner(prop, search_depth+1, noMetaInScope, searchInSignals)
     }
 
   }
