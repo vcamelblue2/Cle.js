@@ -1,9 +1,9 @@
 // Import cle lib
-import * as cle_lib from "../../lib/caged-le-module-to-global.js";
+import * as cle_lib from "../../../../lib/caged-le-module-to-global.js";
 
 // Import cle-react mashup utils
-import { ReactInCle, UseReact, UseReactMixin, useCleProp, useCleProps, fReact, r, rc } from './react-in-cle.js';
-import { CleInReact, UseCle, UseDumbCle } from './cle-in-react.js';
+import { ReactInCle, UseReact, UseReactMixin, useCleProp, useCleProps, fReact, r, rc } from '../../lib/react-in-cle.js';
+import { CleInReact, UseCle, UseDumbCle } from '../../lib/cle-in-react.js';
 
 // Import css-in-js via csz
 import css from 'https://unpkg.com/csz';
