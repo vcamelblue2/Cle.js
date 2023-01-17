@@ -6876,6 +6876,73 @@ const appDemoNoMoreLetAndAsFunc = async ()=>{
 }
 
 
+
+
+const appDemoComponentFactory = async ()=>{
+
+  const MyComponentByFactory = ({bindedCounter, onCounterChanged, readOnlyVal, getText, setText, subElement})=>{
+
+    return cle.myComponent({
+
+      counter: bindedCounter, // must be a Bind
+      num: readOnlyVal, // not binded..cannot be set in this component, or will be overwrite
+      txt: Alias(getText, setText), // react style..
+
+      onInit: $=>console.log("init", $.num),
+      
+      on_counterChanged: onCounterChanged,
+      
+    },
+
+      cle.h2("This is a component by Factory"),
+
+      cle.button({
+        handle_onclick: $ => $.counter += 1,
+      }, "Inc Counter: ", $=>$.counter),
+
+      cle.div({}, "The num is: ", $=>$.num),
+
+      cle.input({ ha_value: Bind($=>$.txt)}),
+
+      cle.div("subel: "), 
+      subElement || "",
+    )
+  }
+
+  RenderApp(document.body, cle.root({
+    aCounter: 10,
+    aNum: 123,
+    aTxt: "hi",
+
+    aCounterClone: undefined,
+    setCounterClone: asFunc(($, v)=>{
+      console.log("otuput: counter changed!")
+      $.aCounterClone = v
+    }),
+
+    on: { this: {
+      aCounterChanged: $=>{ console.log("counter changed!", $.aCounter)},
+      aNumChanged: $=>{ console.log("num changed!", $.aNum)},
+      aTxtChanged: $=>{ console.log("counter changed!", $.aTxt)},
+    }},
+
+  },
+    cle.h2("Hello from component factory"),
+
+    MyComponentByFactory({
+      bindedCounter: Bind('@aCounter'), 
+      readOnlyVal: $=>$.aNum, 
+      getText: $=>$.aTxt, 
+      setText: ($, v)=>{$.aTxt=v}, 
+
+      onCounterChanged: ($, v)=>$.setCounterClone(v), // catch output!
+
+      subElement: { div: ["a subelement, counter clone: ", $=>($.aCounterClone || 'not-set-yet')] }
+    })
+  ))
+
+}
+
 // app0()
 // test2way()
 // appTodolist()
@@ -6923,7 +6990,8 @@ const appDemoNoMoreLetAndAsFunc = async ()=>{
 // appDemoFromHtmlTemplate()
 // appDemoCSSInJSWithCSZ()
 // appDemoEditRefValAndStupidShortcuts()
-appDemoNoMoreLetAndAsFunc()
+// appDemoNoMoreLetAndAsFunc()
+appDemoComponentFactory()
 
 // todo: idea per funzioni "at most once" da usare a giro nel framework: in pratica siccome mi paasano una funzione, aka oggetto, potrei settargli un attributo tipo x.__cle__exec_counter__ e controllare se > 1. problema: come fare per le funzioni che sono delle const dentro una funzione? o in generale funzioni passate e create dentro una funzione? li forse solo una roba diversa es dynamicAtMostOnce, che ti fa il toString della funzione..
 //       - quando può servire sta roba? es in una onhover su un pulsante potrei mettere la import dinamica di un altro pezzo di app, per creare app "parziali" senza dare lagg agli utenti. ovviamnete nel mobile non ha senso :D
