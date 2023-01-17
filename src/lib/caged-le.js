@@ -993,6 +993,8 @@ class ComponentsContainerProxy {
 
   constructor(){
 
+    // qui ci vuole una cosa molto semplice: metto una prop "_data" private vero container dei component, e un proxy che fa la get anche del "super" in ricorsione..su cui baso il proxy!
+
     this.proxy = new Proxy(this, { // todo..proxy è visibile all'interno?????? bug???
       get: function (target, prop, receiver){
         // _debug.log(target, prop, target[prop], target[prop].$this.this)
@@ -1204,11 +1206,6 @@ class Component {
     this.parent = parent
     this.isMyParentHtmlRoot = (parent instanceof HTMLElement) // && !((parent instanceof Component) || (parent instanceof UseComponentDeclaration)) // if false it is a parent HTML node
 
-    this.$le = $le
-    this.$dbus = $dbus
-    this.$ctx = this.getMy$ctx()
-    this.$meta = this.getMy$meta()
-
     this.oj_definition = definition
 
     this.htmlElementType = getComponentType(definition)
@@ -1222,13 +1219,20 @@ class Component {
       metaPushbackAutomark: this.convertedDefinition.meta?.metaPushbackAutomark === undefined ? true : this.convertedDefinition.meta?.metaPushbackAutomark,
     } 
 
+    this.$le = $le
+    this.$dbus = $dbus
+    this.$ctx = this.getMy$ctx()
+    this.$meta = this.getMy$meta()
+
+
     this.defineAndRegisterId()
 
   }
-
+  
+  
   getMy$ctx(){ // as singleton/generator
     if(this.isA$ctxComponent){
-      return this.$ctx ?? new ComponentsContainerProxy()
+      return this.$ctx ?? new ComponentsContainerProxy() // todo: i context devono vedere indietro..ovvero vedo anche i contesti dietro di me! devono essere inclusivi (a run time)
     }
 
     else{
@@ -1239,11 +1243,18 @@ class Component {
       return undefined
     }
   }
-
+  
   // todo: questa cosa potrebbe essere super buggata..perchè io in effetti faccio una copia delle var e non seguo più nulla..
   getMyFullMeta(){
-    if(this.isA$ctxComponent){
+
+    if(this.isMyParentHtmlRoot){
       return this.meta
+    }
+
+    else if (this.meta_options.isNewScope){
+      _info.log("Component meta blocked scope:", this.meta, this.oj_definition, this)
+      return this.meta
+      // throw Error("Properties cannot be found in this meta..blocked scope?")
     }
 
     else{
@@ -1256,9 +1267,15 @@ class Component {
 
   }
   getMy$meta(){ // as singleton/generator
-    if(this.isA$ctxComponent){
+    if(this.isMyParentHtmlRoot){
       _info.log("Component meta:", this.meta, this.oj_definition, this)
       return ComponentProxy(this.meta)
+    }
+
+    else if (this.meta_options.isNewScope){
+      _info.log("Component meta blocked scope:", this.meta, this.oj_definition, this)
+      return ComponentProxy(this.meta)
+      // throw Error("Properties cannot be found in this meta..blocked scope?")
     }
 
     else{
@@ -1338,13 +1355,13 @@ class Component {
       this.$ctx[this._id] = this
     }
 
-    // USE _root_ e _ctxroot_ per accedere alla root di tutto e alla root del context
+    // USE root in le e root in ctx per accedere alla root di tutto e alla root del context
     if(this.isMyParentHtmlRoot){
-      this.$le["_root_"] = this
+      this.$le["root"] = this
     }
 
     if(this.isA$ctxComponent){
-      this.$ctx["_ctxroot_"] = this
+      this.$ctx["root"] = this
     }
   }
   
@@ -2917,8 +2934,8 @@ class Component {
     this.s_css_html_pointer_element=undefined
     try { delete this.$ctx[this.id] } catch {}
     try { delete this.$ctx[this._id] } catch {}
-    try { if(this.isMyParentHtmlRoot){ delete this.$le["_root_"] } } catch {}
-    try { if(this.isA$ctxComponent){ delete this.$ctx["_ctxroot_"] } } catch {}
+    try { if(this.isMyParentHtmlRoot){ delete this.$le["root"] } } catch {}
+    try { if(this.isA$ctxComponent){ delete this.$ctx["root"] } } catch {}
     delete this.$le[this.id]
     
     this.unregisterAsChildsRef()

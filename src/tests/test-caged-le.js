@@ -739,12 +739,12 @@ const app0 = ()=>{
 
             text: $ => "--" + $.ctx.myCtxRoot.todo.toString(),
 
-            on: { // demo di _root_ e _ctxroot_
-              ctx: {"_ctxroot_": {
-                todoChanged: $=> console.log(" heeey sto puntanto al _ctxroot_ e ai sui aggiornamenti di todo!!")
+            on: { // demo di root e ctxroot
+              ctx: { root: {
+                todoChanged: $=> console.log(" heeey sto puntanto al ctxroot e ai sui aggiornamenti di todo!!")
               }},
-              le: {"_root_": {
-                counterChanged: $=> console.log(" heeey sto puntanto al _root_ e ai sui aggiornamenti di counter!! essendo un componente è possibile che vengano lanciati più segnli")
+              le: { root: {
+                counterChanged: $=> console.log(" heeey sto puntanto al root e ai sui aggiornamenti di counter!! essendo un componente è possibile che vengano lanciati più segnli")
               }}
             },
             
@@ -1363,7 +1363,7 @@ const appTodolist = ()=> {
         // here testing component "meta" sapeartion
         { div: {   meta: {forEach:"arr_val", of: $ => $.le.test_lefor.arr}, 
 
-          "=>": Use({ div: {   meta: {forEach:"todo", of: $ => $.le.model.todolist}, 
+          "=>": Use({ div: {   meta: {forEach:"todo", of: $ => $.le.model.todolist, newScope: true}, 
             text: $ => $.meta.arr_val + ") " + $.meta.todo + " (undefined is normal)"
           }})
         }},
@@ -1919,6 +1919,7 @@ const appTestSuperCtxProblem = ()=>{
         smart({span: $=>"elements: "+JSON.stringify($.parent.elements)}),
 
         // testing del problema di accesso al "super-meta", superato con una clone del meta as props(ovviamente qui bastava un parent al posto di scope, ma nei sotto elementi si)
+        // BREAKING CHANGES v0.0.10: now here you should not duplicate meta intoprops to sub use (beacuse meta is NOT blocked by ctx anymore!)
         Use({ div: { meta: {forEach: "tuple", of: $=>$.parent.elements},
 
           props: {
@@ -1941,7 +1942,7 @@ const appTestSuperCtxProblem = ()=>{
                 smart({h6: $=>"-il this vale: "+$.parent.meta_element}),
                 smart({h6: $=>"-il scope vale: "+$.scope.meta_element}),
 
-                smart({h6: $=>"-via meta vale: "+$.meta.meta_tuple}, {ha:{"style.color":"red"}}),
+                smart({h6: $=>"-via meta vale: "+$.meta.tuple}, {ha:{"style.color":"red"}}),
                 smart({h6: $=>"-via scope vale: "+$.scope.meta_tuple}, {ha:{"style.color":"green"}}),
                 
                 smart({ p: $=>"--element:"+$.meta.element}),
@@ -2521,8 +2522,8 @@ const appCalendarOrganizer = async ()=>{
     return res
   }
 
-  const getMonthDays = ()=>{
-    let today_date = new Date() //"04/1/22")
+  const getMonthDays = ()=>{ // MOCK
+    let today_date = new Date("04/1/22")
     let today_date_as_millis = today_date.getTime()
     let today_day = today_date.getDate()
     let first_day_as_millis = today_date_as_millis - ((today_day-1) * (24*60*60*1000))
@@ -2638,6 +2639,21 @@ const appCalendarOrganizer = async ()=>{
         if (plans_on_disk){
           $.this.plans = JSON.parse(plans_on_disk)
         }
+
+        console.log(
+          "--- DATA ---\n",
+          "today: ", $.today,
+          "dates: ", $.dates,
+          "monthLabelMapping: ", $.monthLabelMapping,
+          "slots: ", $.slots,
+          "slot_size_in_hh: ", $.slot_size_in_hh,
+          "colors: ", $.colors,
+          "projects_progressive: ", $.projects_progressive,
+          "projects: ", $.projects,
+          "tasks_progressive: ", $.tasks_progressive,
+          "plans: ", $.plans,
+          "selectedPlan: ", $.selectedPlan,
+        )
       }
 
     }
@@ -3105,7 +3121,7 @@ const appCalendarOrganizer = async ()=>{
 
 
         "=>": [ // gen new meta..
-
+        // BREAKING CHANGES v0.0.10: now here Extended is not required (beacuse meta is NOT blocked by ctx anymore!)
 
           Extended(TodoInput, {attrs: {style: "width: calc(100% - 165px)"}}),
 
@@ -4095,7 +4111,7 @@ const appMetaInScopeAndLowCodeTest = async ()=>{
           f`:::todo.text + " - " + :::todo.done`,
 
           // super meta?
-          Use({ span: { // meta: {newScope: true},
+          Use({ span: { // meta: {newScope: true}, // BREAKING CHANGES v0.0.10: now here now this works! (beacuse meta is NOT blocked by ctx anymore!)
             props: { scoped_todo: $=>$.scope.todo},
             text: $=>" -- testin super meta, ecco il todo: " + $.this.scoped_todo.text
           }}),
