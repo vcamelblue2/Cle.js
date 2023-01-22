@@ -51,14 +51,15 @@ const recursiveAccessor = (pointer, toAccess)=>{
 }
 
 // exponential retry utils..should be a promise, instead use some "return obj" or function
-const exponentialRetry = (func, args=[], customResAsFunc=undefined, resultObj={expRetryObj: true}, msgonerr="", maxNumRetry=maxNumRetry, num_retry=0)=>{
+const exponentialRetry = (func, args=[], customResAsFunc=undefined, resultObj={expRetryObj: true}, msgonerr="", maxNumRetry=maxNumRetry, onDone, num_retry=0)=>{
 
   try{
     resultObj.result = func(...args)
+    onDone !== undefined && onDone(num_retry === 0, resultObj.result) // args: firstTry, result
   }
   catch (e){
     if (num_retry < maxNumRetry) {
-      setTimeout(()=>exponentialRetry(func, args, customResAsFunc, resultObj, msgonerr, maxNumRetry, num_retry+1), Math.min(10*(num_retry+1), maxNumRetry))
+      setTimeout(()=>exponentialRetry(func, args, customResAsFunc, resultObj, msgonerr, maxNumRetry, onDone, num_retry+1), Math.min(10*(num_retry+1), maxNumRetry))
     }
     else{
       _warning.log("CLE - WARNING! unable to execute after 5 retry! "+msgonerr)
@@ -401,7 +402,7 @@ class UseComponentDeclaration{
 
         // throw new Error("Not Implemented Yet!")
         const impossible_to_redefine = []
-        const direct_lvl = ["id", "ctx_id", "constructor", "beforeInit", "onInit", "afterChildsInit", "afterInit", "onUpdate", "onDestroy"] // direct copy
+        const direct_lvl = ["id", "ctx_id", "ctx_ref_id", "constructor", "beforeInit", "onInit", "afterChildsInit", "afterInit", "onUpdate", "onDestroy"] // direct copy
         const first_lvl = ["signals", "dbus_signals", "data", "private:data", "props", "private:props", "let", "alias", "handle", "when"] // on first lvl direct
         const first_lvl_special = ["s_css"] // first lvl direct + eventual overwrite
         const second_lvl = ["on", "on_s", "on_a"]
@@ -1146,7 +1147,8 @@ class Component {
   t_uid // technical id
 
   id  // public id
-  _id // private (or $ctx) id
+  ctx_id // private (or $ctx) id
+  ctx_ref_id // id in the parent $ctx
   
   oj_definition
   convertedDefinition
@@ -1342,7 +1344,8 @@ class Component {
   defineAndRegisterId(){
 
     this.id = this.convertedDefinition.id
-    this._id = this.convertedDefinition._id
+    this.ctx_id = this.convertedDefinition.ctx_id
+    this.ctx_ref_id = this.convertedDefinition.ctx_ref_id
 
     if (this.id !== undefined){
       // if (this.id in this.$le){ _warning.log("CLE - WARNING: Duplicated ID in LE, ", this.id) }
@@ -1350,9 +1353,9 @@ class Component {
       this.$le[this.id] = this
       this.$ctx[this.id] = this
     }
-    if (this._id !== undefined){
-      // if (this._id in this.$ctx){ _warning.log("CLE - WARNING: Duplicated ID in CTX, ", this._id) }
-      this.$ctx[this._id] = this
+    if (this.ctx_id !== undefined){
+      // if (this.ctx_id in this.$ctx){ _warning.log("CLE - WARNING: Duplicated ID in CTX, ", this.ctx_id) }
+      this.$ctx[this.ctx_id] = this
     }
 
     // USE root in le e root in ctx per accedere alla root di tutto e alla root del context
@@ -1363,6 +1366,12 @@ class Component {
     if(this.isA$ctxComponent){
       this.$ctx["root"] = this
     }
+
+    // check if is a set name "in parent ctx" (only for ctx component not root of app)
+    if(this.isA$ctxComponent && !this.isMyParentHtmlRoot && this.ctx_ref_id !== undefined){
+      this.parent.$ctx[this.ctx_ref_id] = this
+    }
+
   }
   
 
@@ -1423,7 +1432,8 @@ class Component {
     this.properties.el = this.html_pointer_element // ha senso??? rischia di spaccare tutto..nella parte di sotto..
     this.properties.parent = this.parent?.$this?.this // ha senso??? rischia di spaccare tutto.. recursive this.parent.parent & parent.parent le.x.parent.. etc..
     this.properties.comp_id = this.id
-    this.properties.comp_ctx_id = this._id
+    this.properties.comp_ctx_id = this.ctx_id
+    this.properties.comp_ctx_ref_id = this.ctx_ref_id
     this.properties.t_uid = this.t_uid
     // Object.defineProperty( // dynamic get childs $this
     //   this.properties, 'childs', {get: ()=>this.childs.map(c=>c instanceof Component || c instanceof IterableViewComponent? c.$this.this : undefined).filter(c=>c!==undefined)}
@@ -1794,13 +1804,19 @@ class Component {
               })
 
               deps.$le_deps?.forEach(d=>{ // [le_id, property]
-                let depRemover = this.$le[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
-                depRemover && depsRemover.push(()=>{depRemover(); handler_remover()})
+                let depRemover;
+                exponentialRetry(()=>{
+                  depRemover = this.$le[d[0]].properties[d[1]].addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+                }, pass, pass, pass, "Cannot connect to CLE Obj by Id", 5)
+                depsRemover.push((...args)=>{depRemover(...args); handler_remover()})
               })
-
-              deps.$ctx_deps?.forEach(d=>{ // [le_id, property]
-                let depRemover = this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
-                depRemover && depsRemover.push(()=>{depRemover(); handler_remover()})
+    
+              deps.$ctx_deps?.forEach(d=>{ // [ctx_id, property]
+                let depRemover;
+                exponentialRetry(()=>{
+                  depRemover = this.$ctx[d[0]].properties[d[1]].addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+                }, pass, pass, pass, "Cannot connect to CLE Obj by Ctx Id", 5)
+                depsRemover.push((...args)=>{depRemover(...args); handler_remover()})
               })
 
               deps.$ref_deps?.forEach(d=>{ // [refName, property]
@@ -1871,20 +1887,19 @@ class Component {
 
 
           deps.$le_deps?.forEach(d=>{ // [le_id, property]
-            // let depRemover;
-            // exponentialRetry(()=>{
-            //   depRemover = this.$le[d[0]].properties[d[1]].addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
-            // }, pass, pass, pass, "Cannot connect to CLE Obj by ID", 5)
-            // depsRemover.push(()=>depRemover())
-
-            let depRemover = this.$le[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
-            depRemover && depsRemover.push(depRemover)
-
+            let depRemover;
+            exponentialRetry(()=>{
+              depRemover = this.$le[d[0]].properties[d[1]].addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+            }, pass, pass, pass, "Cannot connect to CLE Obj by Id", 5)
+            depsRemover.push((...args)=>depRemover(...args))
           })
 
-          deps.$ctx_deps?.forEach(d=>{ // [le_id, property]
-            let depRemover = this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
-            depRemover && depsRemover.push(depRemover)
+          deps.$ctx_deps?.forEach(d=>{ // [ctx_id, property]
+            let depRemover;
+            exponentialRetry(()=>{
+              depRemover = this.$ctx[d[0]].properties[d[1]].addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+            }, pass, pass, pass, "Cannot connect to CLE Obj by Ctx Id", 5)
+            depsRemover.push((...args)=>depRemover(...args))
           })
 
           deps.$ref_deps?.forEach(d=>{ // [refName, property]
@@ -2144,13 +2159,19 @@ class Component {
                 })
 
                 staticDeps.$le_deps?.forEach(d=>{ // [le_id, property]
-                  let deps = this.$le[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k], ()=>setupStyle(v) )
-                  deps && this.attrHattrRemover.push(deps)
+                  let depRemover;
+                  exponentialRetry(()=>{
+                    depRemover = this.$le[d[0]].properties[d[1]].addOnChangedHandler([this, "attr", k], ()=>setupStyle(v) )
+                  }, pass, pass, pass, "Cannot connect to CLE Obj by Id", 5, (firstTry, res)=>{!firstTry && setupStyle(v)})
+                  this.attrHattrRemover.push((...args)=>depRemover(...args))
                 })
 
                 staticDeps.$ctx_deps?.forEach(d=>{ // [ctx_id, property]
-                  let deps = this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k], ()=>setupStyle(v) )
-                  deps && this.attrHattrRemover.push(deps)
+                  let depRemover;
+                  exponentialRetry(()=>{
+                    depRemover = this.$ctx[d[0]].properties[d[1]].addOnChangedHandler([this, "attr", k], ()=>setupStyle(v) )
+                  }, pass, pass, pass, "Cannot connect to CLE Obj by Ctx Id", 5, (firstTry, res)=>{!firstTry && setupStyle(v)})
+                  this.attrHattrRemover.push((...args)=>depRemover(...args))
                 })
 
                 staticDeps.$ref_deps?.forEach(d=>{ // [refName, property]
@@ -2159,7 +2180,7 @@ class Component {
                     const owner = this.getChildsRefOwner(d[0]).childsRefPointers[d[0]]
                     if (Array.isArray(owner)){ throw Error("Cannot Bind to multi-ref child") }
                     depRemover = owner.properties[d[1]].addOnChangedHandler([this, "attr", k],  ()=>setupStyle(v) )
-                  }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5)
+                  }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5, (firstTry, res)=>{!firstTry && setupStyle(v)})
                   this.attrHattrRemover.push(()=>depRemover())
                 })
               }
@@ -2202,13 +2223,19 @@ class Component {
                 })
 
                 staticDeps.$le_deps?.forEach(d=>{ // [le_id, property]
-                  let deps = this.$le[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
-                  deps && this.attrHattrRemover.push(deps)
+                  let depRemover;
+                  exponentialRetry(()=>{
+                    depRemover = this.$le[d[0]].properties[d[1]].addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
+                  }, pass, pass, pass, "Cannot connect to CLE Obj by Id", 5, (firstTry, res)=>{!firstTry && setupValue()})
+                  this.attrHattrRemover.push((...args)=>depRemover(...args))
                 })
 
                 staticDeps.$ctx_deps?.forEach(d=>{ // [ctx_id, property]
-                  let deps = this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
-                  deps && this.attrHattrRemover.push(deps)
+                  let depRemover;
+                  exponentialRetry(()=>{
+                    depRemover = this.$ctx[d[0]].properties[d[1]].addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
+                  }, pass, pass, pass, "Cannot connect to CLE Obj by Ctx Id", 5, (firstTry, res)=>{!firstTry && setupValue()})
+                  this.attrHattrRemover.push((...args)=>depRemover(...args))
                 })
 
                 staticDeps.$ref_deps?.forEach(d=>{ // [refName, property]
@@ -2217,7 +2244,7 @@ class Component {
                     const owner = this.getChildsRefOwner(d[0]).childsRefPointers[d[0]]
                     if (Array.isArray(owner)){ throw Error("Cannot Bind to multi-ref child") }
                     depRemover = owner.properties[d[1]].addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
-                  }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5)
+                  }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5, (firstTry, res)=>{!firstTry && setupValue()})
                   this.attrHattrRemover.push(()=>depRemover())
                 })
 
@@ -2268,14 +2295,20 @@ class Component {
               })
 
               staticDeps.$le_deps?.forEach(d=>{ // [le_id, property]
-                let deps = this.$le[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
-                deps && this.attrHattrRemover.push(deps)
+                let depRemover;
+                exponentialRetry(()=>{
+                  depRemover = this.$le[d[0]].properties[d[1]].addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
+                }, pass, pass, pass, "Cannot connect to CLE Obj by Id", 5, (firstTry, res)=>{!firstTry && setupValue()})
+                this.attrHattrRemover.push((...args)=>depRemover(...args))
                 _2WayPropertyBindingToHandle[k] = ()=>this.$le[d[0]].properties[d[1]]
               })
 
               staticDeps.$ctx_deps?.forEach(d=>{ // [ctx_id, property]
-                let deps = this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
-                deps && this.attrHattrRemover.push(deps)
+                let depRemover;
+                exponentialRetry(()=>{
+                  depRemover = this.$ctx[d[0]].properties[d[1]].addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
+                }, pass, pass, pass, "Cannot connect to CLE Obj by Ctx Id", 5, (firstTry, res)=>{!firstTry && setupValue()})
+                this.attrHattrRemover.push((...args)=>depRemover(...args))
                 _2WayPropertyBindingToHandle[k] = ()=>this.$ctx[d[0]].properties[d[1]]
               })
 
@@ -2285,7 +2318,7 @@ class Component {
                   const owner = this.getChildsRefOwner(d[0]).childsRefPointers[d[0]]
                   if (Array.isArray(owner)){ throw Error("Cannot Bind to multi-ref child") }
                   depRemover = owner.properties[d[1]].addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
-                }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5)
+                }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5, (firstTry, res)=>{!firstTry && setupValue()})
                 this.attrHattrRemover.push(()=>depRemover())
                 _2WayPropertyBindingToHandle[k] = ()=>this.getChildsRefOwner(d[0]).childsRefPointers[d[0]].properties[d[1]]
               })
@@ -2445,13 +2478,19 @@ class Component {
               })
 
               staticDeps.$le_deps?.forEach(d=>{ // [le_id, property]
-                let deps = this.$le[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
-                deps && this.attrHattrRemover.push(deps)
+                let depRemover;
+                exponentialRetry(()=>{
+                  depRemover = this.$le[d[0]].properties[d[1]].addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
+                }, pass, pass, pass, "Cannot connect to CLE Obj by Id", 5, (firstTry, res)=>{!firstTry && setupValue()})
+                this.attrHattrRemover.push((...args)=>depRemover(...args))
               })
 
               staticDeps.$ctx_deps?.forEach(d=>{ // [ctx_id, property]
-                let deps = this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
-                deps && this.attrHattrRemover.push(deps)
+                let depRemover;
+                exponentialRetry(()=>{
+                  depRemover = this.$ctx[d[0]].properties[d[1]].addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
+                }, pass, pass, pass, "Cannot connect to CLE Obj by Ctx Id", 5, (firstTry, res)=>{!firstTry && setupValue()})
+                this.attrHattrRemover.push((...args)=>depRemover(...args))
               })
 
               staticDeps.$ref_deps?.forEach(d=>{ // [refName, property]
@@ -2460,7 +2499,7 @@ class Component {
                   const owner = this.getChildsRefOwner(d[0]).childsRefPointers[d[0]]
                   if (Array.isArray(owner)){ throw Error("Cannot Bind to multi-ref child") }
                   depRemover = owner.properties[d[1]].addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
-                }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5)
+                }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5, (firstTry, res)=>{!firstTry && setupValue()})
                 this.attrHattrRemover.push(()=>depRemover())
               })
 
@@ -2511,14 +2550,20 @@ class Component {
               })
 
               staticDeps.$le_deps?.forEach(d=>{ // [le_id, property]
-                let deps = this.$le[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
-                deps && this.attrHattrRemover.push(deps)
+                let depRemover;
+                exponentialRetry(()=>{
+                  depRemover = this.$le[d[0]].properties[d[1]].addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
+                }, pass, pass, pass, "Cannot connect to CLE Obj by Id", 5, (firstTry, res)=>{!firstTry && setupValue()})
+                this.attrHattrRemover.push((...args)=>depRemover(...args))
                 _2WayPropertyBindingToHandle[k] = ()=>this.$le[d[0]].properties[d[1]]
               })
 
               staticDeps.$ctx_deps?.forEach(d=>{ // [ctx_id, property]
-                let deps = this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
-                deps && this.attrHattrRemover.push(deps)
+                let depRemover;
+                exponentialRetry(()=>{
+                  depRemover = this.$ctx[d[0]].properties[d[1]].addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
+                }, pass, pass, pass, "Cannot connect to CLE Obj by Ctx Id", 5, (firstTry, res)=>{!firstTry && setupValue()})
+                this.attrHattrRemover.push((...args)=>depRemover(...args))
                 _2WayPropertyBindingToHandle[k] = ()=>this.$ctx[d[0]].properties[d[1]]
               })
 
@@ -2528,7 +2573,7 @@ class Component {
                   const owner = this.getChildsRefOwner(d[0]).childsRefPointers[d[0]]
                   if (Array.isArray(owner)){ throw Error("Cannot Bind to multi-ref child") }
                   depRemover = owner.properties[d[1]].addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
-                }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5)
+                }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5, (firstTry, res)=>{!firstTry && setupValue()})
                 this.attrHattrRemover.push(()=>depRemover())
                 _2WayPropertyBindingToHandle[k] = ()=>this.getChildsRefOwner(d[0]).childsRefPointers[d[0]].properties[d[1]]
               })
@@ -2586,13 +2631,19 @@ class Component {
               })
 
               staticDeps.$le_deps?.forEach(d=>{ // [le_id, property]
-                let deps = this.$le[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
-                deps && this.attrHattrRemover.push(deps)
+                let depRemover;
+                exponentialRetry(()=>{
+                  depRemover = this.$le[d[0]].properties[d[1]].addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
+                }, pass, pass, pass, "Cannot connect to CLE Obj by Id", 5, (firstTry, res)=>{!firstTry && setupValue()})
+                this.attrHattrRemover.push((...args)=>depRemover(...args))
               })
 
               staticDeps.$ctx_deps?.forEach(d=>{ // [ctx_id, property]
-                let deps = this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
-                deps && this.attrHattrRemover.push(deps)
+                let depRemover;
+                exponentialRetry(()=>{
+                  depRemover = this.$ctx[d[0]].properties[d[1]].addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
+                }, pass, pass, pass, "Cannot connect to CLE Obj by Ctx Id", 5, (firstTry, res)=>{!firstTry && setupValue()})
+                this.attrHattrRemover.push((...args)=>depRemover(...args))
               })
 
               staticDeps.$ref_deps?.forEach(d=>{ // [refName, property]
@@ -2601,7 +2652,7 @@ class Component {
                   const owner = this.getChildsRefOwner(d[0]).childsRefPointers[d[0]]
                   if (Array.isArray(owner)){ throw Error("Cannot Bind to multi-ref child") }
                   depRemover = owner.properties[d[1]].addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
-                }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5)
+                }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5, (firstTry, res)=>{!firstTry && setupValue()})
                 this.attrHattrRemover.push(()=>depRemover())
               })
 
@@ -2652,14 +2703,20 @@ class Component {
             })
             
             staticDeps.$le_deps?.forEach(d=>{ // [le_id, property]
-              let deps = this.$le[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
-              deps && this.attrHattrRemover.push(deps)
+              let depRemover;
+              exponentialRetry(()=>{
+                depRemover = this.$le[d[0]].properties[d[1]].addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
+              }, pass, pass, pass, "Cannot connect to CLE Obj by Id", 5, (firstTry, res)=>{!firstTry && setupValue()})
+              this.attrHattrRemover.push((...args)=>depRemover(...args))
               _2WayPropertyBindingToHandle[k] = ()=>this.$le[d[0]].properties[d[1]]
             })
 
             staticDeps.$ctx_deps?.forEach(d=>{ // [ctx_id, property]
-              let deps = this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
-              deps && this.attrHattrRemover.push(deps)
+              let depRemover;
+              exponentialRetry(()=>{
+                depRemover = this.$ctx[d[0]].properties[d[1]].addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
+              }, pass, pass, pass, "Cannot connect to CLE Obj by Ctx Id", 5, (firstTry, res)=>{!firstTry && setupValue()})
+              this.attrHattrRemover.push((...args)=>depRemover(...args))
               _2WayPropertyBindingToHandle[k] = ()=>this.$ctx[d[0]].properties[d[1]]
             })
 
@@ -2669,7 +2726,7 @@ class Component {
                 const owner = this.getChildsRefOwner(d[0]).childsRefPointers[d[0]]
                 if (Array.isArray(owner)){ throw Error("Cannot Bind to multi-ref child") }
                 depRemover = owner.properties[d[1]].addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
-              }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5)
+              }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5, (firstTry, res)=>{!firstTry && setupValue()})
               this.attrHattrRemover.push(()=>depRemover())
               _2WayPropertyBindingToHandle[k] = ()=>this.getChildsRefOwner(d[0]).childsRefPointers[d[0]].properties[d[1]]
             })
@@ -2755,13 +2812,19 @@ class Component {
             })
 
             deps.$le_deps?.forEach(d=>{ // [le_id, property]
-              let depRemover = this.$le[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
-              depRemover && depsRemover.push(depRemover)
+              let depRemover;
+              exponentialRetry(()=>{
+                depRemover = this.$le[d[0]].properties[d[1]].addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+              }, pass, pass, pass, "Cannot connect to CLE Obj by Id", 5, (firstTry, res)=>{!firstTry && renderize_css()})
+              depsRemover.push((...args)=>depRemover(...args))
             })
 
-            deps.$ctx_deps?.forEach(d=>{ // [le_id, property]
-              let depRemover = this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
-              depRemover && depsRemover.push(depRemover)
+            deps.$ctx_deps?.forEach(d=>{ // [ctx_id, property]
+              let depRemover;
+              exponentialRetry(()=>{
+                depRemover = this.$ctx[d[0]].properties[d[1]].addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+              }, pass, pass, pass, "Cannot connect to CLE Obj by Ctx Id", 5, (firstTry, res)=>{!firstTry && renderize_css()})
+              depsRemover.push((...args)=>depRemover(...args))
             })
 
             deps.$ref_deps?.forEach(d=>{ // [refName, property]
@@ -2770,7 +2833,7 @@ class Component {
                 const owner = this.getChildsRefOwner(d[0]).childsRefPointers[d[0]]
                 if (Array.isArray(owner)){ throw Error("Cannot Bind to multi-ref child") }
                 depRemover = owner.properties[d[1]].addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
-              }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5)
+              }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5, (firstTry, res)=>{!firstTry && renderize_css()})
               depsRemover.push(()=>depRemover())
             })
 
@@ -2887,13 +2950,19 @@ class Component {
             })
 
             deps.$le_deps?.forEach(d=>{ // [le_id, property]
-              let depRemover = this.$le[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
-              depRemover && depsRemover.push(depRemover)
+              let depRemover;
+              exponentialRetry(()=>{
+                depRemover = this.$le[d[0]].properties[d[1]].addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+              }, pass, pass, pass, "Cannot connect to CLE Obj by Id", 5, (firstTry, res)=>{!firstTry && renderize_css()})
+              depsRemover.push((...args)=>depRemover(...args))
             })
 
-            deps.$ctx_deps?.forEach(d=>{ // [le_id, property]
-              let depRemover = this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
-              depRemover && depsRemover.push(depRemover)
+            deps.$ctx_deps?.forEach(d=>{ // [ctx_id, property]
+              let depRemover;
+              exponentialRetry(()=>{
+                depRemover = this.$ctx[d[0]].properties[d[1]].addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+              }, pass, pass, pass, "Cannot connect to CLE Obj by Ctx Id", 5, (firstTry, res)=>{!firstTry && renderize_css()})
+              depsRemover.push((...args)=>depRemover(...args))
             })
 
             deps.$ref_deps?.forEach(d=>{ // [refName, property]
@@ -2902,7 +2971,7 @@ class Component {
                 const owner = this.getChildsRefOwner(d[0]).childsRefPointers[d[0]]
                 if (Array.isArray(owner)){ throw Error("Cannot Bind to multi-ref child") }
                 depRemover = owner.properties[d[1]].addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
-              }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5)
+              }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5, (firstTry, res)=>{!firstTry && renderize_css()})
               depsRemover.push(()=>depRemover())
             })
 
@@ -2933,9 +3002,10 @@ class Component {
     this.s_css_html_pointer_element?.remove()
     this.s_css_html_pointer_element=undefined
     try { delete this.$ctx[this.id] } catch {}
-    try { delete this.$ctx[this._id] } catch {}
+    try { delete this.$ctx[this.ctx_id] } catch {}
     try { if(this.isMyParentHtmlRoot){ delete this.$le["root"] } } catch {}
     try { if(this.isA$ctxComponent){ delete this.$ctx["root"] } } catch {}
+    try { if(this.isA$ctxComponent && !this.isMyParentHtmlRoot && this.ctx_ref_id !== undefined){ delete this.parent.$ctx[this.ctx_ref_id] } } catch {}
     delete this.$le[this.id]
     
     this.unregisterAsChildsRef()
@@ -3031,7 +3101,7 @@ class Component {
     // maybe private def
 
     let { 
-      id, ctx_id: _id, 
+      id, ctx_id, ctx_ref_id,
       def, "private:def": _def, 
       attrs, "private:attrs":_attrs, 
       a, "private:a": _a, 
@@ -3047,7 +3117,8 @@ class Component {
     )
 
     unifiedDef.id = id || ComponentRUUIDGen.generate()
-    unifiedDef._id = _id || unifiedDef.id
+    unifiedDef.ctx_id = ctx_id || unifiedDef.id
+    unifiedDef.ctx_ref_id = ctx_ref_id
 
     if (def !== undefined) { unifiedDef.def = def }
     if (_def !== undefined) { unifiedDef._def = _def }
@@ -3474,22 +3545,40 @@ class TextNodeComponent {
           // todo: recoursive def deps!
         })
 
-        staticDeps.$le_deps?.forEach(_d=>{
-          let _propName = _d[1]
-          let _pointedProp = pointedComponentEl.$le[_d[0]].properties[_propName]
-          if ("addOnChangedHandler" in _pointedProp){
-            this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
-          }
-          // todo: recoursive def deps!
+        staticDeps.$le_deps?.forEach(_d=>{ // [le_id, property]
+          exponentialRetry(()=>{
+            let _propName = _d[1]
+            let _pointedProp = pointedComponentEl.$le[_d[0]].properties[_propName]
+            if ("addOnChangedHandler" in _pointedProp){
+              this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+            }
+            // todo: recoursive def deps!
+          }, pass, pass, pass, "Cannot connect to CLE Obj by Id", 5, (firstTry, res)=>{!firstTry && this._renderizeText()})
         })
 
         staticDeps.$ctx_deps?.forEach(_d=>{
-          let _propName = _d[1]
-          let _pointedProp = pointedComponentEl.$ctx[_d[0]].properties[_propName]
-          if ("addOnChangedHandler" in _pointedProp){
-            this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
-          }
-          // todo: recoursive def deps!
+          exponentialRetry(()=>{
+            let _propName = _d[1]
+            let _pointedProp = pointedComponentEl.$ctx[_d[0]].properties[_propName]
+            if ("addOnChangedHandler" in _pointedProp){
+              this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+            }
+            // todo: recoursive def deps!
+          }, pass, pass, pass, "Cannot connect to CLE Obj by Ctx Id", 5, (firstTry, res)=>{!firstTry && this._renderizeText()})
+        })
+
+        staticDeps.$ref_deps?.forEach(_d=>{ // [refName, property]
+          exponentialRetry(()=>{
+            let _refName = _d[0]
+            let _propName = _d[1]
+            const owner = pointedComponentEl.getChildsRefOwner(_refName).childsRefPointers[_refName]
+            if (Array.isArray(owner)){ throw Error("Cannot Bind to multi-ref child") }
+            let _pointedProp = owner.properties[_propName]
+            if ("addOnChangedHandler" in _pointedProp){
+              this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+            }
+            // todo: recoursive def deps!
+          }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5, (firstTry, res)=>{!firstTry && this._renderizeText()})
         })
       }
     })
@@ -3534,22 +3623,40 @@ class TextNodeComponent {
           // todo: recoursive def deps!
         })
 
-        staticDeps.$le_deps?.forEach(_d=>{
-          let _propName = _d[1]
-          let _pointedProp = pointedComponentEl.$le[_d[0]].properties[_propName]
-          if ("addOnChangedHandler" in _pointedProp){
-            this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
-          }
-          // todo: recoursive def deps!
+        staticDeps.$le_deps?.forEach(_d=>{ // [le_id, property]
+          exponentialRetry(()=>{
+            let _propName = _d[1]
+            let _pointedProp = pointedComponentEl.$le[_d[0]].properties[_propName]
+            if ("addOnChangedHandler" in _pointedProp){
+              this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+            }
+            // todo: recoursive def deps!
+          }, pass, pass, pass, "Cannot connect to CLE Obj by Id", 5, (firstTry, res)=>{!firstTry && this._renderizeText()})
         })
 
         staticDeps.$ctx_deps?.forEach(_d=>{
-          let _propName = _d[1]
-          let _pointedProp = pointedComponentEl.$ctx[_d[0]].properties[_propName]
-          if ("addOnChangedHandler" in _pointedProp){
-            this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
-          }
-          // todo: recoursive def deps!
+          exponentialRetry(()=>{
+            let _propName = _d[1]
+            let _pointedProp = pointedComponentEl.$ctx[_d[0]].properties[_propName]
+            if ("addOnChangedHandler" in _pointedProp){
+              this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+            }
+            // todo: recoursive def deps!
+          }, pass, pass, pass, "Cannot connect to CLE Obj by Ctx Id", 5, (firstTry, res)=>{!firstTry && this._renderizeText()})
+        })
+
+        staticDeps.$ref_deps?.forEach(_d=>{ // [refName, property]
+          exponentialRetry(()=>{
+            let _refName = _d[0]
+            let _propName = _d[1]
+            const owner = pointedComponentEl.getChildsRefOwner(_refName).childsRefPointers[_refName]
+            if (Array.isArray(owner)){ throw Error("Cannot Bind to multi-ref child") }
+            let _pointedProp = owner.properties[_propName]
+            if ("addOnChangedHandler" in _pointedProp){
+              this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+            }
+            // todo: recoursive def deps!
+          }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5, (firstTry, res)=>{!firstTry && this._renderizeText()})
         })
       }
     })    
@@ -3595,160 +3702,216 @@ class TextNodeComponent {
           // todo: recoursive def deps!
         })
 
-        staticDeps.$le_deps?.forEach(_d=>{
-          let _propName = _d[1]
-          let _pointedProp = pointedComponentEl.$le[_d[0]].properties[_propName]
-          if ("addOnChangedHandler" in _pointedProp){
-            this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
-          }
-          // todo: recoursive def deps!
+        staticDeps.$le_deps?.forEach(_d=>{ // [le_id, property]
+          exponentialRetry(()=>{
+            let _propName = _d[1]
+            let _pointedProp = pointedComponentEl.$le[_d[0]].properties[_propName]
+            if ("addOnChangedHandler" in _pointedProp){
+              this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+            }
+            // todo: recoursive def deps!
+          }, pass, pass, pass, "Cannot connect to CLE Obj by Id", 5, (firstTry, res)=>{!firstTry && this._renderizeText()})
         })
 
         staticDeps.$ctx_deps?.forEach(_d=>{
-          let _propName = _d[1]
-          let _pointedProp = pointedComponentEl.$ctx[_d[0]].properties[_propName]
-          if ("addOnChangedHandler" in _pointedProp){
-            this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
-          }
-          // todo: recoursive def deps!
+          exponentialRetry(()=>{
+            let _propName = _d[1]
+            let _pointedProp = pointedComponentEl.$ctx[_d[0]].properties[_propName]
+            if ("addOnChangedHandler" in _pointedProp){
+              this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+            }
+            // todo: recoursive def deps!
+          }, pass, pass, pass, "Cannot connect to CLE Obj by Ctx Id", 5, (firstTry, res)=>{!firstTry && this._renderizeText()})
+        })
+
+        staticDeps.$ref_deps?.forEach(_d=>{ // [refName, property]
+          exponentialRetry(()=>{
+            let _refName = _d[0]
+            let _propName = _d[1]
+            const owner = pointedComponentEl.getChildsRefOwner(_refName).childsRefPointers[_refName]
+            if (Array.isArray(owner)){ throw Error("Cannot Bind to multi-ref child") }
+            let _pointedProp = owner.properties[_propName]
+            if ("addOnChangedHandler" in _pointedProp){
+              this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+            }
+            // todo: recoursive def deps!
+          }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5, (firstTry, res)=>{!firstTry && this._renderizeText()})
         })
       }
     })
 
     this.staticAnDeps.$le_deps?.forEach(d=>{
-      let propName = d[1]
-      let pointedProp = this.parent.$le[d[0]].properties[propName]
-      if ("addOnChangedHandler" in pointedProp){
-        this.depsRemover.push(pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
-      }
-      else if (propName in this.parent.$le[d[0]].defDeps){ // is a function!
-        let staticDeps = this.parent.$le[d[0]].defDeps[propName]
-        let pointedComponentEl = this.parent.$le[d[0]]
-        
-        staticDeps.$this_deps?.forEach(_d=>{
-          let _propName = Array.isArray(_d) ? _d[0] : _d
-          let _pointedProp = pointedComponentEl.properties[_propName]
-          if ("addOnChangedHandler" in _pointedProp){
-            this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
-          }
-          // todo: recoursive def deps!
-        })
+      exponentialRetry(()=>{
+        let propName = d[1]
+        let pointedProp = this.parent.$le[d[0]].properties[propName]
+        if ("addOnChangedHandler" in pointedProp){
+          this.depsRemover.push(pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+        }
+        else if (propName in this.parent.$le[d[0]].defDeps){ // is a function!
+          let staticDeps = this.parent.$le[d[0]].defDeps[propName]
+          let pointedComponentEl = this.parent.$le[d[0]]
+          
+          staticDeps.$this_deps?.forEach(_d=>{
+            let _propName = Array.isArray(_d) ? _d[0] : _d
+            let _pointedProp = pointedComponentEl.properties[_propName]
+            if ("addOnChangedHandler" in _pointedProp){
+              this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+            }
+            // todo: recoursive def deps!
+          })
 
-        staticDeps.$parent_deps?.forEach(_d=>{
-          let _propName = Array.isArray(_d) ? _d[0] : _d
-          let _pointedProp = pointedComponentEl.parent.properties[_propName]
-          if ("addOnChangedHandler" in _pointedProp){
-            this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
-          }
-          // todo: recoursive def deps!
-        })
+          staticDeps.$parent_deps?.forEach(_d=>{
+            let _propName = Array.isArray(_d) ? _d[0] : _d
+            let _pointedProp = pointedComponentEl.parent.properties[_propName]
+            if ("addOnChangedHandler" in _pointedProp){
+              this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+            }
+            // todo: recoursive def deps!
+          })
 
-        staticDeps.$scope_deps?.forEach(_d=>{
-          let _propName = Array.isArray(_d) ? _d[0] : _d
+          staticDeps.$scope_deps?.forEach(_d=>{
+            let _propName = Array.isArray(_d) ? _d[0] : _d
 
-          let [propsOwner, isPropertiesProp] = pointedComponentEl.get$ScopedPropsOwner(d);
-          let _pointedProp  = isPropertiesProp ? propsOwner.properties[_propName] : propsOwner.meta[_propName];
+            let [propsOwner, isPropertiesProp] = pointedComponentEl.get$ScopedPropsOwner(d);
+            let _pointedProp  = isPropertiesProp ? propsOwner.properties[_propName] : propsOwner.meta[_propName];
 
-          if ("addOnChangedHandler" in _pointedProp){
-            this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
-          }
-          // todo: recoursive def deps!
-        })
+            if ("addOnChangedHandler" in _pointedProp){
+              this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+            }
+            // todo: recoursive def deps!
+          })
 
-        staticDeps.$le_deps?.forEach(_d=>{
-          let _propName = _d[1]
-          let _pointedProp = pointedComponentEl.$le[_d[0]].properties[_propName]
-          if ("addOnChangedHandler" in _pointedProp){
-            this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
-          }
-          // todo: recoursive def deps!
-        })
+          staticDeps.$le_deps?.forEach(_d=>{ // [le_id, property]
+            exponentialRetry(()=>{
+              let _propName = _d[1]
+              let _pointedProp = pointedComponentEl.$le[_d[0]].properties[_propName]
+              if ("addOnChangedHandler" in _pointedProp){
+                this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+              }
+              // todo: recoursive def deps!
+            }, pass, pass, pass, "Cannot connect to CLE Obj by Id", 5, (firstTry, res)=>{!firstTry && this._renderizeText()})
+          })
 
-        staticDeps.$ctx_deps?.forEach(_d=>{
-          let _propName = _d[1]
-          let _pointedProp = pointedComponentEl.$ctx[_d[0]].properties[_propName]
-          if ("addOnChangedHandler" in _pointedProp){
-            this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
-          }
-          // todo: recoursive def deps!
-        })
-      }
+          staticDeps.$ctx_deps?.forEach(_d=>{
+            exponentialRetry(()=>{
+              let _propName = _d[1]
+              let _pointedProp = pointedComponentEl.$ctx[_d[0]].properties[_propName]
+              if ("addOnChangedHandler" in _pointedProp){
+                this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+              }
+              // todo: recoursive def deps!
+            }, pass, pass, pass, "Cannot connect to CLE Obj by Ctx Id", 5, (firstTry, res)=>{!firstTry && this._renderizeText()})
+          })
+
+          staticDeps.$ref_deps?.forEach(_d=>{ // [refName, property]
+            exponentialRetry(()=>{
+              let _refName = _d[0]
+              let _propName = _d[1]
+              const owner = pointedComponentEl.getChildsRefOwner(_refName).childsRefPointers[_refName]
+              if (Array.isArray(owner)){ throw Error("Cannot Bind to multi-ref child") }
+              let _pointedProp = owner.properties[_propName]
+              if ("addOnChangedHandler" in _pointedProp){
+                this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+              }
+              // todo: recoursive def deps!
+            }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5, (firstTry, res)=>{!firstTry && this._renderizeText()})
+          })
+        }
+      }, pass, pass, pass, "Cannot connect to CLE Obj by Id", 5, (firstTry, res)=>{!firstTry && this._renderizeText()})
     })
 
     this.staticAnDeps.$ctx_deps?.forEach(d=>{
-      let propName = d[1]
-      let pointedProp = this.parent.$ctx[d[0]].properties[propName]
-      if ("addOnChangedHandler" in pointedProp){
-        this.depsRemover.push(pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
-      }
-      else if (propName in this.parent.$ctx[d[0]].defDeps){ // is a function!
-        let staticDeps = this.parent.$ctx[d[0]].defDeps[propName]
-        let pointedComponentEl = this.parent.$ctx[d[0]]
-        
-        staticDeps.$this_deps?.forEach(_d=>{
-          let _propName = Array.isArray(_d) ? _d[0] : _d
-          let _pointedProp = pointedComponentEl.properties[_propName]
-          if ("addOnChangedHandler" in _pointedProp){
-            this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
-          }
-          // todo: recoursive def deps!
-        })
-
-        staticDeps.$parent_deps?.forEach(_d=>{
-          let _propName = Array.isArray(_d) ? _d[0] : _d
-          let _pointedProp = pointedComponentEl.parent.properties[_propName]
-          if ("addOnChangedHandler" in _pointedProp){
-            this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
-          }
-          // todo: recoursive def deps!
-        })
-
-        staticDeps.$scope_deps?.forEach(_d=>{
-          let _propName = Array.isArray(_d) ? _d[0] : _d
-
-          let [propsOwner, isPropertiesProp] = pointedComponentEl.get$ScopedPropsOwner(d);
-          let _pointedProp  = isPropertiesProp ? propsOwner.properties[_propName] : propsOwner.meta[_propName];
+      exponentialRetry(()=>{
+        let propName = d[1]
+        let pointedProp = this.parent.$ctx[d[0]].properties[propName]
+        if ("addOnChangedHandler" in pointedProp){
+          this.depsRemover.push(pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+        }
+        else if (propName in this.parent.$ctx[d[0]].defDeps){ // is a function!
+          let staticDeps = this.parent.$ctx[d[0]].defDeps[propName]
+          let pointedComponentEl = this.parent.$ctx[d[0]]
           
-          if ("addOnChangedHandler" in _pointedProp){
-            this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
-          }
-          // todo: recoursive def deps!
-        })
+          staticDeps.$this_deps?.forEach(_d=>{
+            let _propName = Array.isArray(_d) ? _d[0] : _d
+            let _pointedProp = pointedComponentEl.properties[_propName]
+            if ("addOnChangedHandler" in _pointedProp){
+              this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+            }
+            // todo: recoursive def deps!
+          })
 
-        staticDeps.$le_deps?.forEach(_d=>{
-          let _propName = _d[1]
-          let _pointedProp = pointedComponentEl.$le[_d[0]].properties[_propName]
-          if ("addOnChangedHandler" in _pointedProp){
-            this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
-          }
-          // todo: recoursive def deps!
-        })
+          staticDeps.$parent_deps?.forEach(_d=>{
+            let _propName = Array.isArray(_d) ? _d[0] : _d
+            let _pointedProp = pointedComponentEl.parent.properties[_propName]
+            if ("addOnChangedHandler" in _pointedProp){
+              this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+            }
+            // todo: recoursive def deps!
+          })
 
-        staticDeps.$ctx_deps?.forEach(_d=>{
-          let _propName = _d[1]
-          let _pointedProp = pointedComponentEl.$ctx[_d[0]].properties[_propName]
-          if ("addOnChangedHandler" in _pointedProp){
-            this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
-          }
-          // todo: recoursive def deps!
-        })
-      }
+          staticDeps.$scope_deps?.forEach(_d=>{
+            let _propName = Array.isArray(_d) ? _d[0] : _d
+
+            let [propsOwner, isPropertiesProp] = pointedComponentEl.get$ScopedPropsOwner(d);
+            let _pointedProp  = isPropertiesProp ? propsOwner.properties[_propName] : propsOwner.meta[_propName];
+            
+            if ("addOnChangedHandler" in _pointedProp){
+              this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+            }
+            // todo: recoursive def deps!
+          })
+
+          staticDeps.$le_deps?.forEach(_d=>{ // [le_id, property]
+            exponentialRetry(()=>{
+              let _propName = _d[1]
+              let _pointedProp = pointedComponentEl.$le[_d[0]].properties[_propName]
+              if ("addOnChangedHandler" in _pointedProp){
+                this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+              }
+              // todo: recoursive def deps!
+            }, pass, pass, pass, "Cannot connect to CLE Obj by Id", 5, (firstTry, res)=>{!firstTry && this._renderizeText()})
+          })
+
+          staticDeps.$ctx_deps?.forEach(_d=>{
+            exponentialRetry(()=>{
+              let _propName = _d[1]
+              let _pointedProp = pointedComponentEl.$ctx[_d[0]].properties[_propName]
+              if ("addOnChangedHandler" in _pointedProp){
+                this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+              }
+              // todo: recoursive def deps!
+            }, pass, pass, pass, "Cannot connect to CLE Obj by Ctx Id", 5, (firstTry, res)=>{!firstTry && this._renderizeText()})
+          })
+
+          staticDeps.$ref_deps?.forEach(_d=>{ // [refName, property]
+            exponentialRetry(()=>{
+              let _refName = _d[0]
+              let _propName = _d[1]
+              const owner = pointedComponentEl.getChildsRefOwner(_refName).childsRefPointers[_refName]
+              if (Array.isArray(owner)){ throw Error("Cannot Bind to multi-ref child") }
+              let _pointedProp = owner.properties[_propName]
+              if ("addOnChangedHandler" in _pointedProp){
+                this.depsRemover.push(_pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
+              }
+              // todo: recoursive def deps!
+            }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5, (firstTry, res)=>{!firstTry && this._renderizeText()})
+          })
+        }
+      }, pass, pass, pass, "Cannot connect to CLE Obj by Ctx Id", 5, (firstTry, res)=>{!firstTry && this._renderizeText()})
     })
 
     this.staticAnDeps.$ref_deps?.forEach(d=>{// [refName, property]
-
-      let depRemover;
       exponentialRetry(()=>{
+        let propName = d[1]
         const owner = this.parent.getChildsRefOwner(d[0]).childsRefPointers[d[0]]
         if (Array.isArray(owner)){ throw Error("Cannot Bind to multi-ref child") }
-        if ("addOnChangedHandler" in owner.properties[d[1]]){
-          depRemover = owner.properties[d[1]].addOnChangedHandler(this, ()=>this._renderizeText())
+        let pointedProp = owner.properties[propName]
+        if ("addOnChangedHandler" in pointedProp){
+          this.depsRemover.push(pointedProp.addOnChangedHandler(this, ()=>this._renderizeText()))
         }
         else { _warning.log("CLE Warning - function in ref in text as deps not supported at this time")}
-      }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5)
+      }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5, (firstTry, res)=>{!firstTry && this._renderizeText()})
       
-      this.depsRemover.push(()=>depRemover())
-
     })
 
     this.staticAnDeps.$external_deps?.forEach(extProp=>{
@@ -3891,13 +4054,19 @@ class ConditionalComponent extends Component{
       })
 
       deps.$le_deps?.forEach(d=>{ // [le_id, property]
-        let depRemover = this.$le[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
-        depRemover && depsRemover.push(depRemover)
+        let depRemover;
+        exponentialRetry(()=>{
+          depRemover = this.$le[d[0]].properties[d[1]].addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+        }, pass, pass, pass, "Cannot connect to CLE Obj by Id", 5)
+        depsRemover.push((...args)=>depRemover(...args))
       })
 
-      deps.$ctx_deps?.forEach(d=>{ // [le_id, property]
-        let depRemover = this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
-        depRemover && depsRemover.push(depRemover)
+      deps.$ctx_deps?.forEach(d=>{ // [ctx_id, property]
+        let depRemover;
+        exponentialRetry(()=>{
+          depRemover = this.$ctx[d[0]].properties[d[1]].addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+        }, pass, pass, pass, "Cannot connect to CLE Obj by Ctx Id", 5)
+        depsRemover.push((...args)=>depRemover(...args))
       })
 
 
@@ -4291,16 +4460,20 @@ class IterableViewComponent{
         }) // supporting multiple deps, but only of first order..
 
         deps.$le_deps?.forEach(d=>{ // [le_id, property]
-          let depRemover = this.$le[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
-          depRemover && depsRemover.push(depRemover)
-
+          let depRemover;
+          exponentialRetry(()=>{
+            depRemover = this.$le[d[0]].properties[d[1]].addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+          }, pass, pass, pass, "Cannot connect to CLE Obj by Id", 5)
+          depsRemover.push((...args)=>depRemover(...args))
           this.real_pointed_iterable_property.markAsChanged = ()=>{this.$le[d[0]].properties[d[1]]?.markAsChanged()}
         })
 
-        deps.$ctx_deps?.forEach(d=>{ // [le_id, property]
-          let depRemover = this.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
-          depRemover && depsRemover.push(depRemover)
-
+        deps.$ctx_deps?.forEach(d=>{ // [ctx_id, property]
+          let depRemover;
+          exponentialRetry(()=>{
+            depRemover = this.$ctx[d[0]].properties[d[1]].addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() )
+          }, pass, pass, pass, "Cannot connect to CLE Obj by Ctx Id", 5)
+          depsRemover.push((...args)=>depRemover(...args))
           this.real_pointed_iterable_property.markAsChanged = ()=>{this.$ctx[d[0]].properties[d[1]]?.markAsChanged()}
         })
 
