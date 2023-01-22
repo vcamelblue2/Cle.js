@@ -705,7 +705,7 @@ const app0 = ()=>{
 
   const CtxEnabledComponent = {
     div: { 
-      ctx_id: "myCtxRoot",
+      // ctx_id: "root" -> ALWAYS
 
       data: {
         todo: ["todo1", "todo2", "todo3"]
@@ -720,10 +720,10 @@ const app0 = ()=>{
 
           def: {
             removeLastTodo: $ => {
-              if ($.ctx.myCtxRoot.todo.length > 0) {
-                let copy = [...$.ctx.myCtxRoot.todo]
+              if ($.ctx.root.todo.length > 0) {
+                let copy = [...$.ctx.root.todo]
                 copy.pop()
-                $.ctx.myCtxRoot.todo = copy
+                $.ctx.root.todo = copy
               }
             }
           },
@@ -737,7 +737,7 @@ const app0 = ()=>{
         { div: { 
             ctx_id: "listPresenter",
 
-            text: $ => "--" + $.ctx.myCtxRoot.todo.toString(),
+            text: $ => "--" + $.ctx.root.todo.toString(),
 
             on: { // demo di root e ctxroot
               ctx: { root: {
@@ -749,7 +749,7 @@ const app0 = ()=>{
             },
             
             onInit: $ => {
-              console.log("heeeeeey sono visibile solo nel contestooooo", $.ctx, $.ctx.myCtxRoot, $.le)
+              console.log("heeeeeey sono visibile solo nel contestooooo", $.ctx, $.ctx.root, $.le)
             }
         }}
 
