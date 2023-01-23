@@ -3108,7 +3108,7 @@ class Component {
       hattrs, "private:hattrs":_hattrs, 
       ha, "private:ha": _ha, 
     } = definition
-    addToAlreadyResolved('id', 'ctx_id',
+    addToAlreadyResolved('id', 'ctx_id', 'ctx_ref_id',
       'def', "private:def",
       'attrs', "private:attrs",
       'a', "private:a", 
