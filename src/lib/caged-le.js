@@ -3273,10 +3273,6 @@ class Component {
           addToAlreadyResolved(k)
         }
         
-        else if (k.startsWith('dbs_')){
-          dash_shortucts_keys.dbus_signals[k.substring(4)] = val
-          addToAlreadyResolved(k)
-        }
         else if (k.startsWith('dbus_signal_')){
           dash_shortucts_keys.dbus_signals[k.substring(12)] = val
           addToAlreadyResolved(k)
@@ -4713,7 +4709,7 @@ class LE_BackendApiMock{ // base class for backend api mock -> purpose is to hav
 // export 
 /** Syntactic Sugar to define component using cle.div({ DEFINITION }, ...CHILDS), instead of normal object.*/
 const cle = new Proxy({}, {
-  get: (_target, prop, receiver)=>{ return (args_dict, ...childs)=>( args_dict===undefined && childs.length === 0 ? {[prop]: {}} : (typeof args_dict === "string" || typeof args_dict ==="function" ? {[prop]: args_dict} : {[prop]:{...args_dict, ...(childs.length ? {'':childs} : {}) }}) ) },
+  get: (_target, prop, receiver)=>{ return (args_dict, ...childs)=>( args_dict===undefined && childs.length === 0 ? {[prop]: {}} : (typeof args_dict === "string" || typeof args_dict ==="function" ? {[prop]: (childs.length === 0 ? args_dict : [args_dict, ...childs])} : {[prop]:{...args_dict, ...(childs.length ? {'':childs} : {}) }}) ) },
   set: function(_target, prop, value) {}
 })
 
