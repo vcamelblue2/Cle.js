@@ -2,7 +2,7 @@
 
 Clean.js is a declarative Javascript Framework, with pure POJO in mind (for ui, data model & logic), a "caged" environment, a TRUE reactive nature and "static" analysis (used to build dependencies between componentes). Optionally imperative code can still be used for some dynamic parts.
  
- Inspired by: 
+ Inspired mostly by: 
   - QML (id, scoping & naming, true "reactive" properties, signals & slot, mangling for declarations, coding by convention, everything has a signal, components sub-editing from external, elements/ref by ID, auto context/scope)
   - Angular (declarative & templatingm ng-for, ng-if, 2 way data binding, "auto-update", Hooks & life-cycle)
   - React (non-verbose, render library first, light & dynamic, with very limited size & memory footprint, easy to learn)
@@ -76,7 +76,7 @@ Nel caso di più sotto-elementi basta semplicemente utilizzare un Array:
 
  Esistono poi delle shortcuts:
 
- - Se la definizione contiene solo sotto-elementi posso passarli direttamente come valore al tag. 
+ - Se la definizione contiene solo sotto-elementi si possono passare direttamente come valore al tag. 
  - Come prima, l'array può essere omesso in caso di un solo sotto-elemento.
 
  ```javascript
@@ -113,9 +113,9 @@ RenderApp(document.body, cle.root({},
 Il lifecycle di un componente CLE prevede di fatto che prima venga renderizzato l'albero "spoglio" di elementi HTTML, dopodichè vengono inizializzati e lanciati gli Hooks che si possono definire con le keywords:
     
 - `constructor`: async? ($, {...args}) => { } 
-    - Constructor, called at component creations, useful to setup properties from external with the `Use` declaration. use onInit in other cases
+    - Constructor, called at component creations, useful to setup properties from external with the `Use` declaration. use onInit in other cases. Only called in Use components.
 - `onInit`: async? $ => { } 
-    - on Init, After constructor, but before childs creation. This is the standard initializer.
+    - on Init, after constructor, but before childs creation. This is the standard initializer.
 - `afterChildsInit`: async? $ => { } 
     - After every childs "onInit". Useful to setup special things into childs after creation.
 - `afterInit`: $ => { } 
@@ -127,7 +127,7 @@ Infine, sotto determinate condizioni l'elemento viene distrutto
 
 
 
-## Standard Definition
+## Standard Definition - Declare by keyword
 La standard definition di un componente prevede che all'interno della definizione possano essere esplicitati, oltre ai sotto-elementi tramite una delle chiavi di cui sopra, molte altre cose.
 
 E' Ad esempio possibile definire variabili, funzioni, segnali, attributi html, classi css, nonchè gestire eventi html, segnali locali, di properità o globali. Per una lista Approfondita si rimanda alla sezione `#Full Reference` 
@@ -149,10 +149,10 @@ Vediamo ora com'è possibile creare una variabile in un componente.
         console.log($.counter)
     }
 
- }}
+ }} // Component is just a POJO and can be assigned to variable..
  ```
 
- In questo esempio stiamo definendo una variabile `counter` con valore iniziale `0`. Abbiamo inoltre anche assegnato un identificativo (univoco in tutta l'app) al nostro componente `myCounter`. Vedremo meglio com'è possibile utilizzare gli id in seguito. Abbiamo anceh definito l'hook onInit che verrà chiamato all'inizializzazione del componente.
+ In questo esempio stiamo definendo una variabile `counter` con valore iniziale `0` grazie alla keyword "`props`". Abbiamo inoltre anche assegnato un identificativo (univoco in tutta l'app) al nostro componente `myCounter`. Vedremo meglio com'è possibile utilizzare gli id in seguito. Abbiamo anceh definito l'hook onInit che verrà chiamato all'inizializzazione del componente.
 
  Per referenziare e mostrare all'utente il contenuto della variabile è possibile utilizzare:
 
@@ -287,6 +287,40 @@ in questo caso potremmo modificare il codice precedente in:
 
 Nell'esempio precedente per la properità `calendarEvent` verrà generato un segnale `calendarEventChanged`.
 
+
+Una shortcut al patter edit ref-prop & mark as changed è utilizzare la funzionalità built-in nel this `editRefVal`, il quale permette di effetuare modifiche interne a un ref e segnalare il cambiamento automaticamente.
+```javascript
+ $ => $.this.editRefVal.calendarEvent(cv => { cv.title = "Go to the mall" })
+   
+```
+
+## Props alternatives & data declaration shortcuts:
+la keyword "props" non è l'unica che si può utilizzare per dichiarare delle variabili. Le altre sono:
+- let
+- data
+
+e sono determinate solo dalla semantica che lo sviluppatore vuole utilizzare.
+
+Inoltre, come vedremo anche per le altre "keyword", è possibile evitare di scriverele in un oggeto assegnato alla keyword, utilizzando una definizione compatta "inline" con dash-case. Ovvero è quindi possibile dichiarare una variabile come:
+- "let_" + "myPropName"
+
+es: 
+```javascript
+{ div: {
+    let_property1: "a value", // preferred way!
+    let_property2: 123
+}}
+```
+
+In ultima analisi, nel caso in cui si inserisce una "keyword" nella definizione che NON è tra le reserved e/o non viene riconosciuta, questa diventerà per cle una definizione di una variabile. Dunque per dichiarare una variabile è sufficiente scrivere:
+
+```javascript
+{ div: {
+    property1: "a value", // preferred way!
+    property2: 123
+}}
+```
+
 ## Functions
 Le funzioni vengono definite tramite la key "`def`". Come detto in precedenza devono avere come primo argomento un riferimento a `$`, come in python, e a seguire gli altri argomenti.
 
@@ -354,6 +388,15 @@ import {asFunc} from "lib/caged-le.js"
 // using standard usage: $ => $.scope.myFunc()
 ```
 
+Come per le variabili esiste poi la possibilità di collassare la definizione via keyword: object tramite:
+- "def_" + "myFunction"
+
+```javascript
+{ div: {
+    def_myFunc: $ => { ... }
+}}
+```
+
 ## Signals
 I Segnali in CLE sono un meccanismo PUB/SUB like di tipo stream che i componenti possono definire e lanciare affinchè altri componenti (o essi stessi) possano decidere di ascoltare, al fine di reagire ad eventi ad esso collegati. I segnali, come gli Event in Angular possono inviare diversi tipi di dato, al fine di poter essere utilizzati non solo come notifica, ma come meccanismo di Input/Outut, disaccoppiando prodicer dal consumer, e dunque codice.
 
@@ -399,6 +442,24 @@ Per emettere un segniale possiamo riferirci a lui con `$.xxxx.signalname` ed usa
         $.this.counterEditedFromUser.emit(newVal)
     }
     
+    ...
+ }}
+```
+
+E' inoltre possibile collassare la definizione inline keyword: object tramite:
+- "signal_" + "signalName"
+- "s_" + "signalName"
+
+```javascript
+ const TheCounter =  { div: {
+    ...
+
+    signal_counterReset: "stream => (void)",
+    signal_counterEditedFromUser: "stream => (newValue: string)"
+    
+    // or
+    s_counterReset: "stream => (void)",
+    s_counterEditedFromUser: "stream => (newValue: string)"
     ...
  }}
 ```
@@ -462,7 +523,7 @@ in case of "scope" selector it can be omitted as it's the default:
     ...
  }
 ```
-Allo stesso modo è possibile registrarsi a una propertyChanges:
+Allo stesso modo è possibile registrarsi a una propertyChanges (tramite scope selector e mangling "propertyName" + "Changed"):
 
 ```javascript
 const myComponent = { div: {
@@ -512,7 +573,17 @@ per lanciare un segnale DBUS basta utilizzare lo scope speciale all'interno di `
 
 L'utilità di un sistema di DBUS è quello di avere un meccanismo di eventi dipendenta da un concetto / contratto. Basta infatti conoscere il nome del segnale per poter far si che diverse parti dell'applicazione possano seguirlo.
 
-per agganciarsi a un evento DBUS basta utilizzarlo come "scope selector" nella definizione di "on" oppure "on_s":
+per agganciarsi a un evento DBUS basta utilizzarlo come "scope selector" nella definizione di "on" oppure "on_s".
+
+Anche per i segnali DBUS è possibilie collassare la definizione inline tramite:
+- "dbus_signal_" + "signalName"
+
+```javascript
+ { div: {
+    dbus_signal_globalCounterReset: "stream => (void)"
+ }}
+```
+
 
 ## HTML Attributes - attrs & hattrs
 Gli attributi HTML in CLE vengono dichiarati dalla keyword "`attrs`" e la sua shortcut "`a`". Gli attributi permessi in questa definizione sono solo gli attributi testuali (quindi non funzioni cmoe onclick etc, che vanno gestiti in "handle").
@@ -528,11 +599,12 @@ const coloredDiv = { div: {
     }
     
     // shortcut inline:
-    // a_class: "colored-div full-height"
-    // a_style: "color: red"
+    // "a_" + "attributeName":
+    //    a_class: "colored-div full-height"
+    //    a_style: "color: red"
  }}
 ```
-per i soli attributi style e class è possibile omettere la shortcuts "a_" e scriverli direttamente come
+per i soli attributi style e class è possibile anche omettere la shortcuts "a_" e scriverli direttamente come
 
 ```javascript
 const coloredDiv = { div: {
@@ -543,7 +615,7 @@ const coloredDiv = { div: {
  }}
 ```
 
-Inoltre per il solo attributo style è possibile scrivere lo stile inlne come object (camel case)
+Inoltre per il solo attributo style è possibile scrivere lo stile inlne come object (camel case, automaticamente convertito in kebab-case ad eccezione delle proprietà che iniziano per "::" passate come stringhe)
 
 ```javascript
 const coloredDiv = { div: {
@@ -621,7 +693,7 @@ const mySelect = { select: {
 ```
 
 ### hattrs - Potential Harmfull Attribute
-E' inoltre possibile definire gli attributi / proprietà NON inline dell'elemento html associato via `hattrs` e la sua shortcut "`ha`".
+E' inoltre possibile definire gli attributi / proprietà NON inline dell'elemento html associato via `hattrs` e la sua shortcut "`ha_`".
 
 a differenza degli attributi attrs, che vengono impostati in modo safe tramite setAttribute, questi NON sono attributi safe, e dunque potenzialmente pericolosi se non si sa cosa si sta facendo. Vengono comunque messi a disposizione in quanto per la maggior parte utili (tutti quelli che non sono funzioni o che possono essere valutati come funzioni, come gli onclick etc) e sicuri. Inoltre rappresentano, in certi casi, l'unico modo per impostare alcuni attributi in modo dichiarativo con l'aggiunta della detect changes.
 
@@ -645,6 +717,9 @@ const scrollableDiv = { div: {
         // ad esempio in una form: 
         // "@lazy:form.elements.formElement.value": Bind(...) // lazy necessario per accedere a "formElement"
     }
+    // shortcut:
+    // "ha_" + "objectAttributeName":
+    //    ha_scrollTop: ...
  }}
 ```
 
@@ -663,7 +738,7 @@ const coloredDiv = { div: {
  }}
 ```
 ## Event Handling
-Per gestire gli eventi HTML come ad esempio onclick è necessario usare la keyword "`handle`" o la sua shortcut "`h`". 
+Per gestire gli eventi HTML come ad esempio onclick è necessario usare la keyword "`handle`" o la sua shortcut "`h_`". 
 
 L'evento HTML originale viene passato come secondo parametro (il primo è e deve sempre essere "`$`")
 
@@ -678,14 +753,16 @@ const myButton = { button: {
         onmouseleave: $ => ...
     }
 
-    // shortcuts inline
-    // handle_onclick: ($, event) => ...,
-    // h_onclick: ($, event) => ...,
+    // shortcuts inline:
+    // "handle_" + "eventName"
+    // "h_" + "eventName"
+    //    handle_onclick: ($, event) => ...,
+    //    h_onclick: ($, event) => ...,
 
  }}
 ```
 
-Esistono però casi in cui bisogna personalizzare in modo più importante gli eventi. in questo caso si può utilizzare la keyword "`when`" e la sua shortcut "`w`"
+Esistono però casi in cui bisogna personalizzare in modo più importante gli eventi. in questo caso si può utilizzare la keyword "`when`" e la sua shortcut "`w_`"
 
 si può utilizzare per catturare eventi particolari, oppure per cambiare la stategia capture. Questo perchè di fatto gestisce gli html event come addEventListener (che è configurabile!).
 
@@ -701,6 +778,10 @@ Possiamo passare un evaluable/handler direttamente come per "handle" oppure un `
             handler: ($, e) => ...standardAction...
         }
     }
+
+    // shortcuts:
+    // "w_" + "eventName"
+    //    when_focusin: ($, e) => ...,
 }
 ```
 
@@ -771,24 +852,9 @@ come miglioramento troviamo il complesso sistema di “s_css", che permette di r
     } // Use/Extended(component, {s_css: {".myClass": [ExtendSCSS, {opacity: 0.8}]}})
 }}   
 ```
-visita la demo tests/test-caged-le.js/ -> appDemoSCSS per altre info
+visita la demo demo/misc-example.js/ -> appDemoSCSS per altre info
 
 -------
-
-## Componentization
-Componentizzare in CLE significa principalmente 'splittare' il codice in diversi oggetti riutilizzabili (variabili/costanti). A differenza di altri framwork non esiste un vero e proprio concetto di "Componente" da dover definire obbligatoriamente. 
-
-Un vero componente CLE è di fatto un singolo elemento HTML. Grazie però allo `scope` e al `ctx`, nonchè alle due funzioni `Use` ed `Extend` è possibile definire un 'componente' in modo abbastanza simile a ciò che siamo abituati a usare.
-
-Questa scelta di fatto aiuta a pensare alla separazione e componentizzazione del codice come un operazione facile e veloce come in React (ctrl+c, ctr+v), piuttosto che onerosa come in Angular (ng-generate, ctrl+c, ctr+v).
-
-Inoltre, rispetto a framework come React, non è necessario passare in avanti esplicitamente (o con i context manager..) le i getter e setter dello stato, in quanto grazie allo `scope` queset sono esposte e visibili automaticamente, a meno di non essere splicitamente disabilitato. In questo modo si evita di passare in avanti infinite props e in particolare l'uso di `id` e `name` (aka reference) permette di evitare l'effetto "move state into parent components" per permettere la comunicazione, e dunque si ritorna ad avere uno "stato" vicino all'owner naturale.
-
-Pur sembrando un antipattern, rilassare questo vincolo, ovvero che i child possono vedono proprietà del padre, se ben utilizzato tramite i CLE Object (Model/Controller/Service..) permette un incredibile modularità, spostando il concetto di dipendenza come accoppiamento di codice (che tende a generare boilerplate code) a dipendenza come "convenzione" / "concetto atteso" (Coding By Convention, DI like). Per non cadere nel loop del "what is used?" consigliamo di esplicitare sempre le dipendenze tramite "deps". 
-
-Resta però sempre possibile decidere di bloccare lo scope automatico e passare in modo imperativo proprietà, metodi etc tramite costruttore.
-
-----------
 
 ## CLE Shortcuts: Smart Component (`cle`) & Smart Function (`f`, `fArgs`, ) 
 Tra le varie shortcuts linguistiche presenti in cle, in grado di migliorare la sintassi e al tempo stesso la velocità di scrittura del codice troviamo gli `Smart Component` e le `Smart Function` (Evaluable).
@@ -842,6 +908,11 @@ Possiamo riscrivere il componente `TheCounter` di prima come:
  )
  ```
  Allegerendone la sintassi.
+
+ Nel caso in cui i figli siano tutti stringhe o evaluable e non ci sia una definition è possibile anche scrivere:
+ ```javascript
+ cle.div("Text ", $=>$.evaluable, ...)
+ ```
 
 La seconda shortcuts riguarda invece la possibilità di scrivere Funzioni (Evaluable) inline tramite stringhe di testo, inserendo dei riferimenti a variabili dei componenti CLE tramite "`@`". Ricorda, anche se scritte come testo sono a tutti gli effetti Funzioni, dunque NON provare a fare metaprogrammazione combinando o manipolando le Smart Function come faresti con le stringhe ed eviterai spiacevoli attacchi XSS!
 
@@ -1006,7 +1077,7 @@ Tramite la keyword "`define`" in "meta" è possibile definire delle variabili "h
 
 
 # Switch..Case Component
-Pur essendo sostituibile con degli leIf
+Pur essendo sostituibile con degli leIf esiste una definizione specifica per gli switch-case:
 
 ```javascript
 import {Switch, Case} from "lib/caged-le.js"
@@ -1047,14 +1118,257 @@ meta: {
 }
 ```
 
-# More About Evaluable: Bind, Alias, SmarAlias/PropertyBinding/CachedProp
 
+## Componentization
+Componentizzare in CLE significa principalmente 'splittare' il codice in diversi oggetti riutilizzabili (variabili/costanti). A differenza di altri framwork non esiste un vero e proprio concetto di "Componente" da dover definire obbligatoriamente. 
+
+Un vero componente CLE è di fatto un singolo elemento HTML. Grazie però allo `scope` e al `ctx`, nonchè alle due funzioni `Use` ed `Extend` è possibile definire un 'componente' in modo abbastanza simile a ciò che siamo abituati a usare.
+
+Questa scelta di fatto aiuta a pensare alla separazione e componentizzazione del codice come un operazione facile e veloce come in React (ctrl+c, ctr+v), piuttosto che onerosa come in Angular (ng-generate, ctrl+c, ctr+v).
+
+Inoltre, rispetto a framework come React, non è necessario passare in avanti esplicitamente (o con i context manager..) le i getter e setter dello stato, in quanto grazie allo `scope` queset sono esposte e visibili automaticamente, a meno di non essere splicitamente disabilitato. In questo modo si evita di passare in avanti infinite props e in particolare l'uso di `id` e `name` (aka reference) permette di evitare l'effetto "move state into parent components" per permettere la comunicazione, e dunque si ritorna ad avere uno "stato" vicino all'owner naturale.
+
+Pur sembrando un antipattern, rilassare questo vincolo, ovvero che i child possono vedono proprietà del padre, se ben utilizzato tramite i CLE Object (Model/Controller/Service..) permette un incredibile modularità, spostando il concetto di dipendenza come accoppiamento di codice (che tende a generare boilerplate code) a dipendenza come "convenzione" / "concetto atteso" (Coding By Convention, DI like). Per non cadere nel loop del "what is used?" consigliamo di esplicitare sempre le dipendenze tramite "deps". 
+
+Resta però sempre possibile decidere di bloccare lo scope automatico e passare in modo imperativo proprietà, metodi etc tramite costruttore.
+
+----------
+
+# Component Templating, Extension & Use
+Dal momento che un componente CLE è un POJO, per definire dei componenti riutilizzabili basta semplicemente assegnare questi oggeti ad una variabile e dunque per utilizzarli basterà usare tali variabili come childs.
+
+```javascript
+const ReusableH1 = { h1: { text: "I'm reusable!" }}
+const ReusableH3 = { h2: { text: "Whenever you want" }}
+
+const App = { root: {
+    
+    '': [
+
+        ReusableH1,
+        ReusableH3,
+
+        { br: {}}, 
+
+        ReusableH1,
+        ReusableH3,
+        
+        { div: "other definitions.." }
+
+    ]
+}}
+```
+
+Grazie alla sua natura POJO, allo scoping veso il basso e agli id/ctx_id, la modalità predefinita per `"passare" valori` ad un componente è quella della "ridefinizione". Questo concetto, molto familiare agli utilizzatori di QML, è quello di fare "override" di una qualsiasi definizione/keyword del componente, e dunque impostare i valori, le properità da seguire, le reazioni ai segnali. E' possibile addirittura cambiare il comportamento originale. Possiamo infatti utilizzare la funzione `"Use"` da lib per dichiarare l'utilizzo di un componente e allo stesso tempo passare delle `"redefinitions"`. 
+
+```javascript
+Use(
+    component, 
+    redefinitions = { [keyword]: value } | undefined, 
+    // options
+    { 
+        strategy = "merge" | "override", // merge is default
+        init = { [arg]: value } | undefined, 
+        inject = { [placeholderName]: cle component } | undefined
+    }
+)
+```
+
+possiamo pensare a redefinitios come una shortcuts per:
+
+```javascript
+{...definition, ...redefinitions}
+```
+ma molto più evoluta, in quanto effettua, è possibile infatti decidere la strategia della redefinitions: 
+- "override" assume che la redefinitions è a cura dell'utente e dunque è in tutto e per tutto identico al codice precedente
+- "merge" effettua una merge delle nuove chiavi in cascata (senza cancellare le vecchie)
+
+Ad esemprio la merge strategy (default) in questa redefinition:
+```javascript
+const Component = { div: {
+    props: {
+        var1: "",
+    }
+}}
+
+Use( Component, { 
+    props: { var2: "content" } 
+}) 
+```
+produrrebbe di fatto:
+```javascript
+{ div: { 
+   props: { var1: "", var2: "content" }
+}}
+```
+
+Inoltre l'utilizzo di Use su un cle element farà si che questo diventi il root di un nuovo context (ctx), valido per lui stesso e tutti i suoi sottofigli che NON sono componenti Use, ovvero un vero e proprio componente.
+
+
+```javascript
+import {RederApp, Use, Bind, cle} from "lib/caged-le.js"
+
+const InsertPercentageComponent = cle.div({ // ctx id is by defult "root" for component in Use
+    
+    // component's public scope (via ctx.root...)
+    let_initialText: "",
+
+    def: {
+        getInitialInputText: $ => $.initialText,
+        getOriginalInputText: $ => $.ctx.inputBar.text,
+        getCorrectedInputText: $ => $.ctx.output.correctedText,
+
+        setText: ($, txt) => { $.ctx.inputBar.text = txt },
+        resetText: $ => { $.ctx.inputBar.text = "" },
+    }
+
+  },
+    // Component's private scope can be created in this way (accessed in this component via ctx.private...)
+    { Model: {  ctx_id: "private", 
+        let_privateVar: "hello i'm private",
+    }},
+
+    // Ordinary childs, their scope are not visible from outside
+    cle.input({  ctx_id: "inputBar",
+        let_text: $ => $.initialText, // Because of Bind it's copied once, then overwritten!
+        a_value: Bind(f`@text`) 
+    }),
+
+    cle.div({  ctx_id: "output",
+        let_correctedText: $ => $.ctx.inputBar.text.length > 0 ? ($.ctx.inputBar.text.toFixed(1) + "%") : ""
+    }, 
+        $ => $.correctedText
+    ),
+
+    cle.div($ => $.ctx.private.privateVar)
+)
+
+// Usage 
+RenderApp(document.body, cle.root({}, 
+
+    Use( InsertPercentageComponent, { ctx_ref_id: "nameInParentContext", // or define a "name" and use childsRef in root
+
+        let_initalText: "0.0"
+    }),
+
+    { Controller: { // refer to used component by name in this context
+        onInit: $ => console.log($.ctx.nameInParentContext.getCorrectedInputText())
+    }}
+))
+```
+
+Con l'utilizzo della Use è anche possibile utilizzare l'opzione `"init"` per passare valori al "constructor". Il suo funzionamento è molto semplice, basta passare un dizionario contenete le variabile del constructor e il loro valore, tenendo in considerazione che il punto di vista degli evaluable sarà quello del parent. Questa modalità è da preferire per i casi di componenti per cui si vuole creare un nuovo scope (bloccando in sostanza la visibilità dello scope parent), e si vuole passare una variabile "bindata"
+
+Visita la demo in demo/misc-example.js/ -> appDemoConstructor per altre info sui constructor.
+
+### Placeholder
+Una delle possibilità della Use è quella di andare a definire in maniera dichiarativa quali sono i sotto-componenti che è possibile "sostituire", ovvero quelli che si possono "iniettare" all'interno di un componente che verrà utilizzato tramite Use. In particolare basterà definire dei "Placeholder" nel componente che prevede l'injection, e utilizzare il parametro "inject" della Use. 
+
+```javascript
+// Signature
+Placeholder(name, {default_component=undefined | cle element, must_be_redefined=false, forced_id=undefined, forced_ctx_id=undefined, replace_if_different=true})
+```
+Per dichiarare un titolo e un body di deafult all'interno del nostro componente che però potrebbe essere sostituito in altre parti ci basta definire dei Placeholder:
+
+```javascript
+const EditableComponent = cle.div({
+    title: "This is the title"
+  },
+
+    Placeholder("titleEl", { defualt_component: { h2: $ => $.title } }),
+    { h5: "Sub-title NOT EDITABLE" },
+
+    Placeholder("bodyEl", { defualt_component: { p: "This is the body" }, must_be_redefined: true }),
+
+    cle.div({}, 
+        cle.subelement({},
+            Placeholder("nestedEl") // no default defined. will be "evicted" if not injected.
+    ))
+    
+    ...
+)
+
+Use(EditableComponent, pass, { inject: {
+    titleEl: { h1: "A Simple Title" },
+    bodyEl: cle.div({},  cle.b("A Simple Bold Body")),
+}})
+```
+è anche possibile specificare che un elemento deve essere necessariamente specificato, e inoltre è possibile devinire dei Placeholder in tutti i sotto-childs per iniezioni profonde.
+
+### Extended
+Se non vogliamo creare un nuovo contesto ma vogliamo comunque sfruttare le potenzialità della Use è possibile utilizzare la "Extended". Questa utility è in tutto e per tutto identica alla Use, ma la differenza principale è che "inietterà" il componente nell contesto padre, senza generarne uno nuovo.
+
+### Factory
+Un terzo modo in cui è possibile creare componenti è quello delle Factory, ovvero funzioni che restituiscono componenti, e dunque una modalità più "React" style. tenendo però bene a mente che la risoluzione del componente NON sarà a run-time, e dunque NON è possibile modificare il componente a run time come in React negli "High Order Components". Tale possibilità è però raggiungile tramite le modalità Dinamiche come per esempio Dynamic Lazy Render e i SubRenderer.
+
+L'idea alla base è quella di sfruttare lo scope o altre sofisticazioni come le external props etc, per passare a una funzione che costruirà il componente come serve a noi, ovvero come se lo avessimo scritto all'interno della definzione del parent direttamente.
+
+```javascript
+  const MyComponentByFactory({getText, setText, counter, incCounterFunc, onCounterChanged, bodyElement, ...subElements}) => cle.myComponent({
+    
+    readOnlyCounter: counter, // read only! because every set will replace the evaluable to a value!
+
+    txt: Alias(getText, setText), // react style..this is a convenient method to recompose property
+
+    def_incCounterFunc: incCounterFunc,
+    
+    on_readOnlyCounterChanged: onCounterChanged,
+  },
+    
+    cle.h1($ => $.txt),
+
+    cle.div("The counter is: ", $ => $.readOnlyCounter) // or cle.div("The counter is: ", counter) if counter is in scope!
+    
+    cle.button({h_onclick: $ => $.incCounterFunc()}, "Inc Counter"),
+
+    cle.div({}, 
+        cle.subelement({}, 
+            bodyElement || ""
+        )
+    ),
+
+    ...subElements
+  )
+
+
+  RenderApp(document.body, cle.root({
+    
+    aCounter: 10,
+
+    aTxt: "Hi this is a Text",
+
+    def_incCounter: $ => { $.aCounter += 1 }
+
+  },
+    cle.h2("Hello from component factory"),
+
+    MyComponentByFactory({
+
+      getText: $ => $.aTxt, 
+      setText: ($, v)=>{ $.aTxt = v }, 
+      
+      counter: $ => $.aCounter,
+      incCounterFunc: $ => $.incCounter()
+      onCounterChanged: ($, v)=> console.log("do something, aCounteris changed!", v)
+
+      bodyElement: { div: "this is the body" },
+      subElements: [ 
+        cle.div("hi"), 
+        cle.b("bold") 
+      ]
+    })
+  ))
+
+```
+
+visita la demo demo/misc-example.js/ -> appDemoComponentFactory per altre info
+
+
+# More About Evaluable: Bind, Alias, SmarAlias/PropertyBinding/CachedProp
 
 # Html Element Reference
 
 # CLE Object
-
-# Component Templating, Extension & Use
 
 # Childs Ref By Name
 
@@ -1080,6 +1394,7 @@ meta: {
     // Component Identifier
     id: "String"  // A UNIQUE Identifier in the whole app
     ctx_id: "String" // A UNIQUE Identifier in the Component Context
+    ctx_ref_id: "String" // A UNIQUE Identifier in the PARENT Context, used to be finded by ctx in the parent ctx.
     name: "String" // A NON-UNIQUE Name, used to be finded by ref
 
 
@@ -1349,6 +1664,7 @@ $ => {
         
         comp_id // user defined id via "id" keyword
         comp_ctx_id // user defined id via "ctx_id" keyword
+        comp_ctx_ref_id // user defined id via "ctx_ref_id" keyword
 
         t_uid // tecnical id, the cle unique id overall, setted as attr over html element. used for css hoist
 
