@@ -6959,6 +6959,104 @@ const appDemoComponentFactory = async ()=>{
 
 }
 
+const appDemoComponentPrivateVar = async ()=>{
+
+  const Component = cle.div(
+  { 
+    // ctx id is by defult "root" for component in Use
+    
+    initialText: "",
+    publicTextReadOnly: Alias($ => $.ctx.inputBar.text), // public! after a set by evaluable
+
+    def: {
+      getText: $ => $.ctx.inputBar.text,
+
+      setText: ($, txt) => { $.ctx.inputBar.text = txt },
+
+      resetText: $ => { $.ctx.inputBar.text = "" },
+
+      setPrivateText: ($, val) => {
+        $.ctx.private.privateVar = val
+      }
+    }
+  },
+
+    cle.Model({ ctx_id: "private", 
+      let: {
+        privateVar: "hello i'm private",
+      }
+    }),
+  
+    // private! unreachable text props
+    cle.input({  ctx_id: "inputBar",
+        let_text: $=>$.initialText,  a_value: Bind(f`@text`) // copied once, then overwritten!
+    }),
+
+    cle.div({ ctx_id: "output", }, $=>$.ctx.inputBar.text),
+
+    cle.div({}, $=>$.ctx.private.privateVar)
+  )
+
+
+  RenderApp(document.body, cle.root(
+  {
+    childsRef: {
+      component1: "single",
+      component2: "single",
+    },
+
+    def: {
+      getComp1PublicText: $=>{
+        return "-- ref: " + $.ref.component1.publicTextReadOnly + "-- ctx: " + $.ctx.component1.publicTextReadOnly
+      },
+      getComp2PublicText: $=>{
+        return "-- ref: " + $.ref.component2.publicTextReadOnly + "-- ctx: " + $.ctx.component2.publicTextReadOnly
+      },
+    }
+  },
+
+    { h1: "Hello World!" },
+
+    "--ref: ", $=>$.ref.component1.publicTextReadOnly, // test deps following before element has been created!
+    cle.br(),
+    "--ctx: ", $=>$.ctx.component1.publicTextReadOnly,
+    cle.br(),
+    "--via func: ", $ => $.getComp1PublicText(),
+    
+    Use(Component, { 
+      name: "component1", 
+      ctx_ref_id: "component1", // refer in the parent context as
+      initialText: "text 1"
+    }),
+
+    cle.button({
+      handle_onclick: $ => { $.ctx.component1.setPrivateText("Changed with a public (controlled) method")}
+    }, "Edit Private Comp1 Var"),
+    
+    
+    
+    cle.hr(),
+
+    "--ref: ", $=>$.ref.component2.publicTextReadOnly,
+    cle.br(),
+    "--ctx: ", $=>$.ctx.component2.publicTextReadOnly,
+    cle.br(),
+    "--via func: ", $ => $.getComp2PublicText(),
+    
+    Use(Component, { 
+      name: "component2", 
+      ctx_ref_id: "component2", // refer in the parent context as
+      initialText: "text 2"
+    }),
+
+    cle.button({
+      handle_onclick: $ => { $.ctx.component2.setPrivateText("Changed with a public (controlled) method")}
+    }, "Edit Private Comp1 Var"),
+
+
+  ))
+}
+
 // app0()
 // test2way()
 // appTodolist()
@@ -7007,7 +7105,8 @@ const appDemoComponentFactory = async ()=>{
 // appDemoCSSInJSWithCSZ()
 // appDemoEditRefValAndStupidShortcuts()
 // appDemoNoMoreLetAndAsFunc()
-appDemoComponentFactory()
+// appDemoComponentFactory()
+appDemoComponentPrivateVar()
 
 // todo: idea per funzioni "at most once" da usare a giro nel framework: in pratica siccome mi paasano una funzione, aka oggetto, potrei settargli un attributo tipo x.__cle__exec_counter__ e controllare se > 1. problema: come fare per le funzioni che sono delle const dentro una funzione? o in generale funzioni passate e create dentro una funzione? li forse solo una roba diversa es dynamicAtMostOnce, che ti fa il toString della funzione..
 //       - quando può servire sta roba? es in una onhover su un pulsante potrei mettere la import dinamica di un altro pezzo di app, per creare app "parziali" senza dare lagg agli utenti. ovviamnete nel mobile non ha senso :D
