@@ -51,7 +51,7 @@ const recursiveAccessor = (pointer, toAccess)=>{
 }
 
 // exponential retry utils..should be a promise, instead use some "return obj" or function
-const exponentialRetry = (func, args=[], customResAsFunc=undefined, resultObj={expRetryObj: true}, msgonerr="", maxNumRetry=maxNumRetry, onDone, num_retry=0)=>{
+const exponentialRetry = (func, args=[], customResAsFunc=undefined, resultObj={expRetryObj: true}, msgonerr="", maxNumRetry=maxNumRetry, onDone=undefined, onError=undefined, num_retry=0)=>{
 
   try{
     resultObj.result = func(...args)
@@ -59,11 +59,12 @@ const exponentialRetry = (func, args=[], customResAsFunc=undefined, resultObj={e
   }
   catch (e){
     if (num_retry < maxNumRetry) {
-      setTimeout(()=>exponentialRetry(func, args, customResAsFunc, resultObj, msgonerr, maxNumRetry, onDone, num_retry+1), Math.min(10*(num_retry+1), maxNumRetry))
+      setTimeout(()=>exponentialRetry(func, args, customResAsFunc, resultObj, msgonerr, maxNumRetry, onDone, onError, num_retry+1), Math.min(10*(num_retry+1), maxNumRetry))
     }
     else{
       _warning.log("CLE - WARNING! unable to execute after 5 retry! "+msgonerr)
       _warning.log(e)
+      onError !== undefined && onError(num_retry, e, resultObj.result)
     }
   }
   return customResAsFunc !== undefined ? (customResAsFunc(()=>resultObj.result)) : resultObj
@@ -83,15 +84,23 @@ class PropAlias {
     this.getter = getter
     this.setter = setter
     this.markAsChanged = markAsChanged
-    this.cachingComparer = cachingComparer // AKA is different? (newVal, oldVal)=>bool
+    this.cachingComparer = (typeof cachingComparer === 'boolean') && (cachingComparer === true) ? ((n,o)=>n!==o) : cachingComparer // AKA is different? (newVal, oldVal)=>bool
     this.externalDeps = externalDeps
 
     this.isExternal = this.externalDeps !== undefined && this.externalDeps.length > 0
   }
 }
 // export
+/** 
+ * cachingComparer can be also setted to true to enable caching with default straegy 
+ * comparer should check ineqaulity: return true if different and false if equals
+ * */
 const Alias = (getter=()=>{}, setter=()=>{}, markAsChanged=()=>{}, cachingComparer, onChangesRegisterFunc, externalDeps)=>new PropAlias(getter, setter, markAsChanged, cachingComparer, onChangesRegisterFunc, externalDeps)
 // export
+/** 
+ * cachingComparer can be also setted to true to enable caching with default straegy
+ * comparer should check ineqaulity: return true if different and false if equals
+ * */
 const SmartAlias = (getterAndSetterStr, cachingComparer)=>{
   return new PropAlias(
     smartFunc(getterAndSetterStr, true),
@@ -103,6 +112,37 @@ const SmartAlias = (getterAndSetterStr, cachingComparer)=>{
 // export
 /** Better Naming for "SmartAlias"*/
 const PropertyBinding = SmartAlias
+
+// export
+/** usage: 
+ * ...DefineSubprops("todo", ["desc", "done"]) 
+ * ...DefineSubprops("todo", "desc, done") 
+ * ...DefineSubprops("todo => desc, done") 
+ * comparer should check ineqaulity: return true if different and false if equals
+ * */
+const DefineSubprops = (scope_prop="", subprops="", prefix="", comparers={})=>{
+
+  if (scope_prop.includes("=>")){
+    return DefineSubprops(...scope_prop.split("=>").map(v=>v.trim()), prefix, comparers)
+  }
+
+  let definition = {}
+  
+  if (typeof subprops === 'string'){
+    subprops = subprops.split(",").map(sp=>sp.trim())
+  }
+
+  subprops.forEach(sp=>{
+    definition["let_"+prefix+sp] = new PropAlias(
+      smartFunc("@"+scope_prop+"."+sp, true),
+      smartFuncWithCustomArgs("v")("{ "+"@"+scope_prop+"."+sp+" = v; "+"$._mark_"+scope_prop+"_as_changed(); return v }", true), 
+      pass,
+      comparers[sp] ?? true
+    ) // SmartAlias("@"+scope_prop+"."+sp, comparers[sp] ?? true)
+  })
+
+  return definition
+}
 
 // export
 const ExternalProp = (value, onSet) => {
@@ -257,6 +297,14 @@ class Property{
     return oldChangedHandlers
   }
 
+  // utils per quando si aggancia ai segnali di una prop che però è un alias/smartalias/subprop è necessario controllare che se è cachabile non triggero il segnale se non è veramente cambiata!
+  isCachable(){ 
+    return this.isAlias && this.oj_valueFunc.cachingComparer !== undefined
+  }
+  isCacheInvalid(v){
+    return this.oj_valueFunc.cachingComparer(v, this._latestResolvedValue) // comparer return true if different and false if equals
+  }
+
   /** return [Prop, getter, setter] */
   get asFunctions(){
     return [this, ()=>this.value, (v)=>{this.value=v}]
@@ -280,6 +328,37 @@ class Signal {
   emit(...args){
     this.handlers.forEach(h=>h.handler(...args))
   }
+  emitWaitResp(...args){
+    return this.handlers.map(h=>h.handler(...args))
+  }
+  emitWaitFirstToResp(...args){
+    for (let h of this.handlers){
+      const resp = h.handler(...args)
+      if (resp !== undefined){
+        try {
+          return { consumer: h.who.$this, response: resp}
+        }
+        catch {
+          return { consumer: h.who, response: resp}
+        }
+      }
+    }
+    return undefined
+  }
+  emitWaitRespCondition(condition, ...args){
+    for (let h of this.handlers){
+      const resp = h.handler(...args)
+      if (condition(resp)){
+        try {
+          return { consumer: h.who.$this, response: resp}
+        }
+        catch {
+          return { consumer: h.who, response: resp}
+        }
+      }
+    }
+    return undefined
+  }
 
   hasHandler(who){
     return this.handlers.find(h=>h.who === who) !== undefined
@@ -301,7 +380,15 @@ class Signal {
   }
 
   // proxy dei signal esposto agli user, che possono fare solo $.this.signalName.emit(...)
-  static getSignalProxy = (realSignal)=> ( {emit: (...args)=>realSignal.emit(...args), emitLazy: (t=1, ...args)=>setTimeout(() => {realSignal.emit(...args)}, t), subscribe: (who, handler) => realSignal.addHandler(who, handler), unsubscribe: (who) => realSignal.removeHandler(who) })
+  static getSignalProxy = (realSignal)=> ( {
+    emit: (...args)=>realSignal.emit(...args), 
+    emitWaitResp: (...args)=>realSignal.emitWaitResp(...args), 
+    emitWaitFirstToResp: (...args)=>realSignal.emitWaitFirstToResp(...args), 
+    emitWaitRespCondition: (condition, ...args)=>realSignal.emitWaitRespCondition(condition, ...args), 
+    emitLazy: (t=1, ...args)=>setTimeout(() => {realSignal.emit(...args)}, t), 
+    subscribe: (who, handler) => realSignal.addHandler(who, handler), 
+    unsubscribe: (who) => realSignal.removeHandler(who) 
+  })
 
 }
 
@@ -402,7 +489,7 @@ class UseComponentDeclaration{
 
         // throw new Error("Not Implemented Yet!")
         const impossible_to_redefine = []
-        const direct_lvl = ["id", "ctx_id", "ctx_ref_id", "constructor", "beforeInit", "onInit", "afterChildsInit", "afterInit", "onUpdate", "onDestroy"] // direct copy
+        const direct_lvl = ["id", "ctx_id", "ctx_ref_id", "constructor", "beforeInit", "onInit", "afterChildsInit", "afterInit", "onUpdate", "onDestroy", "oos"] // direct copy
         const first_lvl = ["signals", "dbus_signals", "data", "private:data", "props", "private:props", "let", "alias", "handle", "when"] // on first lvl direct
         const first_lvl_special = ["s_css"] // first lvl direct + eventual overwrite
         const second_lvl = ["on", "on_s", "on_a"]
@@ -750,7 +837,8 @@ const analizeDepsStatically = (f, isUseExt=false)=>{
 
   let $full_deps = to_inspect.match(/\$.([_$a-zA-Z]+[0-9]*[.]?)+/g)
   $full_deps?.map(d=>d.split(".").filter(x=>x!=='$')).forEach(els=>{
-    if (['this', 'parent', 'scope', 'le', 'ctx', 'ref', 'meta', 'u'].includes(els[0])){ pass }
+    // new: exclude  out of scope stuff "oos" from binding
+    if (['oos', 'this', 'parent', 'scope', 'le', 'ctx', 'ref', 'meta', 'u'].includes(els[0])){ pass }
     else {
       // console.log("aaaa push!!", $scope_deps, els, $full_deps)
       if($scope_deps !== undefined){
@@ -1192,6 +1280,8 @@ class Component {
   $ref // ComponentRefProxy => contains childsRefPointers  as Proxy, visible to dev as $.ref
   childsRefPointers = {} // { refName: Component}
 
+  $oos // "out of scope" scope..container of anything dev want..untracked and not binded/bindable! accessible using $.oos
+
 
   htmlElementType
   isObjComponent
@@ -1246,6 +1336,26 @@ class Component {
     }
   }
   
+  // utils to retrive my ctx cle-element (his this), usefull to setup deps etc
+  getMy$ctxRoot(){
+    if(this.isA$ctxComponent){
+      return this
+    }
+    else{
+      if (this.parent !== undefined && (this.parent instanceof Component)){
+        return this.parent.getMy$ctxRoot()
+      }
+      return undefined
+    }
+  }
+  // utils to retrive my parent-ctx cle-element (his this), usefull to setup deps etc
+  getMy$ctxParentRoot(){
+    if (this.parent !== undefined && (this.parent instanceof Component)){
+      return this.getMy$ctxRoot().parent.getMy$ctxRoot()
+    }
+    return undefined
+  }
+
   // todo: questa cosa potrebbe essere super buggata..perchè io in effetti faccio una copia delle var e non seguo più nulla..
   getMyFullMeta(){
 
@@ -1438,6 +1548,7 @@ class Component {
     // Object.defineProperty( // dynamic get childs $this
     //   this.properties, 'childs', {get: ()=>this.childs.map(c=>c instanceof Component || c instanceof IterableViewComponent? c.$this.this : undefined).filter(c=>c!==undefined)}
     // )
+    this.properties.getOos = ()=>this.$oos
     this.properties.getAsExternalProperty = (prop_name)=>{let found = this.properties[prop_name]; if (found instanceof Property){return found}} // stupid utils to retrive the real Property behind the $.this proxy..useful to be used as "external" deps in a dynamic context.. (via set value as useExternal([extractedProp], $=>extractedProp.value))
     this.properties.getAsExternalSignal = (signalName)=>{let found = this.signals[signalName]; if (found instanceof Signal){return Signal.getSignalProxy(found)}} // stupid utils to retrive the real Signal behind the $.this proxy..useful to be used as "external" deps in a dynamic context..
     
@@ -1563,7 +1674,18 @@ class Component {
     this.$parent = (this.parent instanceof Component) ? ComponentProxy(this.parent.properties) : undefined
     this.$scope = ComponentScopeProxy(this)
     this.$ref = ComponentRefProxy(this)
-    this.$this = ComponentProxyBase(/*new ComponentProxySentinel(*/{this: ComponentProxy(this.properties), parent: this.$parent, scope: this.$scope,  le: this.$le.proxy, ctx: this.$ctx.proxy, dbus: this.$dbus.proxy, meta: this.$meta, ref: this.$ref, u: this.getUtilsProxy() } /*)*/ ) //tmp, removed ComponentProxySentinel (useless)
+    this.$this = ComponentProxyBase(/*new ComponentProxySentinel(*/{
+      this: ComponentProxy(this.properties), 
+      parent: this.$parent, 
+      scope: this.$scope, 
+      le: this.$le.proxy,
+      ctx: this.$ctx.proxy, 
+      dbus: this.$dbus.proxy, 
+      meta: this.$meta, 
+      ref: this.$ref, 
+      oos: new Proxy({}, { get: (_, prop, __)=>{ return this.$oos[prop] }, set: (_target, prop, value) => {this.$oos[prop]=value; return true} }),
+      u: this.getUtilsProxy()
+    } /*)*/ ) //tmp, removed ComponentProxySentinel (useless)
 
     // mettere private stuff in "private_properties" e "private_signal", a quel punto una strada potrebbe essere quella di avere un "private_this" qui su..ma in teoria dovrebbe essere qualcosa di context, e non solo in me stesso..
   }
@@ -1586,6 +1708,35 @@ class Component {
           scope['_mark_'+v+'_as_changed']()
         }
       }).bind(undefined, this.$scope),
+
+
+      // block and await for property condition, then get value.. (instant get if true)
+      // to be used to await for a prop! tester can be: function | array of values IN OR
+      // onInit: async $=>{
+      //   let ready = await $.u.propCondition($=>$.le.db, "readyProp", v=>v===true)
+      //   $.initData()
+      // }
+      /*await*/ propCondition: (scopeGetter, prop, tester=v=>(v !== null && v !== undefined), retry=5)=>{
+        let sentinel = {}
+        return new Promise((resolve, reject)=>{
+          exponentialRetry(()=>{
+            let scope = scopeGetter.bind(undefined, this.$this)()
+            if (scope === undefined || scope === null){ throw Error("Cannot Find Scope") }
+            else {
+              let val = scope[prop]
+              if ((isFunction(tester) && tester(val)) || (Array.isArray(tester) && tester.includes(val))){
+                resolve(val)
+              } else {
+                let unsub = scope.subscribe(prop+"Changed", sentinel, (v)=>{
+                  // console.log("prop initialzed")
+                  unsub()
+                  resolve(v)
+                })
+              }
+            }
+          }, pass, pass, pass, "Cannot connect to CLE Prop", retry, pass, (...args)=>reject(args))
+        })
+      },
 
       // utils per andare ad ottenre l'elemento CLE da elementi HTML/DOM .. per fare cosy tricky :(
       getCleElementByDom: (dom_el)=>{
@@ -1746,6 +1897,10 @@ class Component {
           }
         }
       })
+    }
+
+    if (this.convertedDefinition.oos !== undefined){
+      this.$oos = this.convertedDefinition.oos
     }
 
     // html event in the form of obj.onxxx = ()=>...
@@ -2100,7 +2255,14 @@ class Component {
           v,
           ()=>_debug.log(k, "getted!"), 
           (v, ojV, self)=>{ _debug.log(k, "setted!", this); 
-            this.signals[k+"Changed"].emit(v, this.properties[k]._latestResolvedValue);
+            if (self.isCachable()){
+              if (self.isCacheInvalid(v)){
+                this.signals[k+"Changed"].emit(v, this.properties[k]._latestResolvedValue);
+              }
+            } 
+            else {
+              this.signals[k+"Changed"].emit(v, this.properties[k]._latestResolvedValue);
+            }
           },
           //()=>{console.log("TODO: on destroy clear stuff and signal!!")}
         )
@@ -3026,6 +3188,8 @@ class Component {
       try{p.destroy(true)} catch{}
     })
 
+    this.$oos = undefined
+
     // todo: destroy properties and signal well..
 
   }
@@ -3080,7 +3244,7 @@ class Component {
       "signals", "dbus_signals", "on", "on_s", "on_a", 
       "alias", "handle", "when", "css", "s_css", 
       "states", "stateChangeStrategy", "onState",
-      "name", "childsRef"
+      "name", "childsRef", "oos"
     ])
     addToAlreadyResolved(
       "constructor", 
@@ -3088,7 +3252,7 @@ class Component {
       "signals", "dbus_signals", "on", "on_s", "on_a", 
       "alias", "handle", "when", "css", "s_css", 
       "states", "stateChangeStrategy", "onState",
-      "name", "childsRef"
+      "name", "childsRef", "oos"
     )
 
     // renamed def
@@ -3248,6 +3412,10 @@ class Component {
 
         else if (k.startsWith('h_')){
           dash_shortucts_keys.handle[k.substring(2)] = val
+          addToAlreadyResolved(k)
+        }
+        else if (k.startsWith('ev_')){
+          dash_shortucts_keys.handle[k.substring(3)] = val
           addToAlreadyResolved(k)
         }
         else if (k.startsWith('handle_')){
@@ -4940,4 +5108,4 @@ const fromHtml = (text, definition={}, tagReplacers={}, extraDefs={})=>{
 
 // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // 
 
-export { pass, none, smart, smartFunc as f, smartFuncWithCustomArgs as fArgs, asFunc, Use, Extended, Placeholder, Bind, Alias, SmartAlias, PropertyBinding, ExternalProp, useExternal, BindToPropInConstructor as BindToProp, Switch, Case, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock, cle, str, str_, input, output, ExtendSCSS, clsIf, fromHtml as html }
+export { pass, none, smart, smartFunc as f, smartFuncWithCustomArgs as fArgs, asFunc, Use, Extended, Placeholder, Bind, Alias, SmartAlias, PropertyBinding, DefineSubprops, ExternalProp, useExternal, BindToPropInConstructor as BindToProp, Switch, Case, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock, cle, str, str_, input, output, ExtendSCSS, clsIf, fromHtml as html }

@@ -1,4 +1,4 @@
-import { Alias, Bind, BindToProp, Case, cle, Extended, ExtendSCSS, ExternalProp, f, fArgs,  asFunc, LE_BackendApiMock, LE_LoadCss, LE_LoadScript, pass, Placeholder, RenderApp, smart, SmartAlias, str, Switch, toInlineStyle, Use, useExternal, html } from "../lib/caged-le.js"
+import { Alias, Bind, BindToProp, Case, cle, DefineSubprops, Extended, ExtendSCSS, ExternalProp, f, fArgs,  asFunc, LE_BackendApiMock, LE_LoadCss, LE_LoadScript, pass, Placeholder, RenderApp, smart, SmartAlias, str, Switch, toInlineStyle, Use, useExternal, html } from "../lib/caged-le.js"
 import { NavSidebarLayout } from "../layouts/layouts.js"
 
 /*
@@ -4819,7 +4819,7 @@ const appDemoChachedWithAlias = async ()=>{
       p3: [1,2,3]
     },
 
-    let_adata: SmartAlias(`@t.data`, (_new, _old)=>_new.p1!==_old.p1),
+    let_adata: SmartAlias(`@t.data`, (_new, _old)=>_new.p1!==_old.p1), // caching comparer can also be set to "true" for default caching strategy enabled!
 
 
     '': [
@@ -7057,6 +7057,149 @@ const appDemoComponentPrivateVar = async ()=>{
   ))
 }
 
+
+const appDemoProducerConsumerSync = async ()=>{
+
+  const GlobalDbus = { Controller: {
+    dbus_signals: {
+      newNumInput: "stream => num"
+    }
+  }}
+
+  const ProducerStyle = { display: "inline-block", border: "1px solid black", width: "200px", height: "200px", backgroundColor: "red"}
+  const ConsumerStyle = { display: "inline-block", border: "1px solid black", width: "100px", height: "100px", backgroundColor: "green"}
+  
+  const Producer = { Producer: {
+    num: 0,
+    responses: [],
+
+    h_onclick: $ => {
+      $.num += 1
+      const responses = $.dbus.newNumInput.emitWaitResp($.num)
+      $.responses = responses
+    },
+
+    h_oncontextmenu: ($, e) => {
+      e.preventDefault();
+
+      $.num += 1
+      const {consumer, response} = $.dbus.newNumInput.emitWaitFirstToResp($.num) // there is also emitWaitRespContidion..
+      console.log(consumer, response)
+      $.responses = response
+
+      return false
+    },
+
+    text: ["Producer, Num: ", $ => $.num, " -> Res: ", $ => $.responses],
+
+    style: ProducerStyle
+  }}
+
+  const Consumer = { Consumer: {
+    
+    consumerId: 0,
+    latestNum: 0,
+    latestResp: 0,
+
+    on_dbus_newNumInput: ($, num) => {
+
+      let resp = num * $.consumerId
+      $.latestNum = num
+      $.latestResp = resp
+      return resp
+    },
+
+    text: ["Consumer  ", $=>$.consumerId, ", Num: ", $ => $.latestNum, " -> Res: ", $ => $.latestResp],
+
+    style: ConsumerStyle
+  }}
+
+  
+  RenderApp(document.body, cle.root({},
+
+    cle.div({}, "Cle Producer Consumer"),
+
+    Use(GlobalDbus),
+
+    Use(Producer),
+    
+    Use(Consumer, { meta: {forEach: "cons", of: $ => [1,2,3,4,5]}, consumerId: $ => $.meta.cons}),
+
+    Use(Consumer, { 
+      consumerId: 10, 
+
+      // TESTING OUT OF SCOPE STUFF
+      oos: {
+        outOfScopeStuff: [123],
+        func: ()=>console.log("aaa")
+      },
+      h_onclick: $ => {
+        console.log($.oos.outOfScopeStuff, $.oos.func())
+        $.oos.outOfScopeStuff[0] += 1
+      },
+    })
+  ))
+
+}
+
+
+
+const appDemoExplodeProps = async ()=>{
+  
+  console.log(DefineSubprops("todo => desc, done"))
+
+  RenderApp(document.body, cle.div({
+
+    todo: {desc: "a todo", done: false, dueto: "never"},
+
+  },
+    cle.div({
+      ...DefineSubprops("todo => desc, done"),
+
+      on_descChanged: ()=>console.log("la desc è changed"),
+      on_doneChanged: ()=>console.log("la done è changed")
+    }, 
+      cle.h2({
+        h_onclick: $ => { $.desc = "desc changed!" },
+      }, f`@desc + ' - ' + (new Date()).getTime()`),
+      cle.h4({
+        h_onclick: $ => { $.done = !$.done },
+      }, f`@done + ' - ' + (new Date()).getTime()`),
+    )
+
+  ))
+
+  RenderApp(document.body, cle.hr())
+
+  const genTodo = ()=>({desc: "a todo", done: false, dueto: "never"})
+
+  RenderApp(document.body, cle.div({
+
+    todos: [genTodo(), genTodo()],
+
+  },
+
+    cle.div({ meta: { forEach: "todo", of: f`@todos`, optimized: true }
+    ,
+      ...DefineSubprops("todo => desc, done"),
+
+      on_descChanged: ()=>console.log("la desc è changed"),
+      on_doneChanged: ()=>console.log("la done è changed")
+    }, 
+      cle.h2({
+        h_onclick: $ => { $.desc = "desc changed!" },
+      }, f`@desc + ' - ' + (new Date()).getTime()`),
+      cle.h4({
+        h_onclick: $ => { $.done = !$.done },
+      }, f`@done + ' - ' + (new Date()).getTime()`),
+    )
+
+  ))
+
+}
+
+
+
 // app0()
 // test2way()
 // appTodolist()
@@ -7106,7 +7249,9 @@ const appDemoComponentPrivateVar = async ()=>{
 // appDemoEditRefValAndStupidShortcuts()
 // appDemoNoMoreLetAndAsFunc()
 // appDemoComponentFactory()
-appDemoComponentPrivateVar()
+// appDemoComponentPrivateVar()
+// appDemoProducerConsumerSync()
+appDemoExplodeProps()
 
 // todo: idea per funzioni "at most once" da usare a giro nel framework: in pratica siccome mi paasano una funzione, aka oggetto, potrei settargli un attributo tipo x.__cle__exec_counter__ e controllare se > 1. problema: come fare per le funzioni che sono delle const dentro una funzione? o in generale funzioni passate e create dentro una funzione? li forse solo una roba diversa es dynamicAtMostOnce, che ti fa il toString della funzione..
 //       - quando può servire sta roba? es in una onhover su un pulsante potrei mettere la import dinamica di un altro pezzo di app, per creare app "parziali" senza dare lagg agli utenti. ovviamnete nel mobile non ha senso :D

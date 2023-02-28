@@ -14,9 +14,9 @@ Clean.js is a declarative Javascript Framework, with pure POJO in mind (for ui, 
 # IT Docs
 
 # Basic Concept
- Un elemnto CLE è un POJO la cui unica e prima chiave è un tag html. Il valore associato a questo tag può essere invece: 
-  - un POJO contenente la definizione delle caratteristiche del elemento HTML che si vuole rendereizzare, nonchè dati, metodi etc.
-  - una Stringa
+ Un elemento CLE è un POJO (Plain Old Javascript Object) la cui unica e prima chiave è un tag html. Il valore associato a questo tag può essere invece: 
+  - un POJO contenente la `definizione` delle caratteristiche dell'elemento HTML che si vuole renderizzare, nonchè dati, metodi etc.
+  - una stringa
   - un Valore-Funzione (Evaluable)
 
 Per esempio, un elemento HTML `h1` può essere scritto come:
@@ -40,9 +40,9 @@ Per esempio, un elemento HTML `h1` può essere scritto come:
     - { span: ... }
  - una stringa 
  - un Valore-Funzione (Evaluable)
-    - funzione lambda che inizia con $ => ...
+    - funzione lambda il cui primo argomento è sempre $ => ...
  
- e possono essere definiti come valori di un array all'interno della `definition` attraverso una qualsiasi di queste chiavi (da scegliere solo il preferito a livello semantico): 
+ e possono essere definiti come valori di un array all'interno della `definition` attraverso una qualsiasi di queste chiavi: 
 - `'childs'`
 - `'text'` 
 - `'view'`
@@ -56,9 +56,9 @@ Per esempio, un elemento HTML `h1` può essere scritto come:
     ]
 }}
 ```
-Nei casi di un singolo sott-elemento l'array può essere omesso.
+Nei casi di un singolo sotto-elemento l'array può essere omesso.
 
-Per avere un `h2` con un `"Hello World!"` (ovvero il cui unico sottoelemnto è un testo) basta scrivere:
+Per avere un elemento html di tipo `h1` contenente un `"Hello World!"` (ovvero il cui unico sotto-elemento è un testo) basta scrivere:
 
  ```javascript
  { h1: {
@@ -76,17 +76,19 @@ Nel caso di più sotto-elementi basta semplicemente utilizzare un Array:
 
  Esistono poi delle shortcuts:
 
- - Se la definizione contiene solo sotto-elementi si possono passare direttamente come valore al tag. 
- - Come prima, l'array può essere omesso in caso di un solo sotto-elemento.
+ 1) Se la `definition` dichiara un solo sotto-elemento e nulla più, si può passare il sotto-elemento direttamente come valore al tag. 
+ 2) Nel caso di più sotto-elementi (definiti come array), è possibile passare direttamente come valore al tag.
 
  ```javascript
  // Shortcuts
- { h1: "Hello World!" }
- { h1: [ "Hello ", "World!" ]}
+ { h1: "Hello World!" } // 1 
+ { h1: [ "Hello ", "World!" ]} // 2 
  ```
 
 ## Rendering
- Per renderizzare il Componente possiamo utilizzare la funzione `RenderApp(htmlContainer, cleComponent)` importandola da lib.
+ L'unità minima che è possibile rendirizzare in CLE è un singolo elemento CLE (ovvero un unico elemento HTML), che si può immaginare come un "componente" per come è inteso in altri framework.
+
+ Per renderizzare un Componente possiamo utilizzare la funzione `RenderApp(htmlContainer, cleComponent)` importandola da `lib`.
 
  ```javascript
 import {RederApp} from "lib/caged-le.js"
@@ -110,7 +112,7 @@ RenderApp(document.body, cle.root({},
 
 
 ## Component Lyfecicle & Hooks
-Il lifecycle di un componente CLE prevede di fatto che prima venga renderizzato l'albero "spoglio" di elementi HTTML, dopodichè vengono inizializzati e lanciati gli Hooks che si possono definire con le keywords:
+Il lifecycle di un componente CLE prevede di fatto che prima venga renderizzato l'albero "spoglio" di elementi HTML, dopodichè vengono inizializzati e lanciati gli Hooks che si possono definire con le seguenti keywords:
     
 - `constructor`: async? ($, {...args}) => { } 
     - Constructor, called at component creations, useful to setup properties from external with the `Use` declaration. use onInit in other cases. Only called in Use components.
@@ -128,9 +130,9 @@ Infine, sotto determinate condizioni l'elemento viene distrutto
 
 
 ## Standard Definition - Declare by keyword
-La standard definition di un componente prevede che all'interno della definizione possano essere esplicitati, oltre ai sotto-elementi tramite una delle chiavi di cui sopra, molte altre cose.
+La standard `definition` di un componente prevede che all'interno della definizione possano essere esplicitati, oltre ai sotto-elementi tramite una delle chiavi di cui sopra, molte altre cose.
 
-E' Ad esempio possibile definire variabili, funzioni, segnali, attributi html, classi css, nonchè gestire eventi html, segnali locali, di properità o globali. Per una lista Approfondita si rimanda alla sezione `#Full Reference` 
+E' ad esempio possibile definire variabili, funzioni, segnali, attributi html, classi css, nonchè gestire eventi html, segnali locali, di properità o globali. Per una lista approfondita si rimanda alla sezione `#Full Reference`. 
 
 ------------
 
@@ -138,6 +140,8 @@ E' Ad esempio possibile definire variabili, funzioni, segnali, attributi html, c
 Vediamo ora com'è possibile creare una variabile in un componente.
 
  ```javascript
+ // Component is just a POJO and can be assigned to any variable
+
  const TheCounter =  { div: {
     id: "myCounter",
 
@@ -149,10 +153,15 @@ Vediamo ora com'è possibile creare una variabile in un componente.
         console.log($.counter)
     }
 
- }} // Component is just a POJO and can be assigned to variable..
+ }} 
  ```
 
- In questo esempio stiamo definendo una variabile `counter` con valore iniziale `0` grazie alla keyword "`props`". Abbiamo inoltre anche assegnato un identificativo (univoco in tutta l'app) al nostro componente `myCounter`. Vedremo meglio com'è possibile utilizzare gli id in seguito. Abbiamo anceh definito l'hook onInit che verrà chiamato all'inizializzazione del componente.
+ In questo esempio stiamo definendo un componente "TheCounter", la cui rappresentazione grafica è un div. Possiamo definire una variabile `counter` con valore iniziale `0` grazie alla keyword "`props`".
+
+Abbiamo inoltre assegnato al nostro componente un identificativo (`myCounter`), tramite la keyword "`id`", che sarà univoco in tutta l'app. 
+Vedremo meglio com'è possibile utilizzare gli id in seguito. 
+
+Abbiamo anche definito l'hook `onInit` che verrà chiamato all'inizializzazione del componente.
 
  Per referenziare e mostrare all'utente il contenuto della variabile è possibile utilizzare:
 
@@ -168,7 +177,7 @@ Vediamo ora com'è possibile creare una variabile in un componente.
  }}
  // Rendered as <div>The Counter Is: 0</div>
  ```
- Per la definizione degli Evaluable (funzioni il cui primo argomento è sempre '`$`') ci si rifà alla definizione di funzione in python, per cui il primo argomento è sempre "`self`". Nel caso di CLE, invece, è sempre `$`, anche se l'argomento `$` è qualcosa di pià complesso che un mero riferimento al '`this`' del Componente.
+ Per la definizione degli Evaluable (funzioni il cui primo argomento è sempre '`$`') ci si rifà alla definizione di funzione in python, per cui il primo argomento è sempre "`self`". Nel caso di CLE, invece, è sempre `$`, anche se l'argomento `$` è qualcosa di più complesso di un mero riferimento al '`this`' del Componente.
 
 `$` here is a special variable that contains some reference to certain `scope selector`. It contains:
     
@@ -182,10 +191,11 @@ Vediamo ora com'è possibile creare una variabile in un componente.
 - '`ref`' scope selector, wich is a container of the element by id (local of the so called 'component', where the 'name' is registered in the childsRef, and a 'name' is assigned)
 - '`dbus`' scope selector, where you can find the global dbus channels. useful to connetc different application part.
 - '`u`' scope selector, that contains some metaprogramming utils, like signal creation and subscribe, dynamic child retrive, creation and destruction
+- '`oos`' out of scope selector, a free (untracked and non bindable) per-object space where can be manually defined (imperative code) anything, for example for data where binding is not required. 
 
 - `#Final Tip`: is always possible to use directly `$.xxx` wich will be resolved as `$.scope.xxx` ( scope selector '`scope`' is the default used in resolution).
 
-Visto che abbiamo definito un id univoco per questo componente (`myCounter`) è in dunque possibile referenziare la variabile counter come:
+Visto che abbiamo definito un id univoco per questo componente (`myCounter`) è dunque possibile referenziare la variabile counter come:
  ```javascript
     $.le.myCounter.counter
  ```
@@ -255,26 +265,26 @@ Inoltre, grazie a `$.parent` e `$.scope` possiamo utilizzare le proprietà nella
  */
  ```
 
- Per concludere sulle variabili andiamo a valutare il meccanimso di change detection adottato da CLE, più simile a quello di React che a quello di Angular.
+ Per concludere sulle variabili andiamo a valutare il meccanismo di change detection adottato da CLE, più simile a quello di React che a quello di Angular.
 
- Data infatti una variabile contenente un oggetto es:
+ Data infatti una variabile contenente un oggetto:
  ```javascript
  props: {
     calendarEvent: { id: 0, dueDate: "2022-01-01", title: "Go to grocery store" }
  }
  ```
- Il meccanismo di change detection, che scatena un rerendering dei componenti che seguono tale proprietà, è quello dell'uguaglianza semplice (===), dunque nel caso dell oggetto calendarEvent, la modifica ad esempio del `title` NON verrà identificata (il riferimento non è cambiato!), mentre per una property string questo succederà (è una nuova stringa!). Ciò ovviamente vale, rispettivamente, per tutti i tipi riferimento e valore. 
+ Il meccanismo di change detection, che scatena un rerendering dei componenti che `seguono` tale proprietà, è quello dell'uguaglianza semplice (===). Nel caso dell'oggetto calendarEvent, la modifica del `title`, ad esempio, NON verrà identificata (il riferimento non è cambiato!), mentre per una property string questo succederà (è una nuova stringa!). Ciò ovviamente vale, rispettivamente, per tutti i tipi riferimento e valore. 
 
- E' necessario dunque trattare le property come costanti, come in React, e dunque per modificare il title è necessario riassegnare un nuovo oggeto, es. usando lo `spread operator`
+ E' necessario dunque trattare le property come costanti (come in React): per modificare il title è necessario riassegnare un nuovo oggetto, ad esempio usando lo `spread operator`
 
  ```javascript
  ... $ => {
     $.calendarEvent =  { ...$.calendarEvent, title: "Go to the mall" }
  }
  ```
-Esiste però un'altra possibilità, ovvero utilizzare un metodo che viene generato per ogni property, nello stesso scope della property, e che viene generato come '`_mark_XXX_as_changed()`'.
+Esiste però un'altra possibilità, ovvero utilizzare un metodo che viene autogenerato per ogni property, nello stesso scope della property, e che viene generato come '`_mark_XXX_as_changed()`'.
 
-in questo caso potremmo modificare il codice precedente in:
+In questo caso potremmo modificare il codice precedente in:
 
  ```javascript
  ... $ => {
@@ -283,25 +293,25 @@ in questo caso potremmo modificare il codice precedente in:
  }
  ```
 
- Come vedremo nel seguito, per ogni property viene anche generato un `Signal`, nella forma '`xxxChanged`', che i componenti (incluso se stesso) possono decidere di ascoltare e reagire al fine di disaccoppiare azioni / responsabilità e diminuire gli orchestratori.
+ Come vedremo in seguito, per ogni property viene anche generato un `Signal`, nella forma '`xxxChanged`', che i componenti (incluso se stesso) possono decidere di ascoltare e reagire al fine di disaccoppiare azioni/responsabilità e ridurre gli orchestratori.
 
-Nell'esempio precedente per la properità `calendarEvent` verrà generato un segnale `calendarEventChanged`.
+Nell'esempio precedente per la proprietà `calendarEvent` verrà generato un segnale `calendarEventChanged`.
 
 
-Una shortcut al patter edit ref-prop & mark as changed è utilizzare la funzionalità built-in nel this `editRefVal`, il quale permette di effetuare modifiche interne a un ref e segnalare il cambiamento automaticamente.
+Una shortcut al patter edit "ref-prop and mark as changed" è utilizzare la funzionalità built-in nel this `editRefVal`, il quale permette di effetuare modifiche interne a un ref e segnalare il cambiamento automaticamente.
 ```javascript
  $ => $.this.editRefVal.calendarEvent(cv => { cv.title = "Go to the mall" })
    
 ```
 
 ## Props alternatives & data declaration shortcuts:
-la keyword "props" non è l'unica che si può utilizzare per dichiarare delle variabili. Le altre sono:
+La keyword "props" non è l'unica che si può utilizzare per dichiarare delle variabili. Le altre sono:
 - let
 - data
 
 e sono determinate solo dalla semantica che lo sviluppatore vuole utilizzare.
 
-Inoltre, come vedremo anche per le altre "keyword", è possibile evitare di scriverele in un oggeto assegnato alla keyword, utilizzando una definizione compatta "inline" con dash-case. Ovvero è quindi possibile dichiarare una variabile come:
+Inoltre, come vedremo anche per le altre "keyword", è possibile evitare di scriverele in un oggetto assegnato alla keyword, utilizzando una definizione compatta "inline" con dash-case. E' quindi possibile dichiarare una variabile come:
 - "let_" + "myPropName"
 
 es: 
@@ -312,7 +322,7 @@ es:
 }}
 ```
 
-In ultima analisi, nel caso in cui si inserisce una "keyword" nella definizione che NON è tra le reserved e/o non viene riconosciuta, questa diventerà per cle una definizione di una variabile. Dunque per dichiarare una variabile è sufficiente scrivere:
+In ultima analisi, nel caso in cui si inserisca una "keyword" nella definizione che NON è tra le reserved e/o non viene riconosciuta, questa diventerà per CLE una definizione di una variabile. Dunque per dichiarare una variabile è sufficiente scrivere:
 
 ```javascript
 { div: {
@@ -322,7 +332,7 @@ In ultima analisi, nel caso in cui si inserisce una "keyword" nella definizione 
 ```
 
 ## Functions
-Le funzioni vengono definite tramite la key "`def`". Come detto in precedenza devono avere come primo argomento un riferimento a `$`, come in python, e a seguire gli altri argomenti.
+Le funzioni vengono definite tramite la key "`def`" e devono avere come primo argomento un riferimento allo scope `$`, come in Python, seguito dagli altri argomenti.
 
 Riprendendo il nostro esempio del counter:
 
@@ -356,7 +366,7 @@ Riprendendo il nostro esempio del counter:
  }}
  ```
 
- Per le sole funzioni è possibile definire dei `namespace` in cui inserire funzioni (massimo 1 livello di prfondità). es:
+ Per le sole funzioni è possibile definire dei `namespace` in cui inserire funzioni (massimo 1 livello di profondità). Ad esempio:
 
   ```javascript
  {
@@ -376,7 +386,7 @@ Riprendendo il nostro esempio del counter:
 $ => $.appUtils.capitalize("hello world!")
  ```
 
-Infine, è anche possibile definire delle funzioni come costanti in una props utilizzando l'utils asFunc
+E' anche possibile definire delle funzioni come costanti in una props utilizzando l'utils `asFunc`
 
 ```javascript
 import {asFunc} from "lib/caged-le.js"
@@ -388,7 +398,7 @@ import {asFunc} from "lib/caged-le.js"
 // using standard usage: $ => $.scope.myFunc()
 ```
 
-Come per le variabili esiste poi la possibilità di collassare la definizione via keyword: object tramite:
+Come per le variabili, esiste poi la possibilità di collassare la definizione `keyword: object` tramite:
 - "def_" + "myFunction"
 
 ```javascript
@@ -398,7 +408,9 @@ Come per le variabili esiste poi la possibilità di collassare la definizione vi
 ```
 
 ## Signals
-I Segnali in CLE sono un meccanismo PUB/SUB like di tipo stream che i componenti possono definire e lanciare affinchè altri componenti (o essi stessi) possano decidere di ascoltare, al fine di reagire ad eventi ad esso collegati. I segnali, come gli Event in Angular possono inviare diversi tipi di dato, al fine di poter essere utilizzati non solo come notifica, ma come meccanismo di Input/Outut, disaccoppiando prodicer dal consumer, e dunque codice.
+I Segnali in CLE sono un meccanismo PUB/SUB like di tipo stream che i componenti possono definire e lanciare affinchè altri componenti (o essi stessi) possano decidere di ascoltare per reagire ad eventi ad esso collegati. 
+
+I segnali, come gli Event in Angular, possono trasmettere diversi tipi di dato, al fine di poter essere utilizzati non solo come notifica ma come meccanismo di Input/Outut, disaccoppiando prodicer dal consumer, e dunque codice.
 
 Esistono due tipi di segnali:
 - `Segnali "Puri`"
@@ -406,11 +418,11 @@ Esistono due tipi di segnali:
 - `Segnali connessi a variabili`
     - autogenerati da CLE per ogni variabile definita, nella forma "`xxxChanged`"
 
-i primi trasportano solo i valori "emessi", mentre i secondi si differenziano dai primi in quanto trasportano il nuovo e il vecchio valore della property puntata, al fine di fare opportuni ragionamenti.
+I primi trasportano solo i valori "emessi", mentre i secondi si differenziano dai primi in quanto trasportano il nuovo e il vecchio valore della property puntata, al fine di fare opportuni ragionamenti.
 
-I segnali "puri" inoltre possono essere lanciati in modo imperativo utilizzando `$.yyy.signal_name.emit(...args)`, mentre i secondi non possono essere lanciati direttamente, ma viene emesso da CLE al change del dato, o dopo una "`mark as changed`" esplicita.
+I segnali "puri" possono anche essere lanciati in modo imperativo utilizzando `$.yyy.signal_name.emit(...args)`, mentre i secondi non possono essere lanciati direttamente ma vengono emessi da CLE al change del dato, o dopo una "`mark as changed`" esplicita.
 
-I segnali sono dunque locali al componente e dunque vivono nel namespace del componente. Per ascoltarli sarà necessario poter puntare a quel namespace, (es via $.scope, $.parent, $.le, $.ref, ...). Come vedremo nel seguito, è però possibile creare segnali globali (univoci) grazie al DBUS di CLE.
+I segnali sono dunque locali al componente e vivono nel namespace dello stesso. Per ascoltarli sarà necessario poter puntare a quel namespace, (es via $.scope, $.parent, $.le, $.ref, ...). Come vedremo in seguito, è però possibile creare segnali globali (univoci) grazie al DBUS di CLE.
 
 E' possibile definire un segnale con:
 ```javascript
@@ -426,7 +438,7 @@ E' possibile definire un segnale con:
  }}
 ```
 
-Per emettere un segniale possiamo riferirci a lui con `$.xxxx.signalname` ed usare `.emit(...args)` (con xxxx scopeSelector)
+Per emettere un segnale possiamo riferirci ad esso con `$.xxxx.signalname` e usare `.emit(...args)` (con xxxx scopeSelector)
 
 ```javascript
  const TheCounter =  { div: {
@@ -446,7 +458,7 @@ Per emettere un segniale possiamo riferirci a lui con `$.xxxx.signalname` ed usa
  }}
 ```
 
-E' inoltre possibile collassare la definizione inline keyword: object tramite:
+E' possibile collassare la definizione inline `keyword: object` tramite:
 - "signal_" + "signalName"
 - "s_" + "signalName"
 
@@ -465,7 +477,7 @@ E' inoltre possibile collassare la definizione inline keyword: object tramite:
 ```
 
 ### Subscribe to Signals
-Per ascoltare un segnale è sufficiente dichiararne la gestione tramite keyword "`on_s`" oppure "`on`". Per esempio per agganciarsi ai due segnali precedenti
+Per ascoltare un segnale è sufficiente dichiararne la gestione tramite keyword "`on_s`" oppure "`on`". Ad esempio, per agganciarsi ai due segnali precedenti:
 
 ```javascript
 {
@@ -495,7 +507,7 @@ Per ascoltare un segnale è sufficiente dichiararne la gestione tramite keyword 
     ...
  }
 ```
-Esiste poi una shortcuts per dichiarare la gestione inline:
+Esiste poi una shortcut per dichiarare la gestione inline:
 
 ```javascript
 {
@@ -511,7 +523,7 @@ Esiste poi una shortcuts per dichiarare la gestione inline:
  }
 ```
 
-in case of "scope" selector it can be omitted as it's the default:
+In case of "scope" selector it can be omitted as it's the default:
 
 ```javascript
 {
@@ -541,17 +553,40 @@ const myComponent = { div: {
  }}
 ```
 
-E' sempre possibile poi utilizzare codice imperativo per creare segnali e fare subscribe/unsubscribe dinamicamente. all'interno di `$.this` troviamo infatti i metodi:
+E' sempre possibile utilizzare codice imperativo per creare segnali e fare subscribe/unsubscribe dinamicamente. All'interno di `$.this` troviamo infatti i metodi:
 - `subscribe`:
     - subscribe to signal and return the unsubscriber
 - `subscribeAsync`
     - same as subscribe but async
 - `unsubscribe`
 
-Per generare nuovi segnali è invece possibile utilizzare lo scope "`u`" (utils), in cui si trova `$.u.newSignal`
+Per generare nuovi segnali è invece possibile utilizzare lo scope "`u`" (utils), in cui si trova `$.u.newSignal`.
+
+#### Emit variants
+E' possibile inviare un segnale a un tempo stabilito con: 
+- emitLazy(t=1, ...args)
+
+E' anche possibile aspettare la gestione del segnale e ricevere le risposte tramite:
+
+- emitWaitResp - wait for all handlersa and capture the response data (if any). To send back a response in a on_xxx_signalName simply return a value in the handler function
+- emitWaitFirstToResp - wait only the first response not "undefined" and STOP subsequent handlers. Signal delivered at most once.
+- emitWaitRespCondition - same as first to resp but with a specific condition (func as first argument).
+
+```javascript
+// on the emitter:
+const responses = $.scope.newElement.emitWaitResp($.element)
+...
+// on the handlers
+on_newElement: ($, el) => {
+    return el.prop1 === "type1" ? $.someData : undefined
+}
+```
 
 ### DBUS
-Dbus è un meccanismo di eventi globale. Sostanzialmente è lo stesso meccanismo di Signals ma a livello globale. In particolare per utilizzare un segnale DBUS è necessario dichiararne l'utilizzo tramite  
+Dbus è un meccanismo di eventi globale, del tutto simile a Signals ma a livello globale. 
+
+Per dichiarare un segnale DBUS è necessario utilizzare la "keyword" `dbus_signals`:
+
 ```javascript
  { div: {
     ...
@@ -559,6 +594,14 @@ Dbus è un meccanismo di eventi globale. Sostanzialmente è lo stesso meccanismo
     dbus_signals: {
         globalCounterReset: "stream => (void)",
     }
+    
+ }}
+```
+
+Per ascoltare un segnale DBUS si utilizza lo scope selector "dbus" in una "on" / "on_s"
+```javascript
+ { div: {
+    ...
 
     on: { 
         dbus: { 
@@ -566,14 +609,11 @@ Dbus è un meccanismo di eventi globale. Sostanzialmente è lo stesso meccanismo
         }
     }
     
-    ...
  }}
 ```
-per lanciare un segnale DBUS basta utilizzare lo scope speciale all'interno di `$.dbus` in cui si possono trovare tutti i segnali globali ed emetterli con `$.dbus.sginal.emit(...args)`
+Per lanciare un segnale DBUS basta utilizzare lo scope speciale `$.dbus` in cui si possono trovare tutti i segnali globali ed emetterli con `$.dbus.dbus_sginal_name.emit(...args)`
 
-L'utilità di un sistema di DBUS è quello di avere un meccanismo di eventi dipendenta da un concetto / contratto. Basta infatti conoscere il nome del segnale per poter far si che diverse parti dell'applicazione possano seguirlo.
-
-per agganciarsi a un evento DBUS basta utilizzarlo come "scope selector" nella definizione di "on" oppure "on_s".
+L'utilità di un sistema come DBUS è quello di avere un meccanismo di eventi dipendente da un concetto / contratto. Basta infatti conoscere il nome del segnale per poter far sì che diverse parti dell'applicazione possano seguirlo.
 
 Anche per i segnali DBUS è possibilie collassare la definizione inline tramite:
 - "dbus_signal_" + "signalName"
@@ -584,9 +624,11 @@ Anche per i segnali DBUS è possibilie collassare la definizione inline tramite:
  }}
 ```
 
+Anche per dbus troviamo le varianti della emit definite per i Signals.
+
 
 ## HTML Attributes - attrs & hattrs
-Gli attributi HTML in CLE vengono dichiarati dalla keyword "`attrs`" e la sua shortcut "`a`". Gli attributi permessi in questa definizione sono solo gli attributi testuali (quindi non funzioni cmoe onclick etc, che vanno gestiti in "handle").
+Gli attributi HTML in CLE vengono dichiarati dalla keyword "`attrs`" e la sua shortcut "`a`". Gli attributi permessi in questa definizione sono solo quelli `testuali` (quindi non le funzioni come onclick etc, che vanno gestiti in "handle").
 
 ```javascript
 const coloredDiv = { div: {
@@ -604,7 +646,7 @@ const coloredDiv = { div: {
     //    a_style: "color: red"
  }}
 ```
-per i soli attributi style e class è possibile anche omettere la shortcuts "a_" e scriverli direttamente come
+Per i soli attributi style e class è possibile anche omettere la shortcuts "a_" e scriverli direttamente come:
 
 ```javascript
 const coloredDiv = { div: {
@@ -615,7 +657,7 @@ const coloredDiv = { div: {
  }}
 ```
 
-Inoltre per il solo attributo style è possibile scrivere lo stile inlne come object (camel case, automaticamente convertito in kebab-case ad eccezione delle proprietà che iniziano per "::" passate come stringhe)
+Per il solo attributo "style" è possibile scrivere lo stile inline come object (camel case, automaticamente convertito in kebab-case ad eccezione delle proprietà che iniziano per "::" passate come stringhe)
 
 ```javascript
 const coloredDiv = { div: {
@@ -632,7 +674,7 @@ const coloredDiv = { div: {
 
  }}
 ```
-Gli attributi possono essere dichiarti anche come evaluable, e dunque seguire dati come per le property
+Gli attributi possono essere dichiarati anche come Evaluable, e dunque seguire cambiamenti nei dati come per le property
 
 ```javascript
 const coloredDiv = { div: {
@@ -654,7 +696,9 @@ const coloredDiv = { div: {
  }}
 ```
 
-Grazie a questo meccanismo è possibile realizzare `2 way data binding` per esempio con un campo di input graazie alla funzione "`Bind`", vista meglio nella sezione dedicata
+Grazie a questo meccanismo è possibile realizzare `2 way data binding` utilizzando la funzione "`Bind`" (vista meglio nella sezione dedicata).
+
+Per esempio, su un campo di input:
 
 ```javascript
 import { Bind } from "lib/caged-le.js"
@@ -756,8 +800,10 @@ const myButton = { button: {
     // shortcuts inline:
     // "handle_" + "eventName"
     // "h_" + "eventName"
+    // "ev_" + "eventName"
     //    handle_onclick: ($, event) => ...,
     //    h_onclick: ($, event) => ...,
+    //    ev_onclick: ($, event) => ...,
 
  }}
 ```
@@ -1412,9 +1458,9 @@ visita la demo demo/misc-example.js/ -> appDemoComponentFactory per altre info
 
       computedProp: $ => $.scope.myProp * 10 // evaluable / computed props
 
-      my_alias: Alias(getter $=>..., setter $,v=>..., caching(new, old)=>new!==old...) // Alias of a property, with custom op on set and get!
+      my_alias: Alias(getter $=>..., setter $,v=>..., cachingComparer true | (new, old)=>new!==old...) // Alias of a property, with custom op on set and get! // caching comparer can also be set to "true" for default caching strategy enabled!
 
-      my_alias2: SmartAlias('@counter') // Same as alias but simple def
+      my_alias2: SmartAlias('@counter') // Same as alias but simple def (second parametr is cachingComparer, set to true to enable default comparer stategy)
       
       my_alias3: Bind('@counter') //Same as Smart Alias, but more generic
 
@@ -1427,7 +1473,7 @@ visita la demo demo/misc-example.js/ -> appDemoComponentFactory per altre info
     def: {
       resetCounter: $ => {
         $.this.counter = 0
-        $.this.counterReset.emit() // also lazy: $.this.counterReset.emitLazy(10)
+        $.this.counterReset.emit() // also lazy: $.this.counterReset.emitLazy(10) or wait signal responses emitWaitResp, emitWaitFirstToResp, emitWaitRespCondition
       }, 
       // You can also define a first lvl namespace for functions
       utils: { // def namespace example
@@ -1472,7 +1518,10 @@ visita la demo demo/misc-example.js/ -> appDemoComponentFactory per altre info
       // on who?
       this: {
         // on what?
-        counterReset: $ => console.log("counter reset!")
+        counterReset: $ => {
+            console.log("counter reset!")
+            // return a value that can be captured in an emitWaitResp
+        }
       }, 
       parent: ...
       scope: ... any prop in self or any parent anchestor
@@ -1528,7 +1577,9 @@ visita la demo demo/misc-example.js/ -> appDemoComponentFactory per altre info
       onclick: ($, e) => $.this.count++
     },
     // shortcuts
+    // handle_onclick: $=>...
     // h_onclick: $=>...
+    // ev_onclick: $=>...
     
     // Configurable Html Event Handlers
     when: { // html event (in the form of addEventListener). More configurable!
@@ -1679,6 +1730,45 @@ $ => {
         // edit reference prop inline without manually mark as changed!
         // use: $.this.editRefVal.myProp(p=>p.value=12)
         editRefVal // Proxy with getter: .name(v => action function)
+    },
+
+    $.u = {
+
+      // dynamic new signal
+      newSignal: (name, definition="stream => void")=>{ },
+      
+      // fastSetScopedVarsAsChanged,
+      changed: (scope, ...scopedVars)=>{ },
+
+
+      // block and await for property condition, then get value.. (instant get if true)
+      // to be used to await for a prop! tester can be: function | array of values IN OR
+      // onInit: async $=>{
+      //   let ready = await $.u.propCondition($=>$.le.db, "readyProp", v=>v===true)
+      //   $.initData()
+      // }
+      propCondition: (scopeGetter, prop, tester=v=>(v !== null && v !== undefined), retry=5)=>{ return Promise },
+
+      // utils per andare ad ottenre l'elemento CLE da elementi HTML/DOM .. per fare cosy tricky :(
+      getCleElementByDom: (dom_el)=>{ return cleElement | throw Error("Null-Query-Sel") },
+      getCleElementsByDom: (...dom_els)=>{ return cleElements | throw Error("Null-Query-Sel") },
+
+      // alias for $.ref.xxx return One child if single, Many childs if multi
+      getChildsRef: (name)=>{ return childsRefList | childRef },
+      //serach only DOWN, breadth first algo
+      getSubChildRef: (name)=>{ return result | null },
+      //serach only DOWN, breadth first algo, return all match or limit
+      getSubChildsRef: (name, limit=0)=>{ return results },
+
+      // Lazy Render: dynamic create, get and render template at run time!
+      /**definition_as_func signature:  (parent.$this.this, state, ...args) => obj || obj[] */
+      lazyRender: (definition_as_func, {afterCreate=undefined, beforeDestroy=undefined, afterDestroy=undefined, auto=false}={}, ...args)=>{ return rendered.map(e=>el.$this) }, // restituisco il loro $this (per la rimozione by ref)
+      getLazyRenderState: () => dynamicChildsState,
+      clearLazyRender: (generatedDynComp, clearState=false, clearDestroyHook=false)=>{ },
+
+      // UTILS PER SUB - SUB APP NESTING! necessario che oj_definition sia una definition standard! { xxx: {yyy}} 
+      // called on $.u.new... use the $ as parent, but a specific html element as mount point (maybe a react element..)
+      newConnectedSubRenderer: (html_mount_point, oj_definition, lazy=false)=>{ return SubRendererComponent }
     }
 }
 ```
