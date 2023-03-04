@@ -78,6 +78,7 @@ typings/
 .DS_Store
 
 harmful/
+local-demos/
 
 # parcel dist stuf
 package.json
