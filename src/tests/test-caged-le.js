@@ -6481,7 +6481,7 @@ const appDemoOptimizedLeFor = async ()=>{
 
 const appDemoFromHtmlTemplate = async ()=>{
 
-  const myspan = html(`
+  const myspan = html( /*html*/`
       <span>
         hello world
       </span>`
@@ -6494,7 +6494,7 @@ const appDemoFromHtmlTemplate = async ()=>{
     }
   }, "hi baby!! ", f`@alias ? "(alias: "+@alias+")" : @alias`, " ", myspan)
 
-  const app = html(`
+  const app = html( /*html*/`
     <div class="myclass" [style]="({color: @color})" [ha-style.font-size]="@fontSize+'px'" (onclick)="@el_clicked()" signal-some_el_clicked="stream => el" >
       
       Hi <b>{{@user}}</b> (<i let-role="ADMIN">{{@role}}</i>)
@@ -6545,7 +6545,7 @@ const appDemoFromHtmlTemplate = async ()=>{
 
     app,
 
-    html(`
+    html( /*html*/`
       <h2>Radio Buttons</h2>
 
       <p>Choose your favorite Web language:</p>
