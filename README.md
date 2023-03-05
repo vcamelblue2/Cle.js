@@ -9,11 +9,13 @@ Clean.js is a declarative Javascript Framework, with pure POJO in mind (for ui, 
   - Python (function declaration must have "self" as first parameter, natural langauge syntax like)
   - and many more
 
- For his POJO nature one of it's major improve w.r.t other frameworks is that components are still editable, also if taken from NPM etc. This lead UI library developers to create and handle less code, because in other frameworks everything that a component can do should be "prepared" from developers.
+ For his POJO nature one of it's major improve w.r.t other frameworks is that components are still editable and customizable, also if taken from NPM. This lead UI library developers to create and handle less code (in other frameworks everything a component can do should be "prepared" from developers).
+
+[![Try in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/edit/web-platform-zpqsmf?file=main.js)
 
 # IT Docs
-
 # Basic Concept
+
  Un elemento CLE è un POJO (Plain Old Javascript Object) la cui unica e prima chiave è un tag html. Il valore associato a questo tag può essere invece: 
   - un POJO contenente la `definizione` delle caratteristiche dell'elemento HTML che si vuole renderizzare, nonchè dati, metodi etc.
   - una stringa
