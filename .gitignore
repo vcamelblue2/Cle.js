@@ -81,10 +81,7 @@ harmful/
 local-demos/
 
 # parcel dist stuf
-package.json
-package-lock.json
 .parcel-cache
-/.terserrc
 dontuseterserrc
 /dist
 **/dist
