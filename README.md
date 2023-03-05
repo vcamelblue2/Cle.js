@@ -108,7 +108,7 @@ RenderApp(document.body, cle.root({},
     { div: "This is the body" }
 ))
  ```
-[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/edit/web-platform-kcbzic?file=index.html,main.js)
+[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/edit/web-platform-zpqsmf?file=main.js)
 
 
 ## Component Lyfecicle & Hooks
