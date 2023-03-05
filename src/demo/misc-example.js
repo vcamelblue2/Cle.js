@@ -7200,6 +7200,102 @@ const appDemoExplodeProps = async ()=>{
 
 
 
+const appDemoFromHtmlTemplateViaExternalFile = async ()=>{
+  // Lib
+  // await Promise.all([LE_LoadScript("https://cdnjs.cloudflare.com/ajax/libs/axios/0.21.1/axios.min.js")])
+  // const htmlRef = async (fileName, ...args) => { let txt = (await axios.get(fileName)).data; return html(txt, ...args)}
+  
+  const htmlRef = async (fileName, ...args) => { 
+    try{
+      let res = await fetch(fileName);
+      if (!res.ok){
+        console.log(res)
+        throw new Error("HTML REF ERROR")
+      }
+      let txt = await res.text()
+      return html(txt, ...args)
+    }
+    catch (e){
+      throw new Error("HTML REF ERROR: " + e)
+    }
+  }
+
+  const HtmlRefComponent = (fileName, ...args)=>({ lazy: {
+    onInit: $ => {
+      setTimeout(async () => {
+        let def = await htmlRef(fileName, ...args)
+        $.u.newConnectedSubRenderer(pass, def)
+      }, 1);
+    }
+  }});
+
+  // Components
+  
+  const myh3 = cle.h3({
+    let_alias: "",
+
+    on_parent_numbersChanged: $=>{
+      console.log("n chan")
+    }
+  }, 
+    "hi baby!! ", f`@alias ? "(alias: " + @alias + ")" : @alias`, " ",  html(`<span> hello world </span>`)
+  )
+
+  const MiscComponent = await htmlRef("./angular-style/misc.html", {
+    // please, also if is it possible do not declare variable or signal inside template..use only to pass variable
+
+    let_user: "vins",
+    let_color: "red",
+    let_numbers: [1,2,3],
+    let_fontSize: 24,
+
+    def_el_clicked: $=>{
+      console.log("el clicked!")
+      $.color = $.color === "red" ? "green" : "red"
+      $.some_el_clicked.emit("passed val")
+    },
+
+    def_addNum($){
+      $.numbers = [...$.numbers, $.numbers.length+1]
+    },
+
+  }, 
+  {myh3}, 
+  { myDivExtraDef: { style: "color: orange"} }
+  )
+
+  const MyFormComponent = await htmlRef("./angular-style/form.html")
+
+
+  const AppController = { Controller: {
+      
+    dbus_signal_radioSelected: "stream => $event",
+
+    on_dbus_radioSelected: ($, e)=>{
+      console.log(e, e.target.value)
+    },
+    onInit: $=>{
+      console.log("dbus", $.dbus)
+    }
+  }}
+
+
+  // SUCCESS
+  RenderApp(document.body, cle.root({},
+    
+    MiscComponent,
+    
+    AppController,
+    
+    MyFormComponent,
+
+    cle.hr(),
+
+    HtmlRefComponent("./angular-style/form.html")
+    
+  ))
+
+}
 // app0()
 // test2way()
 // appTodolist()
@@ -7252,6 +7348,7 @@ const appDemoExplodeProps = async ()=>{
 // appDemoComponentPrivateVar()
 // appDemoProducerConsumerSync()
 appDemoExplodeProps()
+// appDemoFromHtmlTemplateViaExternalFile()
 
 // todo: idea per funzioni "at most once" da usare a giro nel framework: in pratica siccome mi paasano una funzione, aka oggetto, potrei settargli un attributo tipo x.__cle__exec_counter__ e controllare se > 1. problema: come fare per le funzioni che sono delle const dentro una funzione? o in generale funzioni passate e create dentro una funzione? li forse solo una roba diversa es dynamicAtMostOnce, che ti fa il toString della funzione..
 //       - quando può servire sta roba? es in una onhover su un pulsante potrei mettere la import dinamica di un altro pezzo di app, per creare app "parziali" senza dare lagg agli utenti. ovviamnete nel mobile non ha senso :D
