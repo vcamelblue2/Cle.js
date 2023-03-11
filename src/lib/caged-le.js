@@ -5223,9 +5223,19 @@ implicit return if omitted (lambda)
 // from https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/AsyncFunction
 const AsyncFunction = async function () {}.constructor;
 
-const resolveHtmlComponentDef = async (text, extraParams={}, state={})=>{
-  const defRegex = /\s*<script\b[^>]*>([\s\S]*?)<\/script>/gi;
-  const viewRegex = /\s*<view\b[^>]*>([\s\S]*?)<\/view>/gi;
+
+const resolveHtmlComponentDef = async (text, {component="", params={}, state={}}={})=>{
+  
+  const defRegexPattern = "\\s*<script"+(component !== "" ? " "+component : '')+">([\\s\\S]*?)<\\/script>";
+  const viewRegexPattern = "\\s*<view"+(component !== "" ? " "+component : '')+">([\\s\\S]*?)<\\/view>";
+  
+  const defRegex = new RegExp(defRegexPattern, "gi")
+  const viewRegex = new RegExp(viewRegexPattern, "gi")
+  
+  // original: 
+  // const defRegex = /\s*<script\b[^>]*>([\s\S]*?)<\/script>/gi;
+  // const viewRegex = /\s*<view\b[^>]*>([\s\S]*?)<\/view>/gi;
+  console.log(defRegex, viewRegex)
 
   let defContent = defRegex.exec(text)?.[1]
   let viewContent = viewRegex.exec(text)?.[1]
@@ -5241,7 +5251,7 @@ const resolveHtmlComponentDef = async (text, extraParams={}, state={})=>{
     }
     const func = new AsyncFunction("Cle", 'params', 'state', defContent);
     
-    let defs = await func(Cle, extraParams, state);
+    let defs = await func(Cle, params, state);
 
     if (defs !== undefined){
       if (Array.isArray(defs)){
@@ -5265,20 +5275,33 @@ const resolveHtmlComponentDef = async (text, extraParams={}, state={})=>{
   return fromHtml(viewContent, pureDefinition, definitionOptions.deps, definitionOptions.extraDefs)
 }
 
+const cachedRemoteHtmlComponents = new Map()
+
 // export
-const remoteHtmlComponent = async (fileName, extraParams={}, state={}, autoExtension=true) => { 
+const remoteHtmlComponent = async (fileName, {component="", params={}, state={}, autoExtension=true, cache=true}={}) => { 
   if (autoExtension){
     fileName += fileName.endsWith(".html") ? '' : ".html"
   }
   
   try{
-    let res = await fetch(fileName);
-    if (!res.ok){
-      console.log(res)
-      throw new Error("REMOTE HTML REF ERROR")
+    let txt;
+
+    if (cache && cachedRemoteHtmlComponents.has(fileName)){
+      txt = cachedRemoteHtmlComponents.get(fileName)
     }
-    let txt = await res.text()
-    return resolveHtmlComponentDef(txt, extraParams)
+    else {
+      let res = await fetch(fileName);
+      if (!res.ok){
+        console.log(res)
+        throw new Error("REMOTE HTML REF ERROR")
+      }
+      txt = await res.text()
+
+      if (cache){
+        cachedRemoteHtmlComponents.set(fileName, txt)
+      }
+    }
+    return resolveHtmlComponentDef(txt, {component, params, state})
   }
   catch (e){
     throw new Error("REMOTE HTML REF ERROR: " + e)

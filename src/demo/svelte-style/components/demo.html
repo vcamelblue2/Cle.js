@@ -5,7 +5,7 @@ Remember: we are inside a function block with signature
     ... 
   }
 
-<script> 
+<script comp1> 
 console.log(
   Cle, params, state
 )
@@ -31,7 +31,7 @@ return [{ // definition
 
 
 View is the template
-<view>
+<view comp1>
   <div>
     <h3>{{@sayHi}}</h3>
     <use-listComponent></use-listcomponent>
@@ -41,3 +41,10 @@ View is the template
     <use-standardcomponent></use-standardcomponent>
   </div>
 </view>
+
+
+
+You can define multiple componets in the same file by setting 
+a name in script and view (in the form of attribute without value)
+<script comp2>({})</script>
+<view c2><h3>Helloooo</h3></view>

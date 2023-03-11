@@ -9,6 +9,6 @@ LE_InitWebApp(async ()=>{ RenderApp(document.body, cle.root({
 
   },
 
-    await remoteHtmlComponent(baseHref+"/components/demo", {hello: "world"}, {statevar: "private state namespace.."})
+    await remoteHtmlComponent(baseHref+"/components/demo", { component: "comp1", params: {hello: "world"}, state: {statevar: "private state namespace.."}, cache: true} ), // cache is default
 
 ))})
