@@ -1,0 +1,43 @@
+Script is the component definition, where declare variables, function etc.
+Remember: we are inside a function block with signature 
+
+  (Cle [cle module], params: {...}, state: {...}) => { 
+    ... 
+  }
+
+<script> 
+console.log(
+  Cle, params, state
+)
+
+// we are in async context so can use await.
+// in this components import muste be absolute! we use a global var to handle this. in real Prod app you can use "/path" directly
+const listComponent = await Cle.remoteHtmlComponent(baseHref+"/components/list") 
+const {StandardComponent} = await import(baseHref+"/standard-components/standard.js")
+
+// since we do some imperative logic before definition we must use "return "
+return [{ // definition
+
+    sayHi: "Hello world!",
+
+    onInit: $ => {
+      console.log("DEMO", $.sayHi, $.rootProp)
+    }
+  },
+
+  { deps: { listComponent, StandardComponent } } // options {deps, extraDefs}
+]
+</script>
+
+
+View is the template
+<view>
+  <div>
+    <h3>{{@sayHi}}</h3>
+    <use-listComponent></use-listcomponent>
+    <hr>
+    <use-listcomponent [set-array]="['a1', 'b2', 'c3']"></use-listcomponent>
+    <hr>
+    <use-standardcomponent></use-standardcomponent>
+  </div>
+</view>

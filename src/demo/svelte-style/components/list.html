@@ -1,0 +1,24 @@
+
+Here we are not doing any imperative code before definition, so we can avoid "return "
+Note: definition only (without options) does not require to explicit use array! also "return" is implicit!
+p.s. you can use this extra space for note or docs
+
+<script>({
+  
+  let: {
+    array: [1,2,3]
+  },
+
+  onInit: $ => console.log("ARRAY", $.array)
+
+})</script>
+
+
+<view>
+  <h4>HI BY SVELTE-STYLE</h4>
+
+  <li meta-foreach="element of @array" (onclick)="@el.style.color='red'" style="cursor: pointer">
+    {{@element}}) - aaaaa
+    <!-- {{@element}}) - {{[...new Array(@element).keys()].map(x=>'a').join('')}} -->
+  </li>
+</view>
