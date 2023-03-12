@@ -5235,7 +5235,7 @@ const resolveHtmlComponentDef = async (text, {component="", params={}, state={}}
   // original: 
   // const defRegex = /\s*<script\b[^>]*>([\s\S]*?)<\/script>/gi;
   // const viewRegex = /\s*<view\b[^>]*>([\s\S]*?)<\/view>/gi;
-  console.log(defRegex, viewRegex)
+  // _debug.log(defRegex, viewRegex)
 
   let defContent = defRegex.exec(text)?.[1]
   let viewContent = viewRegex.exec(text)?.[1]
