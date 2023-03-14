@@ -1306,6 +1306,7 @@ class Component {
 
     this.htmlElementType = getComponentType(definition)
     this.isObjComponent = ["Model", "Controller", "Service", "Component", "Connector", "Signals", "Style", "Css"].includes(this.htmlElementType)
+    this.isPlaceholderPointerComponent = ["LazyPointer"].includes(this.htmlElementType)
     this.convertedDefinition = Component.parseComponentDefinition( (definition instanceof UseComponentDeclaration ? definition.computedTemplate : definition) [this.htmlElementType])
     this.meta_options = {
       isNewScope: this.convertedDefinition.meta?.newScope,
@@ -1513,6 +1514,19 @@ class Component {
           this.parent.html_pointer_element.appendChild(this.html_pointer_element)
         }
       }
+
+    }
+    else if (this.isPlaceholderPointerComponent){
+      this.html_pointer_element = document.createComment("cleptr")
+
+      if (this.isMyParentHtmlRoot){
+        this.parent.appendChild(this.html_pointer_element)
+      }
+      else {
+        this.parent.html_pointer_element.appendChild(this.html_pointer_element)
+      }
+
+      return;  // do not continue with attr setting
 
     }
     else {
@@ -1732,9 +1746,11 @@ class Component {
                 resolve(val)
               } else {
                 let unsub = scope.subscribe(prop+"Changed", sentinel, (v)=>{
-                  // console.log("prop initialzed")
-                  unsub()
-                  resolve(v)
+                  if ((isFunction(tester) && tester(v)) || (Array.isArray(tester) && tester.includes(v))){
+                    // console.log("prop initialzed")
+                    unsub()
+                    resolve(v)
+                  }
                 })
               }
             }
@@ -1838,11 +1854,12 @@ class Component {
 
       // UTILS PER SUB - SUB APP NESTING! necessario che oj_definition sia una definition standard! { xxx: {yyy}} 
       // called on $.u.new... use the $ as parent, but a specific html element as mount point (maybe a react element..)
-      newConnectedSubRenderer: (html_mount_point, oj_definition, lazy=false)=>{
+      // mode can be: "append" | "before" | "after"
+      newConnectedSubRenderer: (html_mount_point, oj_definition, lazy=false, mode="append")=>{
         if (html_mount_point === undefined){
           html_mount_point = this.html_pointer_element
         }
-        return SubRendererComponent.SubRendererComponentFactory(this, html_mount_point, oj_definition, lazy)
+        return SubRendererComponent.SubRendererComponentFactory(this, html_mount_point, oj_definition, lazy, mode)
       }
     })
   }
@@ -4112,20 +4129,36 @@ class SubRendererComponent extends Component{
   setupMountPoint(html_mount_point){
     this.html_mount_point = html_mount_point
   }
+  // mode can be: "append" | "before" | "after"
+  setupMode(mode){
+    this.insertion_mode = mode
+  }
 
   // @override step 2: DO NOT CREATE HTML EL ON PARENT, use mount point instead!
   buildHtmlPointerElement(){
     this.html_pointer_element = document.createElement(this.htmlElementType)
 
-    this.html_mount_point.appendChild(this.html_pointer_element)
+    if (this.insertion_mode === "append"){
+      this.html_mount_point.appendChild(this.html_pointer_element)
+    } 
+    else if (this.insertion_mode === "before"){
+      this.html_mount_point.before(this.html_pointer_element)
+    } 
+    else if (this.insertion_mode === "after"){
+      this.html_mount_point.after(this.html_pointer_element)
+    } 
+    else {
+      throw Error("Unsupported Subrender insertion mode!")
+    } 
 
     this.html_pointer_element.setAttribute(this.t_uid, "")
   }
-
-  static SubRendererComponentFactory($parent, html_mount_point, oj_definition, lazy=false){
+  // mode can be: "append" | "before" | "after"
+  static SubRendererComponentFactory($parent, html_mount_point, oj_definition, lazy=false, mode="append"){
     const maybeLazy = ()=>{
       const components_root = new SubRendererComponent($parent, oj_definition, $parent.$le, $parent.$dbus)
       components_root.setupMountPoint(html_mount_point)
+      components_root.setupMode(mode)
       components_root.buildSkeleton()
       components_root.create()
       return components_root
@@ -4177,6 +4210,13 @@ class ConditionalComponent extends Component{
         this.html_pointer_element_anchor.after(this.html_pointer_element)
       }
 
+    }
+    else if (this.isPlaceholderPointerComponent){
+      this.html_pointer_element = document.createComment("cleptr")
+      
+      this.html_pointer_element_anchor.after(this.html_pointer_element)
+
+      return; // do not continue with attr setting
     }
     else {
 

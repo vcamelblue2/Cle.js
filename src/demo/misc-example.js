@@ -6506,6 +6506,10 @@ const appDemoFromHtmlTemplate = async ()=>{
       </ul>
 
       <div meta-if="@numbers.length % 2 === 0">Pari!</div>
+      
+      <span>test {{ {a:123} }} helloo! {} </span>
+      <span>test {{ ({a:123}) }} helloo! {} </span>
+      <span>test {{({a:123}).a}} helloo! {} </span>
 
       <div (on-some_el_clicked)="console.log('handlig a signal!', $val)" extra-defs="myDivExtraDef">from extra def</div>
 
@@ -7296,6 +7300,152 @@ const appDemoFromHtmlTemplateViaExternalFile = async ()=>{
   ))
 
 }
+
+
+const appDemoLazyComponent = async ()=>{
+
+  const Lazy = (compFunction, params, extradef={}, rerenderingDeps=undefined, detectRerenderingRequired=(a,b)=>a!==b) => {
+
+    if (rerenderingDeps === undefined){
+
+      return { LazyPointer: {
+        
+        ...extradef,
+
+        renderizedComponent: undefined,
+
+        afterInit: async $ => {
+          
+          let resolvedComp = compFunction
+  
+          if (typeof compFunction === 'function'){
+            resolvedComp = await compFunction($, params)
+          } 
+
+          // console.log($.this.el, resolvedComp)
+
+          $.renderizedComponent = $.u.newConnectedSubRenderer($.this.el, resolvedComp, false, "after")
+        
+        }
+      }}
+
+    }
+    else {
+
+      return { LazyPointer: {
+        
+        ...extradef,
+
+        renderizedComponent: undefined,
+        inRendering: false,
+        
+        rerenderingDeps: rerenderingDeps,
+
+        on_this_rerenderingDepsChanged: ($, n, o) => {
+          if (detectRerenderingRequired(n,o)) {
+            if ($.renderizedComponent !== undefined && !$.inRendering){
+              $.renderizedComponent.destroy();
+              $.renderize()
+            }
+          }
+        },
+
+        // todo: move destroy inside this function (where a rerendering detected), then pass the latest renderized component ( as pure el def {div:{...}} ) to the function, and let that function return array [component, rerenderingRequired], to let function handle rerendering request. then if true destroy and renderize
+        //       in this mode we can reimplement eg. react diffing mode, and reduce rerendering. 
+        def_renderize: async $=>{
+          console.log("renderizing..",)
+          $.inRendering = true
+
+          let resolvedComp = compFunction
+  
+          if (typeof compFunction === 'function'){
+            resolvedComp = await compFunction($, params)
+          } 
+
+          // console.log($.this.el, resolvedComp)
+
+          $.renderizedComponent = $.u.newConnectedSubRenderer($.this.el, resolvedComp, false, "after")
+          console.log("renderized", $.renderizedComponent)
+          $.inRendering = false
+        },
+
+        afterInit: async $ => {
+          await $.renderize()
+        }
+      }}
+
+    }
+
+  }
+
+  const InputOrTextArea = async ($, {componentNum=0, text=()=>""}={}) => {
+    
+    await wait(2000);
+
+    // todo: support meta etc (in general the bug is that connected subrender does not use standard factory..)
+    const Input = { input: { meta: {forEach: "ipt", of: $=>[1,2,3]}, 
+      a_value: Bind(text)
+    }}
+
+    const TextArea = { textarea: { meta: { if: $=>false},//forEach: "ipt", of: $=>[1,2,3]},
+      ha_value: Bind(text),
+      style: "color: red"
+    }}
+
+    return componentNum === 1 ? 
+      ($.component1Type === 'input' ? Input : TextArea) : 
+      ($.component2Type === 'textarea' ? TextArea : Input)
+
+  }
+
+  const wait = (msec) => new Promise((resolve, _) => {
+    setTimeout(resolve, msec);
+  });
+
+  
+  const LazyItem = async ($, {counterValue}, lastRenderized)=>{
+    
+    await $.u.propCondition($=>$.parent, "counter", v=>v>=counterValue && v<=counterValue*2)
+
+    return cle.div({},
+      cle.div({}, f`'Counter at lazy: ' + @counter`),
+      cle.h3({}, "The Counter finally visible: "+counterValue+"!")
+    )
+  }
+
+  const LazyItemWrapper = cle.div({
+    counter: 0,
+  },
+    cle.div(f`'Counter: ' + @counter`),
+    cle.button({handle_onclick: f`{ @counter += 1 }`}, "Inc Counter"),
+
+    Lazy(LazyItem, {counterValue: 5}, {}, $=>$.counter, (n,o)=>n < 5 || n > 10)
+  )
+
+
+  // SUCCESS
+  RenderApp(document.body, cle.root({
+
+    component1Type: "input",
+    component2Type: "textarea",
+
+    let_text: "Helo World!"
+
+  },
+
+    { h2: "Simulate loading in 2 sec.."},
+
+    Lazy(InputOrTextArea, {componentNum: 1, text: $ => $.text}),
+
+    Lazy(InputOrTextArea, {componentNum: 2, text: $ => $.text}),
+
+    LazyItemWrapper
+
+  ))
+
+}
+
+
 // app0()
 // test2way()
 // appTodolist()
@@ -7347,8 +7497,9 @@ const appDemoFromHtmlTemplateViaExternalFile = async ()=>{
 // appDemoComponentFactory()
 // appDemoComponentPrivateVar()
 // appDemoProducerConsumerSync()
-appDemoExplodeProps()
+// appDemoExplodeProps()
 // appDemoFromHtmlTemplateViaExternalFile()
+// appDemoLazyComponent()
 
 // todo: idea per funzioni "at most once" da usare a giro nel framework: in pratica siccome mi paasano una funzione, aka oggetto, potrei settargli un attributo tipo x.__cle__exec_counter__ e controllare se > 1. problema: come fare per le funzioni che sono delle const dentro una funzione? o in generale funzioni passate e create dentro una funzione? li forse solo una roba diversa es dynamicAtMostOnce, che ti fa il toString della funzione..
 //       - quando può servire sta roba? es in una onhover su un pulsante potrei mettere la import dinamica di un altro pezzo di app, per creare app "parziali" senza dare lagg agli utenti. ovviamnete nel mobile non ha senso :D
