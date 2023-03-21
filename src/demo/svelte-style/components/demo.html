@@ -1,13 +1,13 @@
 Script is the component definition, where declare variables, function etc.
 Remember: we are inside a function block with signature 
 
-  (Cle [cle module], params: {...}, state: {...}) => { 
+  (Cle [cle module], params: {...}, state: {...}, style: String) => { 
     ... 
   }
 
 <script comp1> 
 console.log(
-  Cle, params, state
+  Cle, params, state, style
 )
 
 // we are in async context so can use await.
@@ -34,11 +34,12 @@ View is the template
 <view comp1>
   <div>
     <h3>{{@sayHi}}</h3>
-    <use-listComponent></use-listcomponent>
+    <use-listComponent></use-listComponent>
     <hr>
-    <use-listcomponent [set-array]="['a1', 'b2', 'c3']"></use-listcomponent>
+    <use-listComponent [set-array]="['a1', 'b2', 'c3']"></use-listComponent>
     <hr>
-    <use-standardcomponent></use-standardcomponent>
+    <use-StandardComponent></use-StandardComponent>
+    <li>An external li (non-styled)</li>
   </div>
 </view>
 
@@ -52,3 +53,7 @@ a name in script and view (in the form of attribute without value)
 <view comp2><h3>Helloooo</h3></view>
 
 Note: the extra text outside script and view tags will be ignored!
+
+
+Script part is [optional]
+<view comp3><h3>Pure View Only</h3></view>

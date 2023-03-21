@@ -5234,12 +5234,12 @@ const fromHtml = (text, definition={}, tagReplacers={}, extraDefs={})=>{
 Svelte Style Components:
 
 In script we are inside a function block with signature 
-(Cle [cle module], params: {...}, state: {...}) => { 
+(Cle [cle module], params: {...}, state: {...}, style: String) => { 
   ... 
 }
 
 implicit return if omitted (lambda)
-<script>
+<script ComponentName>
 
   const otherComponent = await importRemoteComponent("./otherComponent.html")
 
@@ -5252,12 +5252,15 @@ implicit return if omitted (lambda)
 </script>
 
 // as frmoHtml
-<view>
+<view ComponentName>
   <div>
     {{@sayHi}}
   </div>
 </view>
 
+<style ComponentName>
+ div{ color: red }
+</style>
 */
 
 // from https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/AsyncFunction
@@ -5266,19 +5269,22 @@ const AsyncFunction = async function () {}.constructor;
 
 const resolveHtmlComponentDef = async (text, {component="", params={}, state={}}={})=>{
   
-  const defRegexPattern = "\\s*<script"+(component !== "" ? " "+component : '')+">([\\s\\S]*?)<\\/script>";
   const viewRegexPattern = "\\s*<view"+(component !== "" ? " "+component : '')+">([\\s\\S]*?)<\\/view>";
+  const styleRegexPattern = "\\s*<style"+(component !== "" ? " "+component : '')+">([\\s\\S]*?)<\\/style>";
+  const defRegexPattern = "\\s*<script"+(component !== "" ? " "+component : '')+">([\\s\\S]*?)<\\/script>";
   
-  const defRegex = new RegExp(defRegexPattern, "gi")
   const viewRegex = new RegExp(viewRegexPattern, "gi")
+  const styleRegex = new RegExp(styleRegexPattern, "gi")
+  const defRegex = new RegExp(defRegexPattern, "gi")
   
   // original: 
   // const defRegex = /\s*<script\b[^>]*>([\s\S]*?)<\/script>/gi;
   // const viewRegex = /\s*<view\b[^>]*>([\s\S]*?)<\/view>/gi;
   // _debug.log(defRegex, viewRegex)
 
-  let defContent = defRegex.exec(text)?.[1]
   let viewContent = viewRegex.exec(text)?.[1]
+  let styleContent = styleRegex.exec(text)?.[1]
+  let defContent = defRegex.exec(text)?.[1]
 
   let pureDefinition = {}
   let definitionOptions = {}
@@ -5289,9 +5295,20 @@ const resolveHtmlComponentDef = async (text, {component="", params={}, state={}}
     if (!defContent.includes("return")){
       defContent = "return ( " + defContent + " )"
     }
-    const func = new AsyncFunction("Cle", 'params', 'state', defContent);
+    const func = new AsyncFunction("Cle", 'params', 'state', 'style', defContent);
     
-    let defs = await func(Cle, params, state);
+    if (styleContent !== undefined){
+      let oj_styleContent = styleContent
+      styleContent = Object.assign(oj_styleContent, {setup: (valuesObj)=>{
+        let resolvedStyleContent = oj_styleContent
+        Object.entries(valuesObj).forEach(([toReplace, val])=>{
+          resolvedStyleContent = resolvedStyleContent.replaceAll(toReplace, val)
+        })
+        return resolvedStyleContent
+      }})
+    }
+
+    let defs = await func(Cle, params, state, styleContent);
 
     if (defs !== undefined){
       if (Array.isArray(defs)){
