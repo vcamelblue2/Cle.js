@@ -11,7 +11,137 @@ Clean.js is a declarative Javascript Framework, with pure POJO in mind (for ui, 
 
  For his POJO nature one of it's major improve w.r.t other frameworks is that components are still editable and customizable, also if taken from NPM. This lead UI library developers to create and handle less code (in other frameworks everything a component can do should be "prepared" from developers).
 
+## Quick Start
 [![Try in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/edit/web-platform-zpqsmf?file=main.js)
+
+```javascript
+import { RenderApp, cle, f, Bind, Use, pass } from '/lib/caged-le.js'
+
+// App Definition
+const app = async () => RenderApp(document.body, cle.root({},
+ 
+   { h1: "Hello World!" },
+   
+   { div: ["This is the body", "!"] },
+   
+   { div: {
+     myVariable: "123", // shortcut of let: { myVariable } for NON reserved names
+
+     style: { color: "green"},
+
+     text: $ => "And a component with some definition, myVariable:" + $.myVariable }
+   },
+   
+ 
+   { hr: {}},
+ 
+   // Use components
+   Use(MyReusableInputBar, {
+     
+    // setup variable
+     let_val: "ABC", 
+ 
+     // handle signals & variable changes
+     on_valChanged: ($, txt, oldtxt) => console.log("new text: ", txt, " - old: ", oldtxt),
+     on_hiLogged: $ => console.log("hi has been logged!"), 
+
+   }),
+ 
+   cle.hr({}),
+ 
+ 
+ 
+   { div: {
+ 
+     id: "hiddenDiv", // unique id in app!
+ 
+     let: {
+       isHidden: true
+     },
+     
+     // define depens on computed attr
+     style: $ => ({ 
+       display: $.isHidden ? 'none' : null 
+     }),
+ 
+     // hooks & lifecycle
+     onInit: $ => { console.log("I'm Hidden?", $.isHidden) },
+     
+     text: "Secret Message!"
+   }},
+ 
+ 
+   { h4: {
+     
+     // handle html events
+     handle: {
+       onclick: $ => { 
+           $.le.hiddenDiv.isHidden = !$.le.hiddenDiv.isHidden 
+       }
+     },
+ 
+     text: ["The div is ", $ => $.le.hiddenDiv.isHidden ? 'hidden' : 'visible', " (click to toggle)"],
+ 
+   }},
+ 
+   // same using smart definition:
+   cle.h4({
+ 
+     handle_onclick: $ => { 
+       $.le.hiddenDiv.isHidden = !$.le.hiddenDiv.isHidden 
+     }
+ 
+   }, "The div is ", f`$.le.hiddenDiv.isHidden ? 'hidden' : 'visible'`, " (click to toggle)")
+   
+ ))
+
+
+// A reusable component
+const MyReusableInputBar = cle.div({ 
+  // definition
+ 
+  let: {  // variables
+    val: "",
+    doubleVal: $ => 'x2: ' + $.val + ' - ' + $.val, // computed
+    tripleVal: f`'x3: ' + @val + ' - ' + @val + ' - ' + @val`
+  },
+ 
+  def: {  // functions
+    sayHi: $ => { 
+      console.log("hi!"); 
+      $.this.hiLogged.emit(new Date()) 
+    }
+  },
+ 
+  signals: { // signals
+    hiLogged: "stream => (date: Date)"
+  }
+ 
+ }, 
+ 
+  // childs
+  cle.h5({}, "Insert a value"),
+
+  { input: { // 2 way data binding using 'Bind'
+      attrs: { value: Bind(f`@val`),  placeholder: "Insert a value..", style: "margin-right: 10px" }
+  }},
+
+  { span: { text: f`'You have inserted: ' + @val + ' -> ' + @doubleVal`} },
+
+  cle.button({ // mix modes as you prefer!
+    
+    handle_onclick: $ => $.sayHi(),
+    
+    style: { marginLeft: "10px" }
+
+  }, "Say Hi!" )
+  
+);
+
+
+await app();
+
+```
 
 # IT Docs
 # Basic Concept
