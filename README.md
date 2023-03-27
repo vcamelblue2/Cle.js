@@ -1773,6 +1773,7 @@ visita la demo demo/misc-example.js/ -> appDemoComponentFactory per altre info
         forEach: "myVar", of: $ => $.MyArrayVar, // Element Repeater
         // Repeater Helpers
         optimized: false, bool // enable leFor optimization (RECOMANDED)
+        full_optimized: false, bool // enable leFor optimization (RECOMANDED)
         define:{ 
             // define in meta this variables with this name 
             index:"idx", 
