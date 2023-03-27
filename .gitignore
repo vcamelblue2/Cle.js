@@ -76,6 +76,7 @@ typings/
 .fusebox/
 
 .DS_Store
+.ds_store
 
 harmful/
 local-demos/
