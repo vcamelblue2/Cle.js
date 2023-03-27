@@ -364,6 +364,26 @@ class Signal {
     return undefined
   }
 
+  awaitSignalFired(who, condition=()=>true, timeout=undefined){
+
+    let timeout_handler = undefined;
+    let cancelTimeoutHandler = ()=>{ if (timeout !== undefined) { clearTimeout(timeout_handler); timeout_handler = undefined; } };
+
+    return new Promise((resolve, reject)=>{
+
+      // set timeout (if any)
+      if (timeout) { timeout_handler = setTimeout(()=>{reject({error: "TIMEOUT"})}, timeout) }
+
+      this.addHandler(who, (...values)=>{
+        if (condition === undefined || condition(...values)){
+          cancelTimeoutHandler()
+          this.removeHandler(who)
+          resolve(...values)
+        }
+      })
+    })
+  }
+
   hasHandler(who){
     return this.handlers.find(h=>h.who === who) !== undefined
   }
@@ -391,7 +411,8 @@ class Signal {
     emitWaitRespCondition: (condition, ...args)=>realSignal.emitWaitRespCondition(condition, ...args), 
     emitLazy: (t=1, ...args)=>setTimeout(() => {realSignal.emit(...args)}, t), 
     subscribe: (who, handler) => realSignal.addHandler(who, handler), 
-    unsubscribe: (who) => realSignal.removeHandler(who) 
+    unsubscribe: (who) => realSignal.removeHandler(who),
+    /*await*/ signalFired: async (condition=()=>true, timeout=undefined) => await realSignal.awaitSignalFired({}, condition, timeout),
   })
 
 }
@@ -1672,12 +1693,11 @@ class Component {
     // edit reference prop inline without manually mark as changed!
     // use: $.this.editRefVal.myProp(p=>p.value=12)
     this.properties.editRefVal = new Proxy({}, {
-      get: (_, prop)=>{ 
-        return (action)=>{
-          action(this.$this.this[prop])
-          this.properties["_mark_"+prop+"_as_changed"]() //better also if sacrify performance.. eg for Alias & co
-        }
-      },
+      get: (_, prop)=>{ return (action)=>{ action(this.$this.this[prop]);this.properties["_mark_"+prop+"_as_changed"]() }}, //better also if sacrify performance.. eg for Alias & co
+      set: function() {}
+    })
+    this.properties.editArrRefVal = new Proxy({}, {
+      get: (_, prop)=>(action)=>{ action(this.$this.this[prop]); this.$this.this[prop] = [...this.$this.this[prop]] },
       set: function() {}
     })
 
@@ -1731,30 +1751,47 @@ class Component {
       // block and await for property condition, then get value.. (instant get if true)
       // to be used to await for a prop! tester can be: function | array of values IN OR
       // onInit: async $=>{
-      //   let ready = await $.u.propCondition($=>$.le.db, "readyProp", v=>v===true)
+      //   let ready = await $.u.propCondition($=>$.le.db, "readyProp", v=>v===true, 60*1000) [wait max 60sec]
       //   $.initData()
       // }
-      /*await*/ propCondition: (scopeGetter, prop, tester=v=>(v !== null && v !== undefined), retry=5)=>{
+      /*await*/ propCondition: (scopeGetter, prop, tester=v=>(v !== null && v !== undefined), timeout=undefined, retry=5)=>{
         let sentinel = {}
+        let timeout_handler = undefined
+        let cancelTimeoutHandler = ()=>{ if (timeout !== undefined) { clearTimeout(timeout_handler); timeout_handler = undefined; } };
         return new Promise((resolve, reject)=>{
+          // set timeout (if any)
+          if (timeout) { timeout_handler = setTimeout(()=>{reject({error: "TIMEOUT"})}, timeout) }
+
           exponentialRetry(()=>{
             let scope = scopeGetter.bind(undefined, this.$this)()
             if (scope === undefined || scope === null){ throw Error("Cannot Find Scope") }
             else {
               let val = scope[prop]
               if ((isFunction(tester) && tester(val)) || (Array.isArray(tester) && tester.includes(val))){
+                cancelTimeoutHandler()
                 resolve(val)
               } else {
                 let unsub = scope.subscribe(prop+"Changed", sentinel, (v)=>{
                   if ((isFunction(tester) && tester(v)) || (Array.isArray(tester) && tester.includes(v))){
                     // console.log("prop initialzed")
                     unsub()
+                    cancelTimeoutHandler()
                     resolve(v)
                   }
                 })
               }
             }
-          }, pass, pass, pass, "Cannot connect to CLE Prop", retry, pass, (...args)=>reject(args))
+          }, pass, pass, pass, "Cannot connect to CLE Prop", retry, pass, (...args)=>{ cancelTimeoutHandler(); return reject(args) })
+        })
+      },
+
+      /*await*/ signalFired: (scopeGetter, signal, condition=v=>true, timeout=undefined, retry=5)=>{
+        return new Promise((resolve, reject)=>{
+          exponentialRetry(()=>{
+            let scope = scopeGetter.bind(undefined, this.$this)()
+            if (scope === undefined || scope === null){ throw Error("Cannot Find Scope") }
+            else { scope[signal].signalFired(condition, timeout).then((...res)=>resolve(...res)).catch(err=>reject(err)) }
+          }, pass, pass, pass, "Cannot connect to CLE Signal", retry, pass, (...args)=>reject(args))
         })
       },
 
@@ -1921,7 +1958,8 @@ class Component {
     }
 
     if (this.convertedDefinition.oos !== undefined){
-      this.$oos = this.convertedDefinition.oos
+      // declare as a function to have a personal obj per-instance, otherwhise it will be shared between all instances!
+      this.$oos = isFunction(this.convertedDefinition.oos) ? (this.convertedDefinition.oos.bind(this.$this, this.$this)()) : this.convertedDefinition.oos
     }
 
     // html event in the form of obj.onxxx = ()=>...
@@ -3379,9 +3417,9 @@ class Component {
       on_parent: {},
       on_scope: {},
       on_dbus: {},
-      // on_le: {}, // TODO: support on le & ctx shortcuts!
-      // on_ctx: {},
-      // on_ref: {},
+      on_le: {},
+      on_ctx: {},
+      on_ref: {},
     }
 
     // let has_dash_shortucts_keys = false // todo performance by skip next if series
@@ -3445,7 +3483,7 @@ class Component {
         }
 
         else if (k.startsWith('w_')){
-          dash_shortucts_keys.handle[k.substring(2)] = val
+          dash_shortucts_keys.when_event_listener[k.substring(2)] = val
           addToAlreadyResolved(k)
         }
         else if (k.startsWith('when_')){
@@ -3467,28 +3505,72 @@ class Component {
           addToAlreadyResolved(k)
         }
 
-        else if (k.startsWith('on_this_')){
-          dash_shortucts_keys.on_this[k.substring(8)] = val
-          addToAlreadyResolved(k)
+        else if (k.startsWith('on_')){ 
+
+          if (k.startsWith('on_this_')){
+            dash_shortucts_keys.on_this[k.substring(8)] = val
+            addToAlreadyResolved(k)
+          }
+          else if (k.startsWith('on_parent_')){
+            dash_shortucts_keys.on_parent[k.substring(10)] = val
+            addToAlreadyResolved(k)
+          }
+          else if (k.startsWith('on_scope_')){
+            dash_shortucts_keys.on_scope[k.substring(9)] = val
+            addToAlreadyResolved(k)
+          }
+          else if (k.startsWith('on_dbus_')){
+            dash_shortucts_keys.on_dbus[k.substring(8)] = val
+            addToAlreadyResolved(k)
+          }
+          else if (k.startsWith('on_le_')){
+            let id_and_sign = k.substring(6)
+            let [id, ...rest] = id_and_sign.split("_")
+            let sign = rest.join("_")
+            if (dash_shortucts_keys.on_le[id] !== undefined) {
+              dash_shortucts_keys.on_le[id][sign] = val
+            }
+            else {
+              dash_shortucts_keys.on_le[id] = { [sign]: val }
+            }
+            addToAlreadyResolved(k)
+          }
+          else if (k.startsWith('on_ctx_')){
+            let ctx_id_and_sign = k.substring(7)
+            let [ctx_id, ...rest] = ctx_id_and_sign.split("_")
+            let sign = rest.join("_")
+            if (dash_shortucts_keys.on_ctx[ctx_id] !== undefined) {
+              dash_shortucts_keys.on_ctx[ctx_id][sign] = val
+            }
+            else {
+              dash_shortucts_keys.on_ctx[ctx_id] = { [sign]: val }
+            }
+            addToAlreadyResolved(k)
+          }
+          else if (k.startsWith('on_ctx_')){
+            let ref_id_and_sign = k.substring(7)
+            let [ref_id, ...rest] = ref_id_and_sign.split("_")
+            let sign = rest.join("_")
+            if (dash_shortucts_keys.on_ref[ref_id] !== undefined) {
+              dash_shortucts_keys.on_ref[ref_id][sign] = val
+            }
+            else {
+              dash_shortucts_keys.on_ref[ref_id] = { [sign]: val }
+            }
+            addToAlreadyResolved(k)
+          }
+          else if (k.startsWith('on_s_')){ // ultra shortcuts! use scope (ideally for signals..)
+            dash_shortucts_keys.on_scope[k.substring(5)] = val
+            addToAlreadyResolved(k)
+          }
+          else { // ultra shortcuts! use scope
+            dash_shortucts_keys.on_scope[k.substring(3)] = val
+            addToAlreadyResolved(k)
+          }
         }
-        else if (k.startsWith('on_parent_')){
-          dash_shortucts_keys.on_parent[k.substring(10)] = val
-          addToAlreadyResolved(k)
-        }
-        else if (k.startsWith('on_scope_')){
-          dash_shortucts_keys.on_scope[k.substring(9)] = val
-          addToAlreadyResolved(k)
-        }
-        else if (k.startsWith('on_dbus_')){
-          dash_shortucts_keys.on_dbus[k.substring(8)] = val
-          addToAlreadyResolved(k)
-        }
-        else if (k.startsWith('on_s_')){ // ultra shortcuts! use scope (ideally for signals..)
-          dash_shortucts_keys.on_scope[k.substring(5)] = val
-          addToAlreadyResolved(k)
-        }
-        else if (k.startsWith('on_')){ // ultra shortcuts! use scope
-          dash_shortucts_keys.on_scope[k.substring(3)] = val
+
+        else if (k.startsWith('on') && k.endsWith("_event")){ // handle html events like  "onclick_event" 
+          dash_shortucts_keys.handle[k.substring(0, k.length-6)] = val
           addToAlreadyResolved(k)
         }
       }
@@ -3497,6 +3579,17 @@ class Component {
         dash_shortucts_keys.attrs[k] = definition[k]
         addToAlreadyResolved(k)
       }
+
+      else if (['onclick'].includes(k)){ // Extreme shortcuts for onclick
+        dash_shortucts_keys.handle[k] = definition[k]
+        addToAlreadyResolved(k)
+      }
+
+      // // ?? POTENTIAL BREAKING CHANGES "onclick" etc will now be recognized as html event "handle"
+      // else if (k.startsWith('on') && k.length >= 3 && k[2] === k[2].toLowerCase() && k in window){ // handle html events like  "onclick" directly!
+      //   dash_shortucts_keys.handle[k] = definition[k]
+      //   addToAlreadyResolved(k)
+      // }
 
     })
 
@@ -3590,6 +3683,69 @@ class Component {
         
       }
       else { unifiedDef.on = { dbus: dash_shortucts_keys.on_dbus }}
+    }
+    if (Object.keys(dash_shortucts_keys.on_le).length > 0){
+      if (unifiedDef.on !== undefined){ 
+        if (unifiedDef.on.le !== undefined){
+          const final_on_le = {...unifiedDef.on.le}
+          Object.entries(dash_shortucts_keys.on_le).forEach(([le_id, sign_handlers])=>{
+            if (final_on_le[le_id] !== undefined){
+              final_on_le[le_id] = {...final_on_le[le_id], ...sign_handlers}
+            } 
+            else {
+              final_on_le[le_id] = {...sign_handlers}
+            }
+          })
+          unifiedDef.on.le = final_on_le
+        }
+        else {
+          unifiedDef.on.le = dash_shortucts_keys.on_le
+        }
+        
+      }
+      else { unifiedDef.on = { le: dash_shortucts_keys.on_le }}
+    }
+    if (Object.keys(dash_shortucts_keys.on_ctx).length > 0){
+      if (unifiedDef.on !== undefined){ 
+        if (unifiedDef.on.ctx !== undefined){
+          const final_on_ctx = {...unifiedDef.on.ctx}
+          Object.entries(dash_shortucts_keys.on_ctx).forEach(([ctx_id, sign_handlers])=>{
+            if (final_on_ctx[ctx_id] !== undefined){
+              final_on_ctx[ctx_id] = {...final_on_ctx[ctx_id], ...sign_handlers}
+            } 
+            else {
+              final_on_ctx[ctx_id] = {...sign_handlers}
+            }
+          })
+          unifiedDef.on.ctx = final_on_ctx
+        }
+        else {
+          unifiedDef.on.ctx = dash_shortucts_keys.on_ctx
+        }
+        
+      }
+      else { unifiedDef.on = { ctx: dash_shortucts_keys.on_ctx }}
+    }
+    if (Object.keys(dash_shortucts_keys.on_ref).length > 0){
+      if (unifiedDef.on !== undefined){ 
+        if (unifiedDef.on.ref !== undefined){
+          const final_on_ref = {...unifiedDef.on.ref}
+          Object.entries(dash_shortucts_keys.on_ref).forEach(([ref_id, sign_handlers])=>{
+            if (final_on_ref[ref_id] !== undefined){
+              final_on_ref[ref_id] = {...final_on_ref[ref_id], ...sign_handlers}
+            } 
+            else {
+              final_on_ref[ref_id] = {...sign_handlers}
+            }
+          })
+          unifiedDef.on.ref = final_on_ref
+        }
+        else {
+          unifiedDef.on.ref = dash_shortucts_keys.on_ref
+        }
+        
+      }
+      else { unifiedDef.on = { ref: dash_shortucts_keys.on_ref }}
     }
 
 
@@ -4348,7 +4504,9 @@ class IterableComponent extends Component{
       // define:{ index:"idx", first:"isFirst", last:"isLast", length:"len", iterable:"arr" }
       Object.entries(this.meta_config.define).forEach(([define_var, dev_var_name])=>{
         if (define_var in this.meta_config.define_helper){
-          this.meta[dev_var_name] = new Property(this.meta_config.define_helper[define_var], none, none, none, ()=>this.$this, none, true)
+          let signalName = dev_var_name+"Changed"
+          this.meta[dev_var_name] = new Property(()=>this.meta_config.define_helper[define_var], none, (v, ojV, self)=>{  if (v !== ojV) { this.signals[signalName].emit(v, this.meta[dev_var_name]._latestResolvedValue); } }, none, ()=>this.$this, none, true)
+          this.signals[signalName] = new Signal(signalName, "stream => (newValue: any, oldValue: any) - meta property change signal")
         }
         // altre var custom!
         else {
@@ -4378,7 +4536,7 @@ class IterableComponent extends Component{
   }
   // la destroy funziona già bene, perchè rimuoverò me stesso (pointer)..!
 
-  updateDataRerencesAndMeta(newIterableIdx, newMetaConfig, skip_identifier_value=true){
+  updateDataRerencesAndMeta(newIterableIdx, newMetaConfig, childComparer, childSubpropComparer,  skip_identifier_value=true){
     this.iterableIndex = newIterableIdx
     this.meta_config = newMetaConfig
     Object.entries(this.meta).forEach(([k,v])=>{
@@ -4386,6 +4544,19 @@ class IterableComponent extends Component{
         (v instanceof Property) && v?.markAsChanged() // force update
       }
     })
+
+    // todo: capire se ha senso, AS DOC: nei casi `full_optimized` è possibile anche definire un `subComparer`, in grado di valutare (durante una change dell'iterable) sottoproprietà al fine di scatenare un change signal.
+    // subComparer: (newEl, oldEl) => newEl.val1 !== oldEl.val1
+    // in realtà questa cosa non ha alcun senso.. perchè quando c'è una change dell'array poi scatta la change dei singoli item sopavvissuti all'evicting (i non nuovi e i non rimossi..) e dunque scatta la notifica intrinseca del change da definizione della property!
+
+    // if (childSubpropComparer !== undefined){
+    //   const [_newv, _oldv] = [this.meta[this.meta_config.iterablePropertyIdentifier].value, this.meta[this.meta_config.iterablePropertyIdentifier]._latestResolvedValue]
+    //   if ( (childComparer && childComparer(_newv, _oldv)) || (childSubpropComparer && childSubpropComparer(_newv, _oldv)) ){
+    //     this.signals[this.meta_config.iterablePropertyIdentifier+"Changed"].emit(_newv, _oldv); // NEW FOR REACT MASHUP: force to emit a xxxChanged also for meta vars..
+    //   }
+    // }
+
+    this.hooks.onUpdate !== undefined && this.hooks.onUpdate()
   }
 }
 
@@ -4495,6 +4666,27 @@ class IterableViewComponent{
     child.html_pointer_element.setAttribute(child.t_uid, "")
   }
 
+  sortExistingChildsInDomAsChildsArrOrder(){
+
+    const insertAfter = function (element, after) {
+      after.parentNode.insertBefore(element, after.nextSibling);
+    }
+
+    const root = this.html_pointer_element_anchor;
+
+    let latestReinserted = undefined
+
+    this.childs.forEach((child, idx)=>{
+      if (idx === 0){
+        insertAfter(child.html_pointer_element, root)
+      }
+      else {
+        insertAfter(child.html_pointer_element, latestReinserted)
+      }
+      latestReinserted = child.html_pointer_element
+    })
+  }
+
   // step 2: build skeleton (only the anchors & exec context for 'of' evaluation!)
   buildSkeleton(){
 
@@ -4521,83 +4713,197 @@ class IterableViewComponent{
     this.$this = ComponentProxyBase({parent: this.$parent, le: this.$le.proxy, scope: this.$scope, ctx: this.parent.$ctx.proxy, meta: this.parent.$meta }) // qui $.u nonha senso di esister, visto che viene valutato usato solo per valutare la "of", quindi per cercare le deps. utils non serve!
   }
 
-  detectChangesAndRebuildChilds(currentItems, oldItems){
-    // keep track of wich items in the list have changed
-    const changedItems = {}
-    const currentChilds = this.childs
-
+  detectChangesAndRebuildChilds(newItems, oldItems){
     const childComparer = this.meta_def.idComparer !== undefined && isFunction(this.meta_def.idComparer) ? this.meta_def.idComparer : (_new, _old)=> _new !== _old;
+    const childSubpropComparer = this.meta_def.subComparer !== undefined && isFunction(this.meta_def.subComparer) ? this.meta_def.subComparer : undefined
+    const full_lookahead_check = this.meta_def.full_optimized
 
-    // Compare each item in the current state with the corresponding item in the DOM
-    for (let i = 0; i < currentItems.length; i++) {
-      const item = currentItems[i];
+    // NEW ALGO  WITH 100% COMPARISON & low performance impact
+    // creo una copia shallow dell'array childs
+    // creo un nuovo array vuoto che rappresenta i nuovi childs "finali"
+    // creo un nuovo array vuoto che rappresenta i nuovi childs da creare
+    // itero i new items
+    // se trovo l'elemento tra i childs me lo porto nel nuovo array e lo rimuovo dalla shallow copy dei childs
+    // se l'items NON lo trovo tra i childs allora è uno nuovo, lo creo e lo metto tra i childs
+    // rimuovo e distruggo ciò che resta nella shallow copy dei childs
+    // sort del doom
+    // aggiorno i meta
+    if (full_lookahead_check){
+      let currentChilds = [...this.childs]
+      let newChilds = []
+      let toBuildAndInit = []
 
-      // check for new or changed
-      if (currentChilds[i] === undefined || childComparer(item, currentChilds[i].meta_config.value)) {
-        // If the item is new or has changed, add it to the list of changed items
-        changedItems[i] = item;
+      const itemInOldChilds = (itemToCheck, newIdx, currentChilds)=>{
+        for (let i = 0; i < currentChilds.length; i++) {
+          if ( !childComparer(itemToCheck, currentChilds[i].meta_config.value)){
+            return [true, i]
+          }
+        }
+        return [false, undefined]
       }
-    }
 
-    // Update the changed items in the DOM
-    const iterableComponentsToInit = []
+      newItems.forEach((newItem, index)=>{
+        const [inOldChilds, oldPosition] = itemInOldChilds(newItem, index, currentChilds) 
+        // has only changed position
+        if (inOldChilds){
+          _debug.log("sorted!!", newItem, oldItems, "-->", index)
+          newChilds.push(currentChilds.splice(oldPosition, 1)[0]) // move into new childs with the new position
+        }
+        // new item
+        else {
+              
+          _debug.log("new!!", newItem, index)
+
+          let newChild = new IterableComponent(
+            this.parent, 
+            this.real_iterable_definition, 
+            this.$le, 
+            this.$dbus, 
+            this, 
+            index, 
+            {
+              realPointedIterableProperty: this.real_pointed_iterable_property, 
+              iterablePropertyIdentifier: this.iterablePropertyIdentifier, 
+              value: newItems[index], 
+              define: this.meta_def.define,
+              define_helper: {
+                index: index,
+                first: index === 0,
+                last: index === newItems.length-1,
+                length: newItems.length,
+                iterable: newItems
+              }
+            },
+            this.meta_options,
+            false
+          )
+
+          // If the item is new, create a new element in the DOM and append it to the list
+          newChilds.push(newChild)
+          toBuildAndInit.push(newChild)
+
+        }
+      })
+
+      // destroy removed items
+      currentChilds.forEach(c=>{
+        _debug.log("destroied!!", c)
+        c.destroy()
+      })
+      
+      _debug.log("OLD", this.childs)
+
+      // set the newChilds as the new "childs" array
+      this.childs.splice(0, this.childs.length, ...newChilds)
+
+      // create the new elements
+      toBuildAndInit.forEach(newChild=>{
+        newChild.buildSkeleton()
+      })
+      toBuildAndInit.forEach(newChild=>{
+        newChild.create()
+      })
+
+      // sort DOM as the childs elements array
+      this.sortExistingChildsInDomAsChildsArrOrder()
+
+      _debug.log("NEW", this.childs)
+
+      // update all childs meta (array, index, islast, etc)
+      this.iterableProperty.value?.forEach((arrValue, idx, arr)=>{
+        this.childs[idx].updateDataRerencesAndMeta( idx, {
+          realPointedIterableProperty: this.real_pointed_iterable_property,
+          iterablePropertyIdentifier: this.iterablePropertyIdentifier,
+          value: arrValue,
+          define: this.meta_def.define,
+          define_helper: {
+            index: idx,
+            first: idx === 0,
+            last: idx === arr.length-1,
+            length: arr.length,
+            iterable: arr
+          }
+        }, childComparer, childSubpropComparer, true)
+      })
+    }
+    // OLD ALGO
+    else {
+
+      // keep track of wich items in the list have changed
+      const changedItems = {}
+      const currentChilds = this.childs
+
+      // Compare each item in the current state with the corresponding item in the DOM
+      for (let i = 0; i < newItems.length; i++) {
+        const item = newItems[i];
+
+        // check for new or changed
+        if (currentChilds[i] === undefined || childComparer(item, currentChilds[i].meta_config.value)) {
+          // If the item is new or has changed, add it to the list of changed items
+          changedItems[i] = item;
+        }
+      }
+
+      // Update the changed items in the DOM
+      const iterableComponentsToInit = []
+      
+      for (const idx in changedItems) {
+        const index = parseInt(idx)
+
+        let newChild = new IterableComponent(
+          this.parent, 
+          this.real_iterable_definition, 
+          this.$le, 
+          this.$dbus, 
+          this, 
+          index, 
+          {realPointedIterableProperty: this.real_pointed_iterable_property, iterablePropertyIdentifier: this.iterablePropertyIdentifier, value: newItems[index], define: this.meta_def.define, define_helper: {index: index, first: index === 0, last: index === newItems.length-1, length: newItems.length, iterable: newItems}}, 
+          this.meta_options,
+          false
+        )
+
+        if (currentChilds[index] === undefined) {
+          // If the item is new, create a new element in the DOM and append it to the list
+          currentChilds[index] = newChild
+          newChild.buildSkeleton()
+          iterableComponentsToInit.push(newChild)
+        } else {
+          // If the item has changed, recreate the element
+          currentChilds[index].destroy()
+
+          currentChilds[index] = newChild
+          newChild.buildSkeleton()
+          iterableComponentsToInit.push(newChild)
+        }
+      }
+
+
+      // Check for deleted items in the DOM
+      // _debug.log("new, old", newItems, oldItems)
+      if (newItems.length < oldItems.length) {
+        // If there are more items in the DOM than in the current state, remove the excess items from the DOM
+        for (let i = newItems.length; i < oldItems.length; i++) {
+          currentChilds[i].destroy()
+          currentChilds.splice(i,1)
+        }
+      }
+
+      iterableComponentsToInit.forEach(i=>i.create())
+
+      // _debug.log(this.childs)
+
+      // update all childs meta (array, index, islast, etc)
+      this.iterableProperty.value?.forEach((arrValue, idx, arr)=>{
+        this.childs[idx].updateDataRerencesAndMeta(idx, {realPointedIterableProperty: this.real_pointed_iterable_property, iterablePropertyIdentifier: this.iterablePropertyIdentifier, value: arrValue, define: this.meta_def.define, define_helper: {index: idx, first: idx === 0, last: idx === arr.length-1, length: arr.length, iterable: arr}}, childComparer, childSubpropComparer, true)
+      })
     
-    for (const idx in changedItems) {
-      const index = parseInt(idx)
-
-      let newChild = new IterableComponent(
-        this.parent, 
-        this.real_iterable_definition, 
-        this.$le, 
-        this.$dbus, 
-        this, 
-        index, 
-        {realPointedIterableProperty: this.real_pointed_iterable_property, iterablePropertyIdentifier: this.iterablePropertyIdentifier, value: currentItems[index], define: this.meta_def.define, define_helper: {index: index, first: index === 0, last: index === currentItems.length-1, length: currentItems.length, iterable: currentItems}}, 
-        this.meta_options,
-        false
-      )
-
-      if (currentChilds[index] === undefined) {
-        // If the item is new, create a new element in the DOM and append it to the list
-        currentChilds[index] = newChild
-        newChild.buildSkeleton()
-        iterableComponentsToInit.push(newChild)
-      } else {
-        // If the item has changed, recreate the element
-        currentChilds[index].destroy()
-
-        currentChilds[index] = newChild
-        newChild.buildSkeleton()
-        iterableComponentsToInit.push(newChild)
-      }
     }
-
-
-    // Check for deleted items in the DOM
-    // _debug.log("new, old", currentItems, oldItems)
-    if (currentItems.length < oldItems.length) {
-      // If there are more items in the DOM than in the current state, remove the excess items from the DOM
-      for (let i = currentItems.length; i < oldItems.length; i++) {
-        currentChilds[i].destroy()
-        currentChilds.splice(i,1)
-      }
-    }
-
-    iterableComponentsToInit.forEach(i=>i.create())
-
-    // _debug.log(this.childs)
-
-    // update all childs meta (array, index, islast, etc)
-    this.iterableProperty.value?.forEach((arrValue, idx, arr)=>{
-      this.childs[idx].updateDataRerencesAndMeta(idx, {realPointedIterableProperty: this.real_pointed_iterable_property, iterablePropertyIdentifier: this.iterablePropertyIdentifier, value: arrValue, define: this.meta_def.define, define_helper: {index: idx, first: idx === 0, last: idx === arr.length-1, length: arr.length, iterable: arr}}, true)
-    })
-
   }
 
   //@override, per utilizzare nella Factory this.parent come parent e non this. inoltre qui in realtà parlo dei children come entità replicate, e non i child del template..devo passare una versione del template senza meta alla component factory! altrimenti errore..
   // in realtà dovrebbe essere un "build child skeleton and create child"
   buildChildsSkeleton(rebuild_for_changes=false, latestResolvedValue=undefined){
-    if (rebuild_for_changes && this.meta_def.optimized){
+    if (rebuild_for_changes && (this.meta_def.optimized || this.meta_def.full_optimized)){
       this.detectChangesAndRebuildChilds(this.iterableProperty.value, latestResolvedValue)
     }
     else {
@@ -4763,7 +5069,78 @@ const Switch = (...conditions)=>{
   return conditions
 }
 
+// // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // 
 
+// export
+/** Lazy Component - To force component resolution & creation at run-time, using $ context and variables */
+const LazyComponentCreation = (compFunction, params, extradef={}, rerenderingDeps=undefined, detectRerenderingRequired=(a,b)=>a!==b) => {
+
+  if (rerenderingDeps === undefined){
+
+    return { LazyPointer: {
+      
+      ...extradef,
+
+      renderizedComponent: undefined,
+
+      afterInit: async $ => {
+        let resolvedComp = compFunction
+
+        if (typeof compFunction === 'function'){
+          resolvedComp = await compFunction($, params)
+        } 
+
+        // _debug.log($.this.el, resolvedComp)
+
+        $.renderizedComponent = $.u.newConnectedSubRenderer($.this.el, resolvedComp, false, "after")
+      }
+    }}
+
+  }
+  else {
+
+    return { LazyPointer: {
+      ...extradef,
+
+      renderizedComponent: undefined,
+      inRendering: false,
+      
+      rerenderingDeps: rerenderingDeps,
+
+      on_this_rerenderingDepsChanged: ($, n, o) => {
+        if (detectRerenderingRequired(n,o)) {
+          if ($.renderizedComponent !== undefined && !$.inRendering){
+            $.renderizedComponent.destroy();
+            $.renderize()
+          }
+        }
+      },
+
+      // todo: move destroy inside this function (where a rerendering detected), then pass the latest renderized component ( as pure el def {div:{...}} ) to the function, and let that function return array [component, rerenderingRequired], to let function handle rerendering request. then if true destroy and renderize
+      //       in this mode we can reimplement eg. react diffing mode, and reduce rerendering. 
+      def_renderize: async $=>{
+        _debug.log("renderizing..",)
+        $.inRendering = true
+
+        let resolvedComp = compFunction
+
+        if (typeof compFunction === 'function'){
+          resolvedComp = await compFunction($, params)
+        } 
+
+        // _debug.log($.this.el, resolvedComp)
+
+        $.renderizedComponent = $.u.newConnectedSubRenderer($.this.el, resolvedComp, false, "after")
+        _debug.log("renderized", $.renderizedComponent)
+        $.inRendering = false
+      },
+
+      afterInit: async $ => {
+        await $.renderize()
+      }
+    }}
+  }
+}
 
 // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // 
 // DYNAMIC JS/CSS LOADING -- TESTING --
@@ -5084,6 +5461,15 @@ const resolveAndConvertHtmlElement = (element, tagReplacers, extraDefs )=>{
         else if (name === "optimized"){
           meta.optimized = attr.value==='true'
         }
+        else if (name === "full_optimized" || name === "full-optimized"){
+          meta.full_optimized = attr.value==='true'
+        }
+        else if (name === "comparer"){
+          meta.comparer = smartFunc(attr.value, true)
+        }
+        else if (name === "idcomparer" || name === "id-comparer"){
+          meta.idComparer = smartFunc(attr.value, true)
+        }
         else if (name.startsWith("define-")){
           name = dashCaseToCamelCase(name.substring(7))
           if (meta.define === undefined){
@@ -5365,9 +5751,12 @@ const remoteHtmlComponent = async (fileName, {component="", params={}, state={},
   }
 }
 
+// export
+const fromHtmlComponentDef = async (txt, {component="", params={}, state={}}={}) => await resolveHtmlComponentDef(txt, {component, params, state})
+
 // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // 
 // Exports
 
-const Cle = { pass, none, smart, f: smartFunc, fArgs: smartFuncWithCustomArgs, asFunc, Use, Extended, Placeholder, Bind, Alias, SmartAlias, PropertyBinding, DefineSubprops, ExternalProp, useExternal, BindToProp: BindToPropInConstructor, Switch, Case, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock, cle, str, str_, input, output, ExtendSCSS, clsIf, html: fromHtml, remoteHtmlComponent }
+const Cle = { pass, none, smart, f: smartFunc, fArgs: smartFuncWithCustomArgs, asFunc, Use, Extended, Placeholder, Bind, Alias, SmartAlias, PropertyBinding, DefineSubprops, ExternalProp, useExternal, BindToProp: BindToPropInConstructor, Switch, Case, LazyComponent: LazyComponentCreation, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock, cle, str, str_, input, output, ExtendSCSS, clsIf, html: fromHtml, remoteHtmlComponent, fromHtmlComponentDef }
 
-export { pass, none, smart, smartFunc as f, smartFuncWithCustomArgs as fArgs, asFunc, Use, Extended, Placeholder, Bind, Alias, SmartAlias, PropertyBinding, DefineSubprops, ExternalProp, useExternal, BindToPropInConstructor as BindToProp, Switch, Case, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock, cle, str, str_, input, output, ExtendSCSS, clsIf, fromHtml as html, remoteHtmlComponent }
+export { pass, none, smart, smartFunc as f, smartFuncWithCustomArgs as fArgs, asFunc, Use, Extended, Placeholder, Bind, Alias, SmartAlias, PropertyBinding, DefineSubprops, ExternalProp, useExternal, BindToPropInConstructor as BindToProp, Switch, Case, LazyComponentCreation as LazyComponent, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock, cle, str, str_, input, output, ExtendSCSS, clsIf, fromHtml as html, remoteHtmlComponent, fromHtmlComponentDef }

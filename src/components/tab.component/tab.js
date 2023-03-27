@@ -31,7 +31,8 @@ export const Tabs = (extradef={}, ...tabs) => {
       let_isActive: $=>$.scope.activeTabIndex === $.this.tabIndex,
       let_restyle: t.contentRestyle || (()=>($=>{})),
 
-      onInit: $ => { $.this.tabIndex = $.scope.registerTabContent($.this) },
+      onInit: $ => { $.this.tabIndex = $.scope.registerTabContent($.this); $.scope.correctIndexesOfLeForElements() },
+      ...(t.meta ? { onUpdate: $=> $.scope.correctIndexesOfLeForElements()} : {}),
       ...(t.meta ? { onDestroy: $=> $.scope.removeTabHeaderAndRecomputeIndexes($.this.tabIndex)} : {}),
 
       '': t.content,
@@ -42,7 +43,9 @@ export const Tabs = (extradef={}, ...tabs) => {
         ),
       }), 
       a_class: $=> "tab-content" + ( $.this.isActive ? " tab-content-active" : ''), 
-      a_tabIndex: $ => $.this.tabIndex
+      a_tabIndex: $ => $.this.tabIndex,
+
+      ...(t.extraDef ? t.extraDef : {}),
   }}))
 
   return { div: {
@@ -55,6 +58,7 @@ export const Tabs = (extradef={}, ...tabs) => {
       tabHeaderComponents: [],
       tabContentComponents: [],
       activeTabIndex: 0,
+      tabsNum: $ => $.this.tabContentComponents.length,
       _recomputeIndexTimeout: undefined
     },
 
@@ -80,7 +84,7 @@ export const Tabs = (extradef={}, ...tabs) => {
 
           let headersEl = [...$.this.el.querySelectorAll(".tab-header-wrapper")[0].children]
           let contentsEl = [...$.this.el.querySelectorAll(".tab-content-wrapper")[0].children]
-          console.log("headersel", headersEl, $.this.tabHeaderComponents.map(el=>[el, headersEl.indexOf(el.el)]))
+          // console.log("headersel", headersEl, $.this.tabHeaderComponents.map(el=>[el, headersEl.indexOf(el.el)]))
           $.this.tabHeaderComponents = $.this.tabHeaderComponents.sort((a,b)=>headersEl.indexOf(a.el)-headersEl.indexOf(b.el))
           $.this.tabContentComponents = $.this.tabContentComponents.sort((a,b)=>contentsEl.indexOf(a.el)-contentsEl.indexOf(b.el))
   

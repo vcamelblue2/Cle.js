@@ -9,10 +9,12 @@ Clean.js is a declarative Javascript Framework, with pure POJO in mind (for ui, 
   - Python (function declaration must have "self" as first parameter, natural langauge syntax like)
   - and many more
 
- For his POJO nature one of it's major improve w.r.t other frameworks is that components are still editable and customizable, also if taken from NPM. This lead UI library developers to create and handle less code (in other frameworks everything a component can do should be "prepared" from developers).
+ For his POJO nature one of it's major improve w.r.t other frameworks is that components are just object, still editable, customizable and extensible, also if taken from NPM (in other frameworks everything a component can do should be "prepared" from developers). This lead for eg. UI library developers to create and handle less code, because components are not sealed.
+
+ Clean.js it's also a "meta-language" first. In other words something like JSON: a syntax readable both by Humans & Computers. This means that it's easy to build other syntax/frameworks with CLE. In this framework you will find differents styles & technique, each with pro and cons, but ALL styles can be used together and mixed as you prefer.
 
 ## Quick Start
-[![Try in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/edit/web-platform-zpqsmf?file=main.js)
+[![Try in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/edit/web-platform-xezbjg?file=main.js)
 
 ```javascript
 import { RenderApp, cle, f, Bind, Use, pass } from '/lib/caged-le.js'
@@ -323,7 +325,7 @@ Abbiamo anche definito l'hook `onInit` che verrà chiamato all'inizializzazione 
 - '`ref`' scope selector, wich is a container of the element by id (local of the so called 'component', where the 'name' is registered in the childsRef, and a 'name' is assigned)
 - '`dbus`' scope selector, where you can find the global dbus channels. useful to connetc different application part.
 - '`u`' scope selector, that contains some metaprogramming utils, like signal creation and subscribe, dynamic child retrive, creation and destruction
-- '`oos`' out of scope selector, a free (untracked and non bindable) per-object space where can be manually defined (imperative code) anything, for example for data where binding is not required. 
+- '`oos`' out of scope selector, a free (untracked and non bindable) per-object space where can be manually defined (imperative code) anything, for example for data where binding is not required. This space will be "shared" with all the components instance, also in "Use". To have a per-instance space declare it as a function that return an object (with $ arg) and will be generated at run-time before init.
 
 - `#Final Tip`: is always possible to use directly `$.xxx` wich will be resolved as `$.scope.xxx` ( scope selector '`scope`' is the default used in resolution).
 
@@ -930,14 +932,26 @@ const myButton = { button: {
     }
 
     // shortcuts inline:
-    // "handle_" + "eventName"
-    // "h_" + "eventName"
-    // "ev_" + "eventName"
+    // "handle_" + "oneventname"
+    // "h_" + "oneventname"
+    // "ev_" + "oneventname"
     //    handle_onclick: ($, event) => ...,
     //    h_onclick: ($, event) => ...,
     //    ev_onclick: ($, event) => ...,
 
+    // ma anche:
+    // "oneventname" + "_event"
+    //    onclick_event: ($, event) => ...,
+
+
  }}
+```
+
+Unico caso speciale per "onclick" che può essere definito senza shortcut come per gli attr "style" e "class".
+```javascript
+{
+    onclick: ($, evt) => ...
+}
 ```
 
 Esistono però casi in cui bisogna personalizzare in modo più importante gli eventi. in questo caso si può utilizzare la keyword "`when`" e la sua shortcut "`w_`"
@@ -1220,17 +1234,23 @@ Come già detto però modificare un singolo elemento di una lista non porterebbe
 E' però possibile abilitare nel meta l'opzione `metaPushbackAutomark: true`. Questo farà si che il changes venga identificato correttamente per le assegnazioni dirette: `$.item` = 123
 
 ### Performance Tips
-Al fine di ottenre un boost delle performance nel repaint è consigliato l'utilizzo del flag `optimized: true` nel meta. 
+Al fine di ottenre un boost delle performance nel repaint è consigliato l'utilizzo del flag `optimized: true` nel meta. Il repaint in questo caso sarà solo dal primo elemento che cambia in poi.
 
 Questo farà si che sia possibile definire anche un nuovo `comparer` per la detect dei changes dell'intero array e/o dei singoli elementi con `idComparer`
 
+Per ridurre al minimo il repaint è consigliato abilitare la modalità `full_optimized: true` che migliora la optimize e il comparer con un algoritmo più lento ma che garantisce di non effettuare repaint se non per gli elementi realmente modificati. In questa modalità l'idComparer con id stabili è altamente consigliato.
+
+
 ```javascript
 { meta: {
-    // Array Comparer, per identificare i changes dell'array
-    comparer: (_new, _old) => _new !== _old
+    optimized: true, // enable optimization
+    full_optimized: true, // full optimizatione (slower). disable ALL repaint not required by near-full comparison
 
-    // Comparer for Elements of the Array
-    idComparer: (_new, _old) => _new !== _old
+    // Array Comparer, per identificare i changes dell'array, to change the "edit ref by new val" pattern
+    comparer: (newArr, oldArr) => newArr !== oldArr
+
+    // Comparer of each elements of the Array, to boost performance
+    idComparer: (newEl, oldEl) => newEl !== oldEl
 }}
 ```
 
@@ -1862,6 +1882,10 @@ $ => {
         // edit reference prop inline without manually mark as changed!
         // use: $.this.editRefVal.myProp(p=>p.value=12)
         editRefVal // Proxy with getter: .name(v => action function)
+        
+        // edit array reference prop inline without manually mark as changed! this will change array ref (eg [...array])
+        // use: $.this.editArrRefVal.myProp(p=>p.value=12)
+        editArrRefVal // Proxy with getter: .name(v => action function)
     },
 
     $.u = {
@@ -1876,10 +1900,13 @@ $ => {
       // block and await for property condition, then get value.. (instant get if true)
       // to be used to await for a prop! tester can be: function | array of values IN OR
       // onInit: async $=>{
-      //   let ready = await $.u.propCondition($=>$.le.db, "readyProp", v=>v===true)
+      //   let ready = await $.u.propCondition($=>$.le.db, "readyProp", v=>v===true, 60*1000) [wait max 60 sec]
       //   $.initData()
       // }
-      propCondition: (scopeGetter, prop, tester=v=>(v !== null && v !== undefined), retry=5)=>{ return Promise },
+      propCondition: (scopeGetter, prop, tester=v=>(v !== null && v !== undefined), ms_timeout=undefined, retry=5)=>{ return Promise },
+      
+      // block and await for signal fired (eventually with condition filter), then get value
+      signalFired: (scopeGetter, signal, condition=v=>true, ms_timeout=undefined, retry=5) => { return Promise }
 
       // utils per andare ad ottenre l'elemento CLE da elementi HTML/DOM .. per fare cosy tricky :(
       getCleElementByDom: (dom_el)=>{ return cleElement | throw Error("Null-Query-Sel") },

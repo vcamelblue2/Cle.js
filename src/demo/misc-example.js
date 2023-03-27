@@ -1,4 +1,4 @@
-import { Alias, Bind, BindToProp, Case, cle, DefineSubprops, Extended, ExtendSCSS, ExternalProp, f, fArgs,  asFunc, LE_BackendApiMock, LE_LoadCss, LE_LoadScript, pass, Placeholder, RenderApp, smart, SmartAlias, str, Switch, toInlineStyle, Use, useExternal, html } from "../lib/caged-le.js"
+import { Alias, Bind, BindToProp, Case, cle, DefineSubprops, Extended, ExtendSCSS, ExternalProp, f, fArgs,  asFunc, LE_BackendApiMock, LE_LoadCss, LE_LoadScript, pass, Placeholder, RenderApp, smart, SmartAlias, str, Switch, toInlineStyle, Use, useExternal, html, LazyComponent, remoteHtmlComponent, fromHtmlComponentDef } from "../lib/caged-le.js"
 import { NavSidebarLayout } from "../layouts/layouts.js"
 
 /*
@@ -334,6 +334,7 @@ const TodoList = { // automatic root div!
                      ,comparer: (_new, _old)=>_new !== _old
                      ,idComparer: (_new, _old)=>_new !== _old // comparer for leFor Elements
                      ,optimized: true // enable leFor optimization
+                     ,full_optimized: false, // enable FULL comparison for no repaint
                      ,newScope: bool, noThisInScope: bool, noMetaInScope: bool, hasViewChilds: bool, metaPushbackAutomark: bool}], (le ultime sono le "scope options") 
       
       "=>": [
@@ -6409,10 +6410,9 @@ const appDemoCheckedDeps = async ()=>{
 
 const appDemoOptimizedLeFor = async ()=>{
 
-  // SUCCESS
-  RenderApp(document.body, cle.root({
+  const APP = (elements=10, fully_optimized=false)=>RenderApp(document.body, cle.root({
 
-    let_values: [...new Array(10).keys()],// [1,2,3,4,5,6,7,8,9,10],
+    let_values: [...new Array(elements).keys()],// [1,2,3,4,5,6,7,8,9,10],
 
     def_swap: ($, idx)=>{
       console.log("APP: new, old", 
@@ -6447,35 +6447,58 @@ const appDemoOptimizedLeFor = async ()=>{
       $.values = others.reverse()
     },
 
-    onInit: $=>{
-      setTimeout(() => {
-        $.swap(1)
-      }, 5000);
+    def_changeSecond: $=>{
+      $.editArrRefVal.values(v=>{ v[1] = 999 })
     },
+
+    // onInit: $=>{
+    //   setTimeout(() => {
+    //     $.swap(1)
+    //   }, 5000);
+    // },
   
   },
 
-    cle.h3("CLE Optimized LeFor"),
-
-    // "optimize" is the key to enable the enhancement. "idComparer" can be used to compare elments changes. standard "comparer" can be used to modify the array change detection
-    cle.div({meta: { forEach:"val", of: $=>$.values, define: {index: "idx"}, optimized: true},
-      h_onclick: $=> $.swap($.idx)
-    },
-      cle.div({}, 
-        cle.span({}, "The Number Is: "), cle.span({}, $=>$.val)
-      ) 
-    ),
+    cle.h3(fully_optimized ? "CLE FULLY Optimized LeFor" : "CLE Optimized LeFor"),
 
     cle.button({h_onclick: $=>$.add()}, "Add"),
     cle.button({h_onclick: $=>$.addOnTop()}, "Add On Top"),
     cle.button({h_onclick: $=>$.removeFirst()}, "Remove First"),
     cle.button({h_onclick: $=>$.removeMiddle()}, "Remove Middle"),
     cle.button({h_onclick: $=>$.removeLast()}, "Remove Last"),
+    cle.button({h_onclick: $=>$.changeSecond()}, "Change Second"),
 
+
+    // "optimize" is the key to enable the enhancement. 
+    // "idComparer" can be used to compare elments changes. 
+    // standard "comparer" can be used to modify the array change detection. 
+    // full_optimized: true to enable full optimization (no repaint! what has not changed)
+    cle.div({meta: { forEach:"val", of: $=>$.values, define: {index: "idx"}, optimized: true, full_optimized: fully_optimized},
+      h_onclick: $=> $.swap($.idx),
+
+      createdAt: undefined,
+      onInit: $ => { $.createdAt = new Date().toString()},
+
+      onUpdate: $ => {
+        console.log("UPDATE REQ", $)
+      },
+
+      on_idxChanged: ($, n, o) => console.log("idx changed!", $.val, $.idx, n,o),
+      on_valChanged: ($, n, o) => console.log("val changed!", $.val, $.idx, n,o)
+    },
+      cle.div({}, 
+        cle.span({}, "The Number Is: "), cle.span({}, $=>$.val), cle.span({}, " ------- created on: " , f`@createdAt`), 
+      ) 
+    ),
 
 
   ))
 
+  APP(4, false)
+
+  RenderApp(document.body, cle.hr())
+
+  APP(4, true)
 }
 
 
@@ -7304,80 +7327,6 @@ const appDemoFromHtmlTemplateViaExternalFile = async ()=>{
 
 const appDemoLazyComponent = async ()=>{
 
-  const Lazy = (compFunction, params, extradef={}, rerenderingDeps=undefined, detectRerenderingRequired=(a,b)=>a!==b) => {
-
-    if (rerenderingDeps === undefined){
-
-      return { LazyPointer: {
-        
-        ...extradef,
-
-        renderizedComponent: undefined,
-
-        afterInit: async $ => {
-          
-          let resolvedComp = compFunction
-  
-          if (typeof compFunction === 'function'){
-            resolvedComp = await compFunction($, params)
-          } 
-
-          // console.log($.this.el, resolvedComp)
-
-          $.renderizedComponent = $.u.newConnectedSubRenderer($.this.el, resolvedComp, false, "after")
-        
-        }
-      }}
-
-    }
-    else {
-
-      return { LazyPointer: {
-        
-        ...extradef,
-
-        renderizedComponent: undefined,
-        inRendering: false,
-        
-        rerenderingDeps: rerenderingDeps,
-
-        on_this_rerenderingDepsChanged: ($, n, o) => {
-          if (detectRerenderingRequired(n,o)) {
-            if ($.renderizedComponent !== undefined && !$.inRendering){
-              $.renderizedComponent.destroy();
-              $.renderize()
-            }
-          }
-        },
-
-        // todo: move destroy inside this function (where a rerendering detected), then pass the latest renderized component ( as pure el def {div:{...}} ) to the function, and let that function return array [component, rerenderingRequired], to let function handle rerendering request. then if true destroy and renderize
-        //       in this mode we can reimplement eg. react diffing mode, and reduce rerendering. 
-        def_renderize: async $=>{
-          console.log("renderizing..",)
-          $.inRendering = true
-
-          let resolvedComp = compFunction
-  
-          if (typeof compFunction === 'function'){
-            resolvedComp = await compFunction($, params)
-          } 
-
-          // console.log($.this.el, resolvedComp)
-
-          $.renderizedComponent = $.u.newConnectedSubRenderer($.this.el, resolvedComp, false, "after")
-          console.log("renderized", $.renderizedComponent)
-          $.inRendering = false
-        },
-
-        afterInit: async $ => {
-          await $.renderize()
-        }
-      }}
-
-    }
-
-  }
-
   const InputOrTextArea = async ($, {componentNum=0, text=()=>""}={}) => {
     
     await wait(2000);
@@ -7419,7 +7368,7 @@ const appDemoLazyComponent = async ()=>{
     cle.div(f`'Counter: ' + @counter`),
     cle.button({handle_onclick: f`{ @counter += 1 }`}, "Inc Counter"),
 
-    Lazy(LazyItem, {counterValue: 5}, {}, $=>$.counter, (n,o)=>n < 5 || n > 10)
+    LazyComponent(LazyItem, {counterValue: 5}, {}, $=>$.counter, (n,o)=>n < 5 || n > 10)
   )
 
 
@@ -7435,9 +7384,9 @@ const appDemoLazyComponent = async ()=>{
 
     { h2: "Simulate loading in 2 sec.."},
 
-    Lazy(InputOrTextArea, {componentNum: 1, text: $ => $.text}),
+    LazyComponent(InputOrTextArea, {componentNum: 1, text: $ => $.text}),
 
-    Lazy(InputOrTextArea, {componentNum: 2, text: $ => $.text}),
+    LazyComponent(InputOrTextArea, {componentNum: 2, text: $ => $.text}),
 
     LazyItemWrapper
 
@@ -7445,6 +7394,138 @@ const appDemoLazyComponent = async ()=>{
 
 }
 
+
+const appDemoWaitSignalAndPropCondition = async ()=>{
+
+  const Timer = { Model: {
+    interval: 1000,
+    running: false,
+    repeat: true,
+    trigerOnStart: false,
+
+    last_execution: undefined,
+    num_execution: 0,
+
+    signals: {
+      trigger: "stream => void",
+    },
+
+    oos: $ => ({ private: undefined }),
+
+    def:{
+
+      _private: { setupPrivateModel($, pr){ $.oos.private = pr } },
+      
+      start($){
+        $.oos.private.start()
+      },
+
+      stop($){
+        $.oos.private.start()
+      }
+    },
+
+    '': cle.Model({ // name: "private",
+
+      setIntervalOrTimeout: $ => $.repeat ? (...args)=>setInterval(...args) : (...args)=>setTimeout(...args),
+      clearIntervalOrTimeout: $ => $.repeat ? (...args)=>clearInterval(...args) : (...args)=>clearTimeout(...args),
+      
+      onInit: $ => { 
+        console.log("AAAAAAA", $.setIntervalOrTimeout, $.clearIntervalOrTimeout)
+        $._private.setupPrivateModel($.this);
+        
+        $.running && $.start();
+      },
+
+      on_runningChanged: ($, running, oldRunning) => {
+        if (running !== oldRunning){
+          running ? $.start() : $.stop()
+        }
+      },
+      on_repeatChanged: ($, repeat) => { $.stop(); $.start(); },
+
+      oos: $=>({ // declare as a function to have a personal obj per-instance, otherwhise it will be shared between all instances!
+        interval_handler: undefined
+      }),
+
+      def: {
+
+        triggerSignal($){
+          $.last_execution = new Date()
+          $.num_execution = $.num_execution +1
+          $.trigger.emitLazy(0)
+          
+          if (!$.repeat) { $.stop() }
+        },
+
+        start($){
+          $.num_execution = 0
+
+          $.clearIntervalOrTimeout($.oos.interval_handler)
+
+          $.trigerOnStart && $.triggerSignal();
+
+          $.oos.interval_handler = $.setIntervalOrTimeout($.triggerSignal, $.interval);
+        },
+
+        stop($){
+          $.clearIntervalOrTimeout($.oos.interval_handler)
+          $.oos.interval_handler = undefined
+        }
+      }
+
+    }),
+
+  }}
+
+  RenderApp(document.body, cle.root({
+    
+  },
+
+    Use(Timer, {ctx_ref_id: "secTimer", interval: 1000, running: true, trigerOnStart: true, on_trigger: $ => {
+      console.log("1sec Trigger!")
+    }}),
+
+    cle.h2({
+      date: "-",
+      on:{ ctx:{ secTimer:{ trigger: $ => { $.date = new Date().toString() }}}},
+    }, 'Date: ', f`@date`),
+    cle.h4("Synced once a second. (last execution: ", f`$.ctx.secTimer.last_execution`, ")"),
+
+
+    cle.hr({}),
+
+
+    Use(Timer, {ctx_ref_id: "fiveSecTimer", interval: 5000, running: true, trigerOnStart: true, on_trigger: $ => {
+      console.log("5sec Trigger!")
+    }}),
+
+    cle.h2({
+      date: "-",
+      on:{ ctx:{ fiveSecTimer:{ trigger: $ => { $.date = new Date().toString() }}}},
+    }, 'Date: ', f`@date`),
+    cle.h4("Synced once every 5 seconds. (last execution: ", f`$.ctx.fiveSecTimer.last_execution`, ")"),
+
+    cle.button({
+      color: "black",
+      inWaiting: false,
+
+      style: f`({ color: @color })`,
+
+      // OR onclick_event
+      onclick: async $ => {
+        $.inWaiting = true
+        console.log("waiting next 5sec clock to change color..")
+        await $.u.signalFired($=>$.ctx.fiveSecTimer, "trigger")
+        console.log("changinc color now!")
+        $.color = $.color === "black" ? "red" : "black"
+        $.inWaiting = false
+      }
+    }, "hi, if you click me i will change the color once the timer has been triggered. ", cle.span({meta: {if: f`@inWaiting`}}, "In Waiting.."))
+
+  ))
+
+}
 
 // app0()
 // test2way()
