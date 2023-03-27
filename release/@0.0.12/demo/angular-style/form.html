@@ -1,0 +1,20 @@
+<h2>Radio Buttons</h2>
+
+<p>Choose your favorite Web language:</p>
+
+<form 
+  (onchange)="{ $.dbus.radioSelected.emit(evt) }" 
+  hook-onInit="{ console.log('Form Init!', $); $.u.getCleElementsByDom('['+$.t_uid+'] input')[2].el.checked = true }"
+>
+  <label>
+    <input type="radio" name="fav_language" value="HTML"><i>HTML</i>
+  </label>
+  <br>
+  <label>
+    <input type="radio" name="fav_language" value="CSS"><i>CSS</i>
+  </label>
+  <br>
+  <label>
+    <input type="radio" name="fav_language" value="JavaScript"><i>JavaScript</i>
+  </label>
+</form> 

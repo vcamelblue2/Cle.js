@@ -1,0 +1,49 @@
+
+Here we are not doing any imperative code before definition, so we can avoid "return "
+Note: definition only (without options) does not require to explicit use array! also "return" is implicit!
+p.s. you can use this extra space for note or docs
+
+Remember: we are still inside a function block with signature 
+
+  (Cle [cle module], params: {...}, state: {...}, style: String) => { 
+    ... 
+  }
+
+<script>({
+  
+  let: {
+    array: [1,2,3],
+    color: "gray"
+  },
+
+  onInit: $ => console.log("ARRAY", $.array),
+  
+  // setup defined css style and replace "variables" using csz mode (as global module)
+  // those are define "replacing" string with value. Use any name you like (and doesnt conflict)
+  class: $ => css(style.setup({
+    __use_color_prop__: $.color,
+    __use_padding_prop__: '5px'
+  })),
+
+})</script>
+
+
+<view>
+  <h4 (onclick)="@color='yellow'">HI BY SVELTE-STYLE</h4>
+
+  <li meta-foreach="element of @array" (onclick)="@el.style.color='red'" style="cursor: pointer">
+    {{@element}}) - aaaaa
+    <!-- {{@element}}) - {{[...new Array(@element).keys()].map(x=>'a').join('')}} -->
+  </li>
+</view>
+
+
+Handle style with csz (css in js) for encapsulation, and var injection
+<style>
+  li {
+    font-weight: 600;
+    color: __use_color_prop__;
+    padding: __use_padding_prop__;
+    background: linear-gradient(180, black, transparent)
+  }
+</style>
