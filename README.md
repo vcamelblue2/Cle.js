@@ -1561,31 +1561,37 @@ L'idea alla base è quella di sfruttare lo scope o altre sofisticazioni come le 
 
 visita la demo demo/misc-example.js/ -> appDemoComponentFactory per altre info
 
+### Extra Childs Injection & beforeInit Hook
+
 
 # More About Evaluable: Bind, Alias, SmarAlias/PropertyBinding/CachedProp
+# Define Subprops
 
 # Html Element Reference
 
 # CLE Object
 
-# Childs Ref By Name
+# Childs Ref By Name & Ctx Ref Id
 
-# Advanced: FromHtmlTemplate
+# Advanced: fromHtml, remoteHtmlComponent & fromHtmlComponentDef
 
 # Advanced: Nested Detached Renderer
 # Advanced: Dynamic Lazy Renderer
+# Advanced: LazyPointer & Lazy Components
+# Advanced: SubRenderer
+
+# Advanced: React Mashup
 
 # Advanced: Imperative & Dynamic - DynamicSignal
 # Advanced: Imperative & Dynamic - ExternalProps
 # Advanced: Imperative & Dynamic - GetCleElByDomEl
-# Advanced: Imperative & Dynamic - getAsExternalProperty
+# Advanced: Imperative & Dynamic - getAsExternalProperty & getAsExternalSignal
+# Advanced: Imperative & Dynamic - Synchronization - await propCondition & signalFired
 
-# Advanced: SubRenderer
-# Advanced: React Mashup
-
+# Advanced: Properties Class
+# Advanced: Signals Class
 
 # Full Component Definition Reference
-
  ```javascript
  { div: {
 
@@ -1597,11 +1603,14 @@ visita la demo demo/misc-example.js/ -> appDemoComponentFactory per altre info
 
 
     // Life-Cycle Hooks
+    beforeInit: (unifiedDef, unifiedDefChilds) => editedUnifiedDef // handle and edit childs before init (at declare time, before self context creation)
     constructor: ($, {...args}) => { } // Constructor, called at component creations
     onInit: $ => { } // on Init, After constructor, but before childs creation
     afterChildsInit: $ => { } // After childs onInit
     afterInit: $ => { } // After 1ms of the afterChildsInit (auto-lazy)
     onDestroy: $ => { } // After Childs Destroy, Before Destoing this
+    
+    onUpdate: $ => { } // Only called in le-for components, called on data update
 
 
     // Component Data / Property definition
@@ -1732,6 +1741,8 @@ visita la demo demo/misc-example.js/ -> appDemoComponentFactory per altre info
     // handle_onclick: $=>...
     // h_onclick: $=>...
     // ev_onclick: $=>...
+    // onclick_event: $=>...
+    // onclick: $=>...
     
     // Configurable Html Event Handlers
     when: { // html event (in the form of addEventListener). More configurable!
@@ -1841,7 +1852,8 @@ visita la demo demo/misc-example.js/ -> appDemoComponentFactory per altre info
           inject: {
             placeholderName: cle-element 
           }
-        }, 
+        },
+        [...otherChildsToInject...] 
       ),
 
     ], // can also be a single compnent, avoiding the unecessary [].
@@ -1856,6 +1868,7 @@ visita la demo demo/misc-example.js/ -> appDemoComponentFactory per altre info
   // this way you can also declare myProp: ... without props/let etc.
 }
  ```
+
 # Full Scope Selectors Standard Content Reference
 ```javascript
 $ => {

@@ -480,7 +480,7 @@ const smart = (component, otherDefs={}) => {
 
 //const Use = (component, redefinition, initialization_args=$=>({p1:1, p2:"bla"}), passed_props= $=>({prop1: $.this.prop1...}) )=>{ 
 // export 
-const Use = (component, redefinitions=undefined, { strategy="merge", init=undefined, passed_props=undefined, inject=undefined}={})=>{ return new UseComponentDeclaration(component, redefinitions, { strategy:strategy, init:init, passed_props:passed_props, inject: inject } ) } // passed_props per puntare a una var autostored as passed_props e seguirne i changes, mentre init args per passare principalmente valori (magari anche props) ma che devi elaborare nel construct
+const Use = (component, redefinitions=undefined, { strategy="merge", init=undefined, passed_props=undefined, inject=undefined}={}, extraChilds=[])=>{ return new UseComponentDeclaration(component, redefinitions, { strategy:strategy, init:init, passed_props:passed_props, inject: inject }, extraChilds ) } // passed_props per puntare a una var autostored as passed_props e seguirne i changes, mentre init args per passare principalmente valori (magari anche props) ma che devi elaborare nel construct
 // todo: qui potrebbe starci una connect del signal con autopropagate, ovvero poter indicare che propago un certo segnale nel mio parent! subito dopo la redefinitions, in modo da avere una roba molto simile a quello che ha angular (Output) e chiudere il cerchio della mancanza di id..
 // di fatto creiamo un nuovo segnale e lo connettiamo in modo semplice..nel parent chiamo "definePropagatedSignal"
 // perdo solo un po di descrittività, in favore di un meccanismo comodo e facile..
@@ -488,7 +488,7 @@ const Use = (component, redefinitions=undefined, { strategy="merge", init=undefi
 // nella init il punto di vista del this E' SEMPRE IL MIO PARENT
 
 class UseComponentDeclaration{
-  constructor(component, redefinitions=undefined, { strategy="merge", init=undefined, passed_props=undefined, inject=undefined }={}){
+  constructor(component, redefinitions=undefined, { strategy="merge", init=undefined, passed_props=undefined, inject=undefined }={}, extraChilds=[]){
     this.component = component // Todo: e se voglio ridefinire un componente già Use??
     this.init = init
     this.passed_props = passed_props
@@ -497,6 +497,8 @@ class UseComponentDeclaration{
     this.strategy = strategy
 
     this.inject = inject
+
+    this.extraChilds = Array.isArray(extraChilds) ? extraChilds : [extraChilds]
 
     this.computedTemplate = this._resolveComponentRedefinition()
   }
@@ -645,12 +647,39 @@ class UseComponentDeclaration{
     const recursive_check_childs_injection = (resolved_component, lvl=0) =>{
       // _debug.log("Level: ", lvl, resolved_component)
 
-      if (typeof resolved_component === "function" || typeof resolved_component === "string" || (resolved_component instanceof UseComponentDeclaration) ){
+      if ((typeof resolved_component === "function") || (typeof resolved_component === "string") || (resolved_component instanceof UseComponentDeclaration) ){
         // _debug.log("Level: ", lvl, "not a component")
         return resolved_component
       }
       else {
         let ctype = getComponentType(resolved_component)
+        let oj_cdef = resolved_component[ctype]
+        
+        // handle smart definition, like: {h3: "..."} or {h3: ["...", ...]}
+        if ((typeof oj_cdef === "function") || (typeof oj_cdef === "string") || Array.isArray(oj_cdef)){ // shallow copy def
+          // _debug.log("Level: ", lvl, "not a component def")
+          
+          // resolve array childs, if any
+          if (Array.isArray(oj_cdef)){
+            oj_cdef = oj_cdef.map(child=>recursive_check_childs_injection(child, lvl+1))
+          }
+
+          // insert extra childs on first lvl, if any!
+          if (lvl === 0 && this.extraChilds.length > 0){
+            // _debug.log("EXPANDING EXTRA CHILDS: ", this.component, cdef, this.extraChilds)
+            if (Array.isArray(oj_cdef)){ // add to existing childs
+              return {[ctype]: [...oj_cdef, ...this.extraChilds]}
+            }
+            else { // add to a new key
+              return {[ctype]: [oj_cdef, ...this.extraChilds]}
+            }
+          }
+          else {
+            return {[ctype]: oj_cdef }
+          }
+        }
+
+        // handle standard components
         let cdef = Object.assign({}, resolved_component[ctype]) // shallow copy def
         let childs_def_key = get_childs_def_typology(cdef)
         
@@ -668,7 +697,19 @@ class UseComponentDeclaration{
             child => child instanceof PlaceholderDeclaration ? child.getCheckedComponent(injections[child.name]) : recursive_check_childs_injection(child, lvl+1)
           ).filter(c=>c!==undefined)
 
+        } 
+        
+        // insert extra childs on first lvl, if any!
+        if (lvl === 0 && this.extraChilds.length > 0){ // no childs defined, but we are in first lvl
+          if (childs_def_key !== null){ // add to existing childs
+            cdef[childs_def_key] = [...cdef[childs_def_key], ...this.extraChilds]
+          }
+          else { // add to a new key
+            cdef[childs_def_typology[0]] = [...this.extraChilds]
+          }
+          // _debug.log("EXPANDING EXTRA CHILDS: ", this.component, cdef, this.extraChilds)
         }
+
 
         return {[ctype]: cdef }
       }
@@ -687,7 +728,7 @@ class UseComponentDeclaration{
     }
 
     return new UseComponentDeclaration(
-      cloneDefinitionWithoutMeta(this.component), redefinitions_no_meta, { strategy:this.strategy, init:this.init, passed_props:this.passed_props, inject:this.inject }
+      cloneDefinitionWithoutMeta(this.component), redefinitions_no_meta, { strategy:this.strategy, init:this.init, passed_props:this.passed_props, inject:this.inject }, this.extraChilds
     )
   }
 
@@ -3748,6 +3789,11 @@ class Component {
       else { unifiedDef.on = { ref: dash_shortucts_keys.on_ref }}
     }
 
+    // handle subcomponent transformation
+    if (unifiedDef.beforeInit !== undefined) {
+      let res_unifiedDef = unifiedDef.beforeInit(unifiedDef, unifiedDef.childs) // passare una funzione in grado di guardare nei child e queryare quelli che hanno una certa proprietà, in modo da ricreare l'effetto "ngTemplate xxxNamexxx"
+      unifiedDef = res_unifiedDef !== undefined ? res_unifiedDef : unifiedDef
+    }
 
     return unifiedDef
 
@@ -5142,6 +5188,28 @@ const LazyComponentCreation = (compFunction, params, extradef={}, rerenderingDep
   }
 }
 
+
+// export
+/** Shadow Root Enabled Components */
+const ShadowRootComponentCreator = (component, extradef={}, useUse=true, useUseExtraDef=[], tag="div", open=false)=>{
+  return { [tag]: {
+    ...extradef,
+
+    renderizedComponent: undefined,
+    shadowRoot: undefined,
+
+    afterInit: async $ => {
+      $.shadowRoot = $.this.el.attachShadow({mode:  open ? 'open' : 'closed'});
+
+      $.renderizedComponent = $.u.newConnectedSubRenderer($.shadowRoot, useUse ? Use(component, ...useUseExtraDef) : component)
+    },
+    onDestroy: $ => {
+      $.renderizedComponent.destroy()
+    }
+  }}
+}
+
+
 // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // 
 // DYNAMIC JS/CSS LOADING -- TESTING --
 // TODO: TEST!!!! assolutamente temporaneo..importato da LE originale
@@ -5298,7 +5366,7 @@ class LE_BackendApiMock{ // base class for backend api mock -> purpose is to hav
 // export 
 /** Syntactic Sugar to define component using cle.div({ DEFINITION }, ...CHILDS), instead of normal object.*/
 const cle = new Proxy({}, {
-  get: (_target, prop, receiver)=>{ return (args_dict, ...childs)=>( args_dict===undefined && childs.length === 0 ? {[prop]: {}} : (typeof args_dict === "string" || typeof args_dict ==="function" ? {[prop]: (childs.length === 0 ? args_dict : [args_dict, ...childs])} : {[prop]:{...args_dict, ...(childs.length ? {'':childs} : {}) }}) ) },
+  get: (_target, prop, receiver)=>{ return (args_dict, ...childs)=>( args_dict===undefined && childs.length === 0 ? {[prop]: {}} : ((typeof args_dict) === "string" || (typeof args_dict) ==="function" ? {[prop]: (childs.length === 0 ? args_dict : [args_dict, ...childs])} : {[prop]:{...args_dict, ...(childs.length ? {'':childs} : {}) }}) ) },
   set: function(_target, prop, value) {}
 })
 
@@ -5361,6 +5429,7 @@ const htmlConverterHookRemap = {
   afterchildsinit: 'afterChildsInit',
   afterinit: 'afterInit',
   ondestroy: 'onDestroy',
+  onupdate: 'onUpdate',
   constructor: 'constructor',
 }
 const resolveAndConvertHtmlElement = (element, tagReplacers, extraDefs )=>{
@@ -5399,6 +5468,10 @@ const resolveAndConvertHtmlElement = (element, tagReplacers, extraDefs )=>{
   else {
     let tag = element.tagName.toLowerCase()
 
+    if (tag === "js-val"){
+      return smartFunc(Array.from(element.childNodes)[0].textContent, true)()
+    }
+
     const properties = {}
     const signals = {}
     const on_handlers = {}
@@ -5411,6 +5484,7 @@ const resolveAndConvertHtmlElement = (element, tagReplacers, extraDefs )=>{
     const hooks = {}
     const identifiers = {} // id, ctx_id, ctx_ref_id, name
     let raw_defs = {}
+    let use_options = {}
 
     let extra_def_id = undefined
 
@@ -5419,6 +5493,10 @@ const resolveAndConvertHtmlElement = (element, tagReplacers, extraDefs )=>{
       // extra/external def
       if (attr.name === "extra-defs"){
         extra_def_id = attr.value
+      }
+      else if (attr.name === "[use-options]"){
+        use_options = smartFunc(attr.value, true)()
+        _debug.log("USE OPTIONS: ", use_options)
       }
       else if (attr.name === "[raw-defs]"){
         raw_defs = smartFunc(attr.value, true)()
@@ -5573,14 +5651,15 @@ const resolveAndConvertHtmlElement = (element, tagReplacers, extraDefs )=>{
       ...(extra_def_id !== undefined && extra_def_id in extraDefs ? extraDefs[extra_def_id] : {})
     }
     
+    const children = Array.from(element.childNodes).flatMap(c=>resolveAndConvertHtmlElement(c, tagReplacers, extraDefs)).filter(c=>c !== undefined)
+
     if (tag.startsWith("use-") && tag.substring(4).toLowerCase() in tagReplacers){
-      return Use(tagReplacers[tag.substring(4).toLowerCase()], {...parsedDef})
+      return Use(tagReplacers[tag.substring(4).toLowerCase()], {...parsedDef}, {...use_options}, children)
     }
     else if (tag.startsWith("extended-") && tag.substring(9).toLowerCase() in tagReplacers){
-      return Extended(tagReplacers[tag.substring(9).toLowerCase()], {...parsedDef})
+      return Extended(tagReplacers[tag.substring(9).toLowerCase()], {...parsedDef}, {...use_options}, children)
     }
     else {
-      const children = Array.from(element.childNodes).flatMap(c=>resolveAndConvertHtmlElement(c, tagReplacers, extraDefs)).filter(c=>c !== undefined)
       return { [tag]: {...parsedDef, "=>": children}}
     }
   }
@@ -5653,7 +5732,7 @@ implicit return if omitted (lambda)
 const AsyncFunction = async function () {}.constructor;
 
 
-const resolveHtmlComponentDef = async (text, {component="", params={}, state={}}={})=>{
+const resolveHtmlComponentDef = async (text, {component="", params={}, state={}, DepsInj={}}={})=>{
   
   const viewRegexPattern = "\\s*<view"+(component !== "" ? " "+component : '')+">([\\s\\S]*?)<\\/view>";
   const styleRegexPattern = "\\s*<style"+(component !== "" ? " "+component : '')+">([\\s\\S]*?)<\\/style>";
@@ -5681,7 +5760,7 @@ const resolveHtmlComponentDef = async (text, {component="", params={}, state={}}
     if (!defContent.includes("return")){
       defContent = "return ( " + defContent + " )"
     }
-    const func = new AsyncFunction("Cle", 'params', 'state', 'style', defContent);
+    const func = new AsyncFunction("Cle", 'params', 'state', 'style', 'DepsInj', defContent);
     
     if (styleContent !== undefined){
       let oj_styleContent = styleContent
@@ -5694,7 +5773,7 @@ const resolveHtmlComponentDef = async (text, {component="", params={}, state={}}
       }})
     }
 
-    let defs = await func(Cle, params, state, styleContent);
+    let defs = await func(Cle, params, state, styleContent, DepsInj);
 
     if (defs !== undefined){
       if (Array.isArray(defs)){
@@ -5721,7 +5800,7 @@ const resolveHtmlComponentDef = async (text, {component="", params={}, state={}}
 const cachedRemoteHtmlComponents = new Map()
 
 // export
-const remoteHtmlComponent = async (fileName, {component="", params={}, state={}, autoExtension=true, cache=true}={}) => { 
+const remoteHtmlComponent = async (fileName, {component="", params={}, state={}, DepsInj={}, autoExtension=true, cache=true}={}) => { 
   if (autoExtension){
     fileName += fileName.endsWith(".html") ? '' : ".html"
   }
@@ -5744,7 +5823,7 @@ const remoteHtmlComponent = async (fileName, {component="", params={}, state={},
         cachedRemoteHtmlComponents.set(fileName, txt)
       }
     }
-    return resolveHtmlComponentDef(txt, {component, params, state})
+    return resolveHtmlComponentDef(txt, {component, params, state, DepsInj})
   }
   catch (e){
     throw new Error("REMOTE HTML REF ERROR: " + e)
@@ -5752,11 +5831,11 @@ const remoteHtmlComponent = async (fileName, {component="", params={}, state={},
 }
 
 // export
-const fromHtmlComponentDef = async (txt, {component="", params={}, state={}}={}) => await resolveHtmlComponentDef(txt, {component, params, state})
+const fromHtmlComponentDef = async (txt, {component="", params={}, state={}, DepsInj={}}={}) => await resolveHtmlComponentDef(txt, {component, params, state, DepsInj})
 
 // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // 
 // Exports
 
-const Cle = { pass, none, smart, f: smartFunc, fArgs: smartFuncWithCustomArgs, asFunc, Use, Extended, Placeholder, Bind, Alias, SmartAlias, PropertyBinding, DefineSubprops, ExternalProp, useExternal, BindToProp: BindToPropInConstructor, Switch, Case, LazyComponent: LazyComponentCreation, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock, cle, str, str_, input, output, ExtendSCSS, clsIf, html: fromHtml, remoteHtmlComponent, fromHtmlComponentDef }
+const Cle = { pass, none, smart, f: smartFunc, fArgs: smartFuncWithCustomArgs, asFunc, Use, Extended, Placeholder, Bind, Alias, SmartAlias, PropertyBinding, DefineSubprops, ExternalProp, useExternal, BindToProp: BindToPropInConstructor, Switch, Case, LazyComponent: LazyComponentCreation, UseShadow: ShadowRootComponentCreator, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock, cle, str, str_, input, output, ExtendSCSS, clsIf, html: fromHtml, remoteHtmlComponent, fromHtmlComponentDef }
 
-export { pass, none, smart, smartFunc as f, smartFuncWithCustomArgs as fArgs, asFunc, Use, Extended, Placeholder, Bind, Alias, SmartAlias, PropertyBinding, DefineSubprops, ExternalProp, useExternal, BindToPropInConstructor as BindToProp, Switch, Case, LazyComponentCreation as LazyComponent, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock, cle, str, str_, input, output, ExtendSCSS, clsIf, fromHtml as html, remoteHtmlComponent, fromHtmlComponentDef }
+export { pass, none, smart, smartFunc as f, smartFuncWithCustomArgs as fArgs, asFunc, Use, Extended, Placeholder, Bind, Alias, SmartAlias, PropertyBinding, DefineSubprops, ExternalProp, useExternal, BindToPropInConstructor as BindToProp, Switch, Case, LazyComponentCreation as LazyComponent, ShadowRootComponentCreator as UseShadow, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock, cle, str, str_, input, output, ExtendSCSS, clsIf, fromHtml as html, remoteHtmlComponent, fromHtmlComponentDef }

@@ -1,13 +1,13 @@
 Script is the component definition, where declare variables, function etc.
 Remember: we are inside a function block with signature 
 
-  (Cle [cle module], params: {...}, state: {...}, style: String) => { 
+  (Cle [cle module], params: {...}, state: {...}, style: String, DepsInj: {...}) => { 
     ... 
   }
 
 <script comp1> 
 console.log(
-  Cle, params, state, style
+  Cle, params, state, style, DepsInj
 )
 
 // we are in async context so can use await.
@@ -25,7 +25,7 @@ return [{ // definition
     }
   },
 
-  { deps: { listComponent, StandardComponent } } // options {deps, extraDefs}
+  { deps: { listComponent, StandardComponent, InjectedComponent: DepsInj.InjectedComponentFromExternal ?? {div: "component-not-provided" } } } // options {deps, extraDefs}
 ]
 </script>
 
@@ -40,6 +40,9 @@ View is the template
     <hr>
     <use-StandardComponent></use-StandardComponent>
     <li>An external li (non-styled)</li>
+    <hr>
+    <use-InjectedComponent></use-InjectedComponent>
+    <li>An injected component (from external: IoC / DI) </li>
   </div>
 </view>
 

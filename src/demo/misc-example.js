@@ -1,4 +1,4 @@
-import { Alias, Bind, BindToProp, Case, cle, DefineSubprops, Extended, ExtendSCSS, ExternalProp, f, fArgs,  asFunc, LE_BackendApiMock, LE_LoadCss, LE_LoadScript, pass, Placeholder, RenderApp, smart, SmartAlias, str, Switch, toInlineStyle, Use, useExternal, html, LazyComponent, remoteHtmlComponent, fromHtmlComponentDef } from "../lib/caged-le.js"
+import { Alias, Bind, BindToProp, Case, cle, DefineSubprops, Extended, ExtendSCSS, ExternalProp, f, fArgs,  asFunc, LE_BackendApiMock, LE_LoadCss, LE_LoadScript, pass, Placeholder, RenderApp, smart, SmartAlias, str, Switch, toInlineStyle, Use, useExternal, html, LazyComponent, remoteHtmlComponent, fromHtmlComponentDef, UseShadow } from "../lib/caged-le.js"
 import { NavSidebarLayout } from "../layouts/layouts.js"
 
 
@@ -6938,6 +6938,158 @@ const appDemoWaitSignalAndPropCondition = async ()=>{
 
 }
 
+
+const appDemoSubChildsInUseAndHandleChildsBeforeInit = async ()=>{
+
+  const InjectableListStdComponent = cle.ol({
+                
+    beforeInit:  def  => {
+
+      console.log("before init!", def)
+      
+      def.childs = def.childs.map(el=>{
+        if (typeof el === "string" && el==="sublist") {
+          return cle.ol({}, cle.li({}, "sublist"))
+        } 
+        else if (typeof el === "object" && el.type==='red-content'){
+          return cle.li({style: "color: red"}, "Red Content")
+        }
+        return el
+      })
+
+      console.log("after 'before init' transformation!", def)
+
+      return def
+    }
+  },
+    
+    { li: "Initial 'Standard' Item, from JS" },
+
+  )
+  
+  RenderApp(document.body, cle.root({},
+
+    await fromHtmlComponentDef( /*html*/`
+      <script>
+      
+        const { cle } = Cle;
+
+        return [ {}, 
+          { deps: { 
+
+            injectableList: cle.ol({ // recreated here
+              
+              beforeInit:  def  => {
+
+                console.log("before init!", def)
+                
+                def.childs = def.childs.map(el=>{
+                  if (typeof el === "string" && el==="sublist") {
+                    return cle.ol({}, cle.li({}, "sublist"))
+                  } 
+                  else if (typeof el === "object" && el.type==='red-content'){
+                    return cle.li({style: "color: red"}, "Red Content")
+                  }
+                  return el
+                })
+
+                console.log("after 'before init' transformation!", def)
+
+                return def
+              }
+            }, 
+              { li: { text: "Initial 'Standard' Item, from JS"} },
+            ),
+          }}
+        ];
+      </script>
+
+      <view>
+        <h3> Hi Developer </h3>
+
+        <hr/>
+
+        <!-- use with childs injection! -->
+        <use-injectableList> 
+          <li>Hi to all!</li>
+          <li>Insert How Many Childs You Whant!</li>
+          <js-val>({ li: { text: "Or do in cle-in-js way from HTML", onclick: $=>{$.el.style.color = 'blue'} } })</js-val>
+          
+          <!-- handled and convertedby beforeInit handler -->
+          <js-val>"sublist"</js-val>
+          <js-val>({type: "red-content"})</js-val>
+        </use-injectableList>
+
+      </view>
+    `),
+
+    cle.hr(),
+    cle.hr(),
+
+    { h3: 'Hi Developer' },
+    
+    cle.hr(),
+
+    Use(InjectableListStdComponent, pass, pass, [ // childs injection
+      { li: "Hi to all!" },
+      { li: "Insert How Many Childs You Whant!" },
+      { li: { text: "Or do in cle-in-js way from HTML", onclick: $=>{$.el.style.color = 'blue'} } },
+      
+      // handled and convertedby beforeInit handler
+      "sublist",
+      {type: "red-content"}
+    ]),
+
+  ))
+}
+
+
+const appDemoShadowRoot = async ()=>{
+
+  await Promise.all([
+    LE_LoadCss("https://fonts.googleapis.com/css?family=Roboto:300,300italic,700,700italic"),
+    LE_LoadCss("https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.css"),
+    LE_LoadCss("https://cdnjs.cloudflare.com/ajax/libs/milligram/1.4.1/milligram.min.css"),
+  ])
+  
+  RenderApp(document.body, cle.root({
+    prop1: 123,
+    showShadow: true,
+  },
+
+    cle.style({}, `
+      body{padding: 25px; height: 100%; width: 100%;}
+      h3{font-size: 2rem}
+    `),
+
+    cle.h3({}, "Hi From External!", f`@prop1`),
+
+
+    UseShadow(cle.div({ 
+      onDestroy: $ => console.log("destroy"),
+
+      style: "border: 1px solid gray; padding: 25px; margin: 25px; font-family: unset"
+    }, 
+
+      cle.style({}, `
+        h3{color: green}
+      `),
+
+      cle.h3({}, "Hi From Internal! ", f`@prop1`, " (Shadow)"),
+      
+      cle.button({onclick: $ => $.showShadow = !$.showShadow}, 'Change From Internal')
+      
+    ),{meta: {if: $ => $.showShadow}}),
+
+    cle.button({onclick: $ => $.showShadow = !$.showShadow}, 'Change From External'),
+
+    cle.hr(),
+
+    cle.h4("At the end of the day all except font-face should works!")
+  ))
+}
+
+
 // app0()
 // test2way()
 // appTodolist()
@@ -6993,4 +7145,5 @@ const appDemoWaitSignalAndPropCondition = async ()=>{
 // appDemoFromHtmlTemplateViaExternalFile()
 // appDemoLazyComponent()
 // appDemoWaitSignalAndPropCondition()
-
+// appDemoSubChildsInUseAndHandleChildsBeforeInit()
+// appDemoShadowRoot()
