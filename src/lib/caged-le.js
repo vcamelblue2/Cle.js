@@ -1,9 +1,22 @@
-const DEBUG_ENABLED = false
-const DEBUG_INFO_ENABLED = false
-const DEBUG_WARNING_ENABLED = true
-const _debug = { log: (...args)=> DEBUG_ENABLED && console.log(...args) }
-const _info = { log: (...args)=> DEBUG_INFO_ENABLED && console.log(...args) }
-const _warning = { log: (...args)=> DEBUG_WARNING_ENABLED && console.log(...args) }
+/* export */
+const CLE_FLAGS = {
+  LOG_DEBUG_ENABLED: false,
+  LOG_INFO_ENABLED: false,
+  LOG_WARNING_ENABLED: true,
+
+  PROPERTY_OPTIMIZATION: true,
+
+  DEFAULTS: {
+    META: {
+      FULL_OPTIMIZED: false,
+      PUSHBACK_AUTOMARK: true,
+    }
+  }
+}
+
+const _debug = { log: (...args)=> CLE_FLAGS.LOG_DEBUG_ENABLED && console.log(...args) }
+const _info = { log: (...args)=> CLE_FLAGS.LOG_INFO_ENABLED && console.log(...args) }
+const _warning = { log: (...args)=> CLE_FLAGS.LOG_WARNING_ENABLED && console.log(...args) }
 
 // syntatic sentinel..maybe use symbol in future..
 /* export */ const pass = undefined
@@ -175,6 +188,9 @@ class Property{
     this.onChangedHandlers = []
     this.dependency = undefined
     this.registeredDependency = [] // container of depsRemoverFunc
+    this.mustRetriveRealValue = true
+    this.lastRetrivedRealValue = undefined
+    this.setupRetriverFunc()
 
     if (init){
       this.init(valueFunc, onGet, onSet, onDestroy) // helper, to separate prop definition from initializzation (for register)
@@ -190,6 +206,7 @@ class Property{
     if (this.isAlias) { valueFunc = valueFunc.getter }
 
     this.isFunc = isFunction(valueFunc)
+    this.setupRetriverFunc()
 
     this._onGet = onGet
     this._onSet = onSet
@@ -199,6 +216,8 @@ class Property{
     this._valueFunc = valueFunc
     this.__analyzeAndConnectDeps()
 
+    this.mustRetriveRealValue = true
+    this.lastRetrivedRealValue = undefined
     try{ this._latestResolvedValue = this.__getRealVaule() } catch {} // with this trick (and setting on markAsChanged and set value) we can compare new and old!
   }
 
@@ -225,7 +244,7 @@ class Property{
   }
 
   __getRealVaule(){
-    return this.isFunc ? this._valueFunc(...this.executionContext.map(ec=>ec())) : this._valueFunc
+    return this.retriver_func()
   }
 
   get value(){
@@ -234,6 +253,8 @@ class Property{
     return this.__getRealVaule()
   }
   set value(v){
+    this.mustRetriveRealValue = true
+    this.lastRetrivedRealValue = undefined
     if(this._onSet === undefined){_warning.log("CLE - WARNING: the onSet is undefined! (ERROR)", this);return} // todo: teeemp!! c'è un bug più subdolo da risolvere..riguarda gli le-for e le-if nested..
     if(isUseExternalDefinition(v)){ // set at runtime new useExternal!
       this.init(v, this._onGet, this._onSet, this._onDestroy)
@@ -248,6 +269,7 @@ class Property{
     }
     else {
       this.isFunc = isFunction(v)
+      this.setupRetriverFunc()
       this._valueFunc = v
       this.__analyzeAndConnectDeps()
       let _v = this.__getRealVaule()
@@ -256,10 +278,34 @@ class Property{
       this._latestResolvedValue = _v // in this way during the onSet we have the latest val in "_latestResolvedValue" fr caching strategy
     }
   }
+  setupRetriverFunc(){
+    if(CLE_FLAGS.PROPERTY_OPTIMIZATION){
+      if (this.isFunc){
+        this.retriver_func = () => {
+          if (this.mustRetriveRealValue){
+            this.lastRetrivedRealValue = this._valueFunc(...this.executionContext.map(ec=>ec()))
+            this.mustRetriveRealValue = false
+          }
+          return this.lastRetrivedRealValue
+        }
+      }
+      else {
+        this.retriver_func = () => this._valueFunc;
+      }
+    }
+    else {
+      this.retriver_func = this.isFunc ? 
+        ()=>this._valueFunc(...this.executionContext.map(ec=>ec())) 
+        : 
+        ()=>this._valueFunc;
+    }
 
+  }
   // manually, useful for deps
   markAsChanged(){
     _debug.log("marked as changed!", this)
+    this.mustRetriveRealValue = true
+    this.lastRetrivedRealValue = undefined
     if(this._onSet === undefined){_warning.log("CLE - WARNING: the onSet is undefined!", this);return} // todo: teeemp!! c'è un bug più subdolo da risolvere..riguarda gli le-for e le-if nested..
     if (this.isAlias){
       this.oj_valueFunc.markAsChanged(...this.executionContext.map(ec=>ec()))
@@ -281,7 +327,8 @@ class Property{
 
   // registered changes handler, deps and notify system
   fireOnChangedSignal(){
-    this.onChangedHandlers.forEach(h=>h.handler(this.__getRealVaule(), this._latestResolvedValue))
+    let v = this.__getRealVaule()
+    this.onChangedHandlers.forEach(h=>h.handler(v, this._latestResolvedValue))
   }
   hasOnChangedHandler(who){
     return this.onChangedHandlers.find(h=>h.who === who) !== undefined
@@ -1375,7 +1422,7 @@ class Component {
       noThisInScope: this.convertedDefinition.meta?.noThisInScope,
       noMetaInScope: this.convertedDefinition.meta?.noMetaInScope,
       hasViewChilds: this.convertedDefinition.meta?.hasViewChilds,
-      metaPushbackAutomark: this.convertedDefinition.meta?.metaPushbackAutomark === undefined ? true : this.convertedDefinition.meta?.metaPushbackAutomark,
+      metaPushbackAutomark: this.convertedDefinition.meta?.metaPushbackAutomark ?? CLE_FLAGS.DEFAULTS.META.PUSHBACK_AUTOMARK,
     } 
 
     this.$le = $le
@@ -3639,7 +3686,7 @@ class Component {
     Object.keys(definition).forEach(k=>{
       if (!already_resolved.includes(k)){
         dash_shortucts_keys.data[k] = definition[k]
-        _warning.log('CLE-INFO: unrecognized ', k, " converted into props!")
+        _info.log('CLE-INFO: unrecognized ', k, " converted into props!")
       }
     })
 
@@ -4644,7 +4691,7 @@ class IterableViewComponent{
       noThisInScope: this.meta_def?.noThisInScope,
       noMetaInScope: this.meta_def?.noMetaInScope,
       hasViewChilds: this.meta_def?.hasViewChilds,
-      metaPushbackAutomark: this.meta_def?.metaPushbackAutomark === undefined ? true : this.meta_def?.metaPushbackAutomark,
+      metaPushbackAutomark: this.meta_def?.metaPushbackAutomark ?? CLE_FLAGS.DEFAULTS.META.PUSHBACK_AUTOMARK,
     }
     this.real_pointed_iterable_property = {markAsChanged: ()=>{}}
   }
@@ -4762,7 +4809,7 @@ class IterableViewComponent{
   detectChangesAndRebuildChilds(newItems, oldItems){
     const childComparer = this.meta_def.idComparer !== undefined && isFunction(this.meta_def.idComparer) ? this.meta_def.idComparer : (_new, _old)=> _new !== _old;
     const childSubpropComparer = this.meta_def.subComparer !== undefined && isFunction(this.meta_def.subComparer) ? this.meta_def.subComparer : undefined
-    const full_lookahead_check = this.meta_def.full_optimized
+    const full_lookahead_check = this.meta_def.full_optimized ?? CLE_FLAGS.DEFAULTS.META.FULL_OPTIMIZED
 
     // NEW ALGO  WITH 100% COMPARISON & low performance impact
     // creo una copia shallow dell'array childs
@@ -4949,7 +4996,7 @@ class IterableViewComponent{
   //@override, per utilizzare nella Factory this.parent come parent e non this. inoltre qui in realtà parlo dei children come entità replicate, e non i child del template..devo passare una versione del template senza meta alla component factory! altrimenti errore..
   // in realtà dovrebbe essere un "build child skeleton and create child"
   buildChildsSkeleton(rebuild_for_changes=false, latestResolvedValue=undefined){
-    if (rebuild_for_changes && (this.meta_def.optimized || this.meta_def.full_optimized)){
+    if (rebuild_for_changes && (this.meta_def.optimized || (this.meta_def.full_optimized ?? CLE_FLAGS.DEFAULTS.META.FULL_OPTIMIZED))){
       this.detectChangesAndRebuildChilds(this.iterableProperty.value, latestResolvedValue)
     }
     else {
@@ -5830,12 +5877,45 @@ const remoteHtmlComponent = async (fileName, {component="", params={}, state={},
   }
 }
 
+// export 
+const remoteHtmlComponents = async (fileName, ...components)=>{
+  let result = {}
+  for (let component of components){
+    let name = typeof component === 'string' ? {component} : component
+    result[name] = await remoteHtmlComponent(fileName)
+  }
+  return result
+}
+
 // export
 const fromHtmlComponentDef = async (txt, {component="", params={}, state={}, DepsInj={}}={}) => await resolveHtmlComponentDef(txt, {component, params, state, DepsInj})
 
+
+//// utils per imports in remoteComponents
+// export 
+const importAll = async (deps={}) => {
+  let deps_with_pre_post_processing = Object.entries(deps).map(([name, dep])=>({name: name, depImporterPromise: dep instanceof Promise ? dep : dep[0], postProcessing: dep instanceof Promise ? ((v)=>v) : dep[1]  }));
+  // console.log(deps_with_pre_post_processing)
+  let imported = await Promise.all(deps_with_pre_post_processing.map(d=>d.depImporterPromise));
+  return Object.fromEntries(imported.map((dep, i)=>[deps_with_pre_post_processing[i].name, deps_with_pre_post_processing[i].postProcessing(dep) ]));
+}
+
+
+const globalImportAll = async (deps={}) => {
+  let deps_with_pre_post_processing = Object.entries(deps).map(([name, dep])=>({name: name, depImporterPromise: dep instanceof Promise ? dep : dep[0], postProcessing: dep instanceof Promise ? ((v)=>v) : dep[1]  }));
+  // console.log(deps_with_pre_post_processing)
+  let imported = await Promise.all(deps_with_pre_post_processing.map(d=>d.depImporterPromise));
+  let res = Object.fromEntries(imported.map((dep, i)=>[deps_with_pre_post_processing[i].name, deps_with_pre_post_processing[i].postProcessing(dep) ]));
+  if (window.globalCleImports === undefined){
+    return window.globalCleImports = res
+  }
+  else {
+    return window.globalCleImports = {...window.globalCleImports, ...res}
+  }
+}
 // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // 
 // Exports
 
-const Cle = { pass, none, smart, f: smartFunc, fArgs: smartFuncWithCustomArgs, asFunc, Use, Extended, Placeholder, Bind, Alias, SmartAlias, PropertyBinding, DefineSubprops, ExternalProp, useExternal, BindToProp: BindToPropInConstructor, Switch, Case, LazyComponent: LazyComponentCreation, UseShadow: ShadowRootComponentCreator, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock, cle, str, str_, input, output, ExtendSCSS, clsIf, html: fromHtml, remoteHtmlComponent, fromHtmlComponentDef }
+const Cle = { CLE_FLAGS, pass, none, smart, f: smartFunc, fArgs: smartFuncWithCustomArgs, asFunc, Use, Extended, Placeholder, Bind, Alias, SmartAlias, PropertyBinding, DefineSubprops, ExternalProp, useExternal, BindToProp: BindToPropInConstructor, Switch, Case, LazyComponent: LazyComponentCreation, UseShadow: ShadowRootComponentCreator, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock, cle, str, str_, input, output, ExtendSCSS, clsIf, html: fromHtml, remoteHtmlComponent, remoteHtmlComponents, fromHtmlComponentDef, importAll, globalImportAll }
 
-export { pass, none, smart, smartFunc as f, smartFuncWithCustomArgs as fArgs, asFunc, Use, Extended, Placeholder, Bind, Alias, SmartAlias, PropertyBinding, DefineSubprops, ExternalProp, useExternal, BindToPropInConstructor as BindToProp, Switch, Case, LazyComponentCreation as LazyComponent, ShadowRootComponentCreator as UseShadow, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock, cle, str, str_, input, output, ExtendSCSS, clsIf, fromHtml as html, remoteHtmlComponent, fromHtmlComponentDef }
+export { CLE_FLAGS, pass, none, smart, smartFunc as f, smartFuncWithCustomArgs as fArgs, asFunc, Use, Extended, Placeholder, Bind, Alias, SmartAlias, PropertyBinding, DefineSubprops, ExternalProp, useExternal, BindToPropInConstructor as BindToProp, Switch, Case, LazyComponentCreation as LazyComponent, ShadowRootComponentCreator as UseShadow, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock, cle, str, str_, input, output, ExtendSCSS, clsIf, fromHtml as html, remoteHtmlComponent, remoteHtmlComponents, fromHtmlComponentDef, importAll, globalImportAll }

@@ -1581,6 +1581,7 @@ visita la demo demo/misc-example.js/ -> appDemoComponentFactory per altre info
 # Advanced: SubRenderer
 
 # Advanced: React Mashup
+# Advanced: CLE_FLAGS
 
 # Advanced: Imperative & Dynamic - DynamicSignal
 # Advanced: Imperative & Dynamic - ExternalProps

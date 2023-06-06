@@ -1,4 +1,4 @@
-import { Alias, Bind, BindToProp, Case, cle, DefineSubprops, Extended, ExtendSCSS, ExternalProp, f, fArgs,  asFunc, LE_BackendApiMock, LE_LoadCss, LE_LoadScript, pass, Placeholder, RenderApp, smart, SmartAlias, str, Switch, toInlineStyle, Use, useExternal, html, LazyComponent, remoteHtmlComponent, fromHtmlComponentDef, UseShadow } from "../lib/caged-le.js"
+import { CLE_FLAGS,  Alias, Bind, BindToProp, Case, cle, DefineSubprops, Extended, ExtendSCSS, ExternalProp, f, fArgs,  asFunc, LE_BackendApiMock, LE_LoadCss, LE_LoadScript, pass, Placeholder, RenderApp, smart, SmartAlias, str, Switch, toInlineStyle, Use, useExternal, html, LazyComponent, remoteHtmlComponent, fromHtmlComponentDef, UseShadow } from "../lib/caged-le.js"
 import { NavSidebarLayout } from "../layouts/layouts.js"
 
 
@@ -7090,6 +7090,42 @@ const appDemoShadowRoot = async ()=>{
 }
 
 
+
+const appDemoHeavyPropertyFuncEvalOptimization = async ()=>{
+
+  RenderApp(document.body, cle.root({
+    array: [...new Array(100000).keys()],
+    partition_num_up:1.5,
+    partition_num_down:2,
+    filtered: $ => $.array.filter(v => v >= $.array.length/$.partition_num_down && v <= $.array.length/$.partition_num_up),
+    
+  },
+    cle.button({onclick: $=>{
+      let oj_val = $.array.length
+      let start = new Date().getTime()
+      let val = $.filtered.length
+      let end = new Date().getTime()
+      console.log(oj_val, val, start, end, " -> ", end-start)
+    }}, "Get Data"),
+
+    cle.button({onclick: $=>{
+      CLE_FLAGS.PROPERTY_OPTIMIZATION = !CLE_FLAGS.PROPERTY_OPTIMIZATION
+      $.filtered = $ => $.array.filter(v => v >= $.array.length/$.partition_num_down && v <= $.array.length/$.partition_num_up) // reset to change mode
+    }}, "Changemode"),
+
+    cle.button({onclick: $=>{
+      $.array = [...new Array($.array.length*10).keys()]
+    }}, "Edit data"),
+
+    cle.button({onclick: $=>{
+      $.partition_num_down = $.partition_num_down+0.1
+      $.partition_num_up = $.partition_num_up-0.1
+    }}, $=>"Edit limits ["+$.partition_num_up+","+$.partition_num_down+"]")
+  ))
+}
+
+
+
 // app0()
 // test2way()
 // appTodolist()
@@ -7147,3 +7183,4 @@ const appDemoShadowRoot = async ()=>{
 // appDemoWaitSignalAndPropCondition()
 // appDemoSubChildsInUseAndHandleChildsBeforeInit()
 // appDemoShadowRoot()
+// appDemoHeavyPropertyFuncEvalOptimization()
