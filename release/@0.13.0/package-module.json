@@ -1,7 +1,7 @@
 {
     "name": "cle.js",
     "description": "A modern and small Javascript framework to create webapp",
-    "version": "0.0.13",
+    "version": "0.13.0",
 
     "author": {
         "name": "Vincenzo Villani",
@@ -11,7 +11,7 @@
 
     "repository" : {
       "type": "git",
-      "url": "https://github.com/vcamelblue2/clan.js.git"
+      "url": "https://github.com/vcamelblue2/clean.js.git"
     },
 
     "files": ["*"],
@@ -21,12 +21,15 @@
       ".": {
         "import": "./index.js"
       },
-      "./lib/caged-le.js": "./lib/caged-le.js",
+      "./lib": "./lib/caged-le.js",
       "./lib/caged-le": "./lib/caged-le",
-      "./routing/lite_routing": "./routing/lite_routing",
+      "./lib/caged-le.js": "./lib/caged-le.js",
+      "./routing/lite_routing": "./routing/lite_routing.js",
       "./mashup/react": "./mashup/react",
-      "./layouts/layouts": "./layouts/layouts",
-      "./layouts/anchors": "./layouts/anchors",
+      "./mashup/react/lib/cle-in-react": "./mashup/react/lib/cle-in-react.js",
+      "./mashup/react/lib/react-in-cle": "./mashup/react/lib/react-in-cle.js",
+      "./layouts/layouts": "./layouts/layouts.js",
+      "./layouts/anchors": "./layouts/anchors.js",
       "./components": "./components"
     },
 

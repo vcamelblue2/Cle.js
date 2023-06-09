@@ -1,7 +1,7 @@
 {
     "name": "cle.js",
     "description": "A modern and small Javascript framework to create webapp",
-    "version": "0.0.13",
+    "version": "0.13.0",
 
     "author": {
         "name": "Vincenzo Villani",
@@ -11,7 +11,7 @@
 
     "repository" : {
       "type": "git",
-      "url": "https://github.com/vcamelblue2/clan.js.git"
+      "url": "https://github.com/vcamelblue2/clean.js.git"
     },
     "keywords": [
       "javascript",
