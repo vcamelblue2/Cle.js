@@ -1,6 +1,25 @@
 {
-    "name": "cle",
-    "version": "1.0.0",
+    "name": "cle.js",
+    "description": "A modern and small Javascript framework to create webapp",
+    "version": "0.0.13",
+
+    "author": {
+        "name": "Vincenzo Villani",
+        "email": "vcamelblue2@outlook.com"
+    },
+    "license": "MIT",
+
+    "repository" : {
+      "type": "git",
+      "url": "https://github.com/vcamelblue2/clan.js.git"
+    },
+    "keywords": [
+      "javascript",
+      "framework",
+      "webapp",
+      "spa"
+    ],
+
     "outputFormat": "esmodule",
     "targets": {
         "main": {

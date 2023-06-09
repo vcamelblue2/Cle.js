@@ -1,0 +1,39 @@
+{
+    "name": "cle.js",
+    "description": "A modern and small Javascript framework to create webapp",
+    "version": "0.0.13",
+
+    "author": {
+        "name": "Vincenzo Villani",
+        "email": "vcamelblue2@outlook.com"
+    },
+    "license": "MIT",
+
+    "repository" : {
+      "type": "git",
+      "url": "https://github.com/vcamelblue2/clan.js.git"
+    },
+
+    "files": ["*"],
+    "main": "index.js",
+    "module": "index.js",
+    "exports": {
+      ".": {
+        "import": "./index.js"
+      },
+      "./lib/caged-le.js": "./lib/caged-le.js",
+      "./lib/caged-le": "./lib/caged-le",
+      "./routing/lite_routing": "./routing/lite_routing",
+      "./mashup/react": "./mashup/react",
+      "./layouts/layouts": "./layouts/layouts",
+      "./layouts/anchors": "./layouts/anchors",
+      "./components": "./components"
+    },
+
+    "keywords": [
+      "javascript",
+      "framework",
+      "webapp",
+      "spa"
+    ]
+}

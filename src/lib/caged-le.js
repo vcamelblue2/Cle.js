@@ -2421,7 +2421,7 @@ class Component {
     if (this.convertedDefinition.attrs !== undefined){
       _debug.log("Found attrs: ", this.convertedDefinition.attrs)
 
-      // let has2WayBinding = Object.values(this.convertedDefinition.attrs).find(v=>v instanceof Binding) !== undefined
+      // let has2WayBinding = Object.values(this.convertedDefinition.attrs).find(v=>v instanceof HAttrBinding) !== undefined
       let _2WayPropertyBindingToHandle = {}
 
       Object.entries(this.convertedDefinition.attrs).forEach(([k,v])=>{
@@ -2446,10 +2446,12 @@ class Component {
                   this.html_pointer_element.setAttribute("style", resolveObjStyle( val ).toString())
                 } 
               }
-
-              if (isFunction(v)){
-                let staticDeps = analizeDepsStatically(v) // WARNING actally w're bypassing the "deps storage" machanism..this wil break deps update in future!!!
+              // let isUseExt = isUseExternalDefinition(v)
+              if (isFunction(v)){// || isUseExt ){
+                let staticDeps = analizeDepsStatically(v)//, isUseExt) // WARNING actally w're bypassing the "deps storage" machanism..this wil break deps update in future!!!
                 _debug.log("Attr static deps analysis: ", staticDeps)
+
+                // v = isUseExt ? v.getter : v
 
                 staticDeps.$this_deps?.forEach(d=>{
                   let deps = this.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupStyle(v) ) // questa cosa da rivdere...il who non lo salviam ma in generale ora questa roba deve essere una prop, fully automated!
@@ -2492,6 +2494,13 @@ class Component {
                   }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5, (firstTry, res)=>{!firstTry && setupStyle(v)})
                   this.attrHattrRemover.push(()=>depRemover())
                 })
+
+                // staticDeps.$external_deps?.forEach(d=>{
+                //   const deps = d?.addOnChangedHandler([this, "attr", k], ()=>setupStyle(v) )
+                //   deps && this.attrHattrRemover.push(deps)
+                //   console.log("attr remover must be completeed!!")
+                // })
+
               }
               else {
 
@@ -5706,6 +5715,12 @@ const resolveAndConvertHtmlElement = (element, tagReplacers, extraDefs )=>{
     else if (tag.startsWith("extended-") && tag.substring(9).toLowerCase() in tagReplacers){
       return Extended(tagReplacers[tag.substring(9).toLowerCase()], {...parsedDef}, {...use_options}, children)
     }
+    // if (tag.startsWith("extended-direct") && tag.substring(15).toLowerCase() in tagReplacers){
+    //   let el = tagReplacers[tag.substring(15).toLowerCase()]
+    //   let componentType = getComponentType(el)
+    //   let ext = Extended(el, {...parsedDef}, {...use_options}, children)
+    //   ext[componentType].meta = el.meta
+    // } // todo: fix use and extended..that skip meta definition!
     else {
       return { [tag]: {...parsedDef, "=>": children}}
     }
