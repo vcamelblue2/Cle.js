@@ -80,6 +80,7 @@ typings/
 
 harmful/
 local-demos/
+**/demo/todo_and_tmp.js
 
 # parcel dist stuf
 .parcel-cache
