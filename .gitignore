@@ -90,3 +90,5 @@ dontuseterserrc
 **/env.js
 **/env.test.js
 **/env.prod.js
+
+npm_release/
