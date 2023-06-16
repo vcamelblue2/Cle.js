@@ -5794,7 +5794,7 @@ implicit return if omitted (lambda)
 const AsyncFunction = async function () {}.constructor;
 
 
-const resolveHtmlComponentDef = async (text, {component="", params={}, state={}, DepsInj={}}={})=>{
+const resolveHtmlComponentDef = async (text, {component="", params={}, state={}, DepsInj={}, externalDef=undefined}={})=>{
   
   const viewRegexPattern = "\\s*<view"+(component !== "" ? " "+component : '')+">([\\s\\S]*?)<\\/view>";
   const styleRegexPattern = "\\s*<style"+(component !== "" ? " "+component : '')+">([\\s\\S]*?)<\\/style>";
@@ -5818,11 +5818,11 @@ const resolveHtmlComponentDef = async (text, {component="", params={}, state={},
   
   // _debug.log(defContent, viewContent, pureDefinition)
   
-  if (defContent){
-    if (!defContent.includes("return")){
+  if (defContent || externalDef){
+    if (defContent && !defContent.includes("return")){
       defContent = "return ( " + defContent + " )"
     }
-    const func = new AsyncFunction("Cle", 'params', 'state', 'style', 'DepsInj', defContent);
+    const func = externalDef ? externalDef : new AsyncFunction("Cle", 'params', 'state', 'style', 'DepsInj', defContent);
     
     if (styleContent !== undefined){
       let oj_styleContent = styleContent
@@ -5862,7 +5862,7 @@ const resolveHtmlComponentDef = async (text, {component="", params={}, state={},
 const cachedRemoteHtmlComponents = new Map()
 
 // export
-const remoteHtmlComponent = async (fileName, {component="", params={}, state={}, DepsInj={}, autoExtension=true, cache=true}={}) => { 
+const remoteHtmlComponent = async (fileName, {component="", params={}, state={}, DepsInj={}, autoExtension=true, cache=true, externalDef=undefined}={}) => { 
   if (autoExtension){
     fileName += fileName.endsWith(".html") ? '' : ".html"
   }
@@ -5885,7 +5885,7 @@ const remoteHtmlComponent = async (fileName, {component="", params={}, state={},
         cachedRemoteHtmlComponents.set(fileName, txt)
       }
     }
-    return resolveHtmlComponentDef(txt, {component, params, state, DepsInj})
+    return resolveHtmlComponentDef(txt, {component, params, state, DepsInj, externalDef})
   }
   catch (e){
     throw new Error("REMOTE HTML REF ERROR: " + e)
@@ -5903,7 +5903,16 @@ const remoteHtmlComponents = async (fileName, ...components)=>{
 }
 
 // export
-const fromHtmlComponentDef = async (txt, {component="", params={}, state={}, DepsInj={}}={}) => await resolveHtmlComponentDef(txt, {component, params, state, DepsInj})
+const fromHtmlComponentDef = async (txt, {component="", params={}, state={}, DepsInj={}, def=undefined}={}) => await resolveHtmlComponentDef(txt, {component, params, state, DepsInj, externalDef: def})
+
+
+const defineHtmlComponent = (remoteHtmlPath, {component=undefined, isRemote=true, autoExtension=true, cache=true, def=async (Cle, params, state, style, DepsInj)=>{return [{}, {}]}}) => {
+  return (params, state, DepsInj)=> isRemote ? remoteHtmlComponent(remoteHtmlPath, {component, params, state, DepsInj, autoExtension, cache, externalDef: def}) : resolveHtmlComponentDef(remoteHtmlPath, {component, params, state, DepsInj, externalDef: def});
+}
+
+const defineHtmlComponents = (remoteHtmlPath, ...components) => {
+  return Object.fromEntries(components.map(c=>[c.component, defineHtmlComponent(remoteHtmlPath, c)]))
+}
 
 
 //// utils per imports in remoteComponents
@@ -5931,6 +5940,6 @@ const globalImportAll = async (deps={}) => {
 // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // 
 // Exports
 
-const Cle = { CLE_FLAGS, pass, none, smart, f: smartFunc, fArgs: smartFuncWithCustomArgs, asFunc, Use, Extended, Placeholder, Bind, Alias, SmartAlias, PropertyBinding, DefineSubprops, ExternalProp, useExternal, BindToProp: BindToPropInConstructor, Switch, Case, LazyComponent: LazyComponentCreation, UseShadow: ShadowRootComponentCreator, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock, cle, str, str_, input, output, ExtendSCSS, clsIf, html: fromHtml, remoteHtmlComponent, remoteHtmlComponents, fromHtmlComponentDef, importAll, globalImportAll }
+const Cle = { CLE_FLAGS, pass, none, smart, f: smartFunc, fArgs: smartFuncWithCustomArgs, asFunc, Use, Extended, Placeholder, Bind, Alias, SmartAlias, PropertyBinding, DefineSubprops, ExternalProp, useExternal, BindToProp: BindToPropInConstructor, Switch, Case, LazyComponent: LazyComponentCreation, UseShadow: ShadowRootComponentCreator, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock, cle, str, str_, input, output, ExtendSCSS, clsIf, html: fromHtml, remoteHtmlComponent, remoteHtmlComponents, fromHtmlComponentDef, defineHtmlComponent, defineHtmlComponents, importAll, globalImportAll }
 
-export { CLE_FLAGS, pass, none, smart, smartFunc as f, smartFuncWithCustomArgs as fArgs, asFunc, Use, Extended, Placeholder, Bind, Alias, SmartAlias, PropertyBinding, DefineSubprops, ExternalProp, useExternal, BindToPropInConstructor as BindToProp, Switch, Case, LazyComponentCreation as LazyComponent, ShadowRootComponentCreator as UseShadow, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock, cle, str, str_, input, output, ExtendSCSS, clsIf, fromHtml as html, remoteHtmlComponent, remoteHtmlComponents, fromHtmlComponentDef, importAll, globalImportAll }
+export { CLE_FLAGS, pass, none, smart, smartFunc as f, smartFuncWithCustomArgs as fArgs, asFunc, Use, Extended, Placeholder, Bind, Alias, SmartAlias, PropertyBinding, DefineSubprops, ExternalProp, useExternal, BindToPropInConstructor as BindToProp, Switch, Case, LazyComponentCreation as LazyComponent, ShadowRootComponentCreator as UseShadow, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock, cle, str, str_, input, output, ExtendSCSS, clsIf, fromHtml as html, remoteHtmlComponent, remoteHtmlComponents, fromHtmlComponentDef, defineHtmlComponent, defineHtmlComponents, importAll, globalImportAll }
