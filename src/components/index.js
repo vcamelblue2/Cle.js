@@ -8,6 +8,7 @@ import { SelectButtons } from "./select-buttons.component/select-buttons.js"
 import { BootstrapIcon } from "./vendor-dependent/bootstrap-icon.component/bootstrap-icon.js"
 import { MatInput } from "./input.component/mat-input.js"
 import { TreeNav } from "./treenav.component/treenav.js"
+import { Timer } from "./timer.component/timer.js"
 
 export {
     Table,
@@ -20,4 +21,5 @@ export {
     BootstrapIcon,
     MatInput,
     TreeNav,
+    Timer
 }
