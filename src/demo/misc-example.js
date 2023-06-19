@@ -5522,7 +5522,7 @@ const appDemoFirebase = async ()=>{
   const { getDatabase: fb_getDatabase, ref: fb_ref, get: fb_get, onValue: fb_onValue, child: fb_child, set: fb_set } = await import("https://www.gstatic.com/firebasejs/9.10.0/firebase-database.js");
 
   // Your web app's Firebase configuration
-  const { dbus_firebaseConfig } = await import("./env.js")
+  const { dbus_firebaseConfig } = await import("../../env.js")
 
 
   RenderApp(document.body, cle.root({
