@@ -1403,6 +1403,8 @@ class Component {
   css_html_pointer_element
   s_css_html_pointer_element
 
+  singlePropStyleRecomputeHooks = [] // handle ha_style.xxxx with also function a_style defined: when a_style is recomputed also ha_style.xxxx will be recomputed
+
   // step 1: build
   constructor(parent, definition, $le, $dbus){
     this.t_uid = ComponentTechnicalRUUIDGen.generate()
@@ -2445,6 +2447,8 @@ class Component {
                 } else { 
                   this.html_pointer_element.setAttribute("style", resolveObjStyle( val ).toString())
                 } 
+                // recompute all ha style (if any)
+                this.singlePropStyleRecomputeHooks?.forEach(runner=>runner?.())
               }
               // let isUseExt = isUseExternalDefinition(v)
               if (isFunction(v)){// || isUseExt ){
@@ -2823,6 +2827,10 @@ class Component {
 
               setupValue()
 
+              if(k.split(".")[0] === 'style'){
+                this.singlePropStyleRecomputeHooks?.push(()=>setupValue())
+              }
+
             }
             else if (v instanceof HAttrBinding){ 
               _info.log("Found binding hattr: ", k,v, this)
@@ -2919,8 +2927,17 @@ class Component {
 
             }
             else {
-              let [pointer, final_k] = recursiveAccessor(this.html_pointer_element, k.split("."))
-              pointer[final_k] = v
+              const setupValue = ()=>{
+                let [pointer, final_k] = recursiveAccessor(this.html_pointer_element, k.split("."))
+                pointer[final_k] = v
+              }
+              
+              setupValue()
+
+              if(k.split(".")[0] === 'style'){
+                this.singlePropStyleRecomputeHooks?.push(()=>setupValue())
+              }
+
             }
 
           }
@@ -3334,6 +3351,7 @@ class Component {
     this.attrHattrRemover?.forEach(remover=>{
       try{remover()} catch{}
     })
+    this.singlePropStyleRecomputeHooks = undefined
     Object.values(this.signals).forEach(s=>{
       try{s.destroy()} catch{}
     })
@@ -5653,6 +5671,16 @@ const resolveAndConvertHtmlElement = (element, tagReplacers, extraDefs, jsValCon
         let name = attr.name.substring(1, attr.name.length-1)
         let value = smartFuncWithCustomArgs("evt")(attr.value, true)
         handlers["h_"+name] = value
+      }
+      // standard properties
+      else if (attr.name.startsWith("let-raw") || attr.name.startsWith("set-raw-")){
+        let name = dashCaseToCamelCase(attr.name.substring(8))
+        properties[name] = attr.value
+      }
+      // evaluable properties use "-" to convert in camel case
+      else if (attr.name.startsWith("[let-raw") || attr.name.startsWith("[set-raw-")){
+        let name = dashCaseToCamelCase(attr.name.substring(9, attr.name.length-1))
+        properties[name] = smartFunc(attr.value, true)
       }
       // standard properties
       else if (attr.name.startsWith("let-") || attr.name.startsWith("set-")){

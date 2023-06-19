@@ -7129,6 +7129,73 @@ const appDemoHeavyPropertyFuncEvalOptimization = async ()=>{
 
 
 
+const appDemoFixStyleWithHAStyleProp = ()=>{
+
+  RenderApp(document.body, cle.root({
+    
+    condition2: true,
+  },
+
+      cle.div({ meta: {forEach: "q", of: [1,2]},
+
+      condition: true,
+
+      a_style: $ => ( 
+        $.condition === true ? 
+        {
+          background: "green",
+          color: "white"
+        } : {
+          background: "red",
+          color: "white"
+        }
+      ),
+
+      "ha.style.width": "200px",
+      "ha.style.height": "200px",
+
+      "ha.style.border": $ => ($.condition ? 5 : 10 ) + "px solid black",
+      "ha.style.padding": $ => $.condition ? "25px" : "0px",
+
+      onclick: $=>{
+        $.condition = !$.condition
+      }
+
+    }, "I'm a rectangle! Click to change condition"),
+
+    cle.br({}),
+
+    cle.div({ meta: {if: f`@condition2`,},
+
+
+      a_style: $ => ( 
+        $.condition2 === true ? 
+        {
+          background: "green",
+          color: "white"
+        } : {
+          background: "red",
+          color: "white"
+        }
+      ),
+
+      "ha.style.width": "200px",
+      "ha.style.height": "200px",
+
+      "ha.style.border": $ => ($.condition2 ? 5 : 10 ) + "px solid black",
+      "ha.style.padding": $ => $.condition2 ? "25px" : "0px",
+
+    }, "I'm a rectangle 2!"),
+
+    cle.button({ onclick: $=>{
+      $.condition2 = !$.condition2
+    }}, "Change condition2")
+
+  ))
+}
+
+
+
 // app0()
 // test2way()
 // appTodolist()
@@ -7187,3 +7254,4 @@ const appDemoHeavyPropertyFuncEvalOptimization = async ()=>{
 // appDemoSubChildsInUseAndHandleChildsBeforeInit()
 // appDemoShadowRoot()
 // appDemoHeavyPropertyFuncEvalOptimization()
+// appDemoFixStyleWithHAStyleProp()
