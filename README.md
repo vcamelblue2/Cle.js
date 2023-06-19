@@ -1,6 +1,6 @@
 # CLE - Welcome to  Clean.js
 
-Clean.js is a declarative Javascript Framework, with pure POJO in mind (for ui, data model & logic), a "caged" environment, a TRUE reactive nature and "static" analysis (used to build dependencies between componentes). Optionally imperative code can still be used for some dynamic parts.
+Clean.js is a declarative Javascript Framework, with pure POJO in mind (for ui, data model & logic), a "caged" environment, a True reactive nature and "static" analysis (used to build dependencies between componentes). Optionally imperative code can still be used for some dynamic parts.
  
  Inspired mostly by: 
   - QML (id, scoping & naming, true "reactive" properties, signals & slot, mangling for declarations, coding by convention, everything has a signal, components sub-editing from external, elements/ref by ID, auto context/scope)
@@ -16,10 +16,16 @@ Clean.js is a declarative Javascript Framework, with pure POJO in mind (for ui, 
 ## Quick Start
 [![Try in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/edit/web-platform-xezbjg?file=main.js)
 
+Install from npm
 ```sh
 npm install cle.js
 ```
 
+or clone the project template
+```sh
+git clone https://github.com/vcamelblue2/create-cleanjs-app--use-html.git
+```
+Quick Example
 ```javascript
 import { RenderApp, cle, f, Bind, Use, pass } from 'cle.js/lib'
 // or import from cdn 
@@ -152,8 +158,9 @@ await app();
 ```
 
 # IT Docs
-# Basic Concept
+# Basic Concepts
 
+## POJO - Plain Old Javascript Object
  Un elemento CLE è un POJO (Plain Old Javascript Object) la cui unica e prima chiave è un tag html. Il valore associato a questo tag può essere invece: 
   - un POJO contenente la `definizione` delle caratteristiche dell'elemento HTML che si vuole renderizzare, nonchè dati, metodi etc.
   - una stringa
@@ -444,7 +451,7 @@ Una shortcut al patter edit "ref-prop and mark as changed" è utilizzare la funz
    
 ```
 
-## Props alternatives & data declaration shortcuts:
+### Props alternatives & data declaration shortcuts:
 La keyword "props" non è l'unica che si può utilizzare per dichiarare delle variabili. Le altre sono:
 - let
 - data
@@ -921,6 +928,7 @@ const coloredDiv = { div: {
     
  }}
 ```
+
 ## Event Handling
 Per gestire gli eventi HTML come ad esempio onclick è necessario usare la keyword "`handle`" o la sua shortcut "`h_`". 
 
@@ -1181,7 +1189,9 @@ Le fArgs entrano in gioco quando vogliamo invece definire funzioni che però acc
 ...
 ```
 
-# Conditional Component - leIf
+
+# Dynamic Definition - leIf, leFor, Switch
+## Conditional Component - leIf
 Per la definizione di componenti che devono essere presenti o meno in base ad una condizione (es *ngIf in Angular) utilizziamo la keyword "`if`" nel "meta".
 
 la keyword `meta` di fatto è un contenitore di meta-programmazione, per cui si stabilisce il funzionamento di ogni componente.
@@ -1194,7 +1204,7 @@ Per realizzare un componente "opzionale" basta scrivere:
 }}
 ```
 
-# Repeated Component - leFor
+## Repeated Component - leFor
 Per realizzare componenti ripetuti, come una lista di elementi, si utilizza la definzione "`forEach`": "meta-var-definition-name", "`of`": evaluable/const nella keyword "`meta`"
 
 ```javascript
@@ -1280,7 +1290,7 @@ Tramite la keyword "`define`" in "meta" è possibile definire delle variabili "h
 ```
 
 
-# Switch..Case Component
+## Switch..Case Component
 Pur essendo sostituibile con degli leIf esiste una definizione specifica per gli switch-case:
 
 ```javascript
@@ -1308,7 +1318,7 @@ import {Switch, Case} from "cle.js/lib"
 }} 
 ```
 
-# More About Meta
+## More About Meta
 
 Scope Options, inside meta:
 
@@ -1323,7 +1333,7 @@ meta: {
 ```
 
 
-## Componentization
+# Componentization
 Componentizzare in CLE significa principalmente 'splittare' il codice in diversi oggetti riutilizzabili (variabili/costanti). A differenza di altri framwork non esiste un vero e proprio concetto di "Componente" da dover definire obbligatoriamente. 
 
 Un vero componente CLE è di fatto un singolo elemento HTML. Grazie però allo `scope` e al `ctx`, nonchè alle due funzioni `Use` ed `Extend` è possibile definire un 'componente' in modo abbastanza simile a ciò che siamo abituati a usare.
@@ -1338,7 +1348,7 @@ Resta però sempre possibile decidere di bloccare lo scope automatico e passare 
 
 ----------
 
-# Component Templating, Extension & Use
+## Component Templating, Extension & Use
 Dal momento che un componente CLE è un POJO, per definire dei componenti riutilizzabili basta semplicemente assegnare questi oggeti ad una variabile e dunque per utilizzarli basterà usare tali variabili come childs.
 
 ```javascript
@@ -1568,37 +1578,40 @@ L'idea alla base è quella di sfruttare lo scope o altre sofisticazioni come le 
 visita la demo demo/misc-example.js/ -> appDemoComponentFactory per altre info
 
 ### Extra Childs Injection & beforeInit Hook
+T.B.D
 
-
-# More About Evaluable: Bind, Alias, SmarAlias/PropertyBinding/CachedProp
-# Define Subprops
+# More About Evaluable: Bind, Alias, SmarAlias/PropertyBinding/CachedProp, Define Subprops
+T.B.D
 
 # Html Element Reference
+T.B.D
 
 # CLE Object
+T.B.D
 
 # Childs Ref By Name & Ctx Ref Id
+T.B.D
 
-# Advanced: fromHtml, remoteHtmlComponent & fromHtmlComponentDef
+# Advanced
+## Advanced: fromHtml, remoteHtmlComponent & fromHtmlComponentDef & defineHtmlComponent
 
-# Advanced: Nested Detached Renderer
-# Advanced: Dynamic Lazy Renderer
-# Advanced: LazyPointer & Lazy Components
-# Advanced: SubRenderer
+## Advanced: Nested Detached Renderer
+## Advanced: Dynamic Lazy Renderer
+## Advanced: LazyPointer & Lazy Components
+## Advanced: SubRenderer
 
-# Advanced: React Mashup
-Cle can easly used in combination with other framework like React. visit /src/mashup/react to see some example
+## Advanced: React Mashup
+Cle can easly used in combination with other framework like React. visit /src/mashup/react/demo to see some example
 
-# Advanced: CLE_FLAGS
+## Advanced: Imperative & Dynamic - DynamicSignal
+## Advanced: Imperative & Dynamic - ExternalProps
+## Advanced: Imperative & Dynamic - GetCleElByDomEl
+## Advanced: Imperative & Dynamic - getAsExternalProperty & getAsExternalSignal
+## Advanced: Imperative & Dynamic - Synchronization - await propCondition & signalFired
 
-# Advanced: Imperative & Dynamic - DynamicSignal
-# Advanced: Imperative & Dynamic - ExternalProps
-# Advanced: Imperative & Dynamic - GetCleElByDomEl
-# Advanced: Imperative & Dynamic - getAsExternalProperty & getAsExternalSignal
-# Advanced: Imperative & Dynamic - Synchronization - await propCondition & signalFired
-
-# Advanced: Properties Class
-# Advanced: Signals Class
+## Advanced: CLE_FLAGS
+## Advanced: Properties Class
+## Advanced: Signals Class
 
 # Full Component Definition Reference
  ```javascript
@@ -1909,6 +1922,8 @@ $ => {
         // edit array reference prop inline without manually mark as changed! this will change array ref (eg [...array])
         // use: $.this.editArrRefVal.myProp(p=>p.value=12)
         editArrRefVal // Proxy with getter: .name(v => action function)
+
+        // + every props and function defined
     },
 
     $.u = {
