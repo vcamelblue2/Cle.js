@@ -5655,6 +5655,16 @@ const resolveAndConvertHtmlElement = (element, tagReplacers, extraDefs, jsValCon
         handlers["h_"+name] = value
       }
       // standard properties
+      else if (attr.name.startsWith("let-raw") || attr.name.startsWith("set-raw-")){
+        let name = dashCaseToCamelCase(attr.name.substring(8))
+        properties[name] = attr.value
+      }
+      // evaluable properties use "-" to convert in camel case
+      else if (attr.name.startsWith("[let-raw") || attr.name.startsWith("[set-raw-")){
+        let name = dashCaseToCamelCase(attr.name.substring(9, attr.name.length-1))
+        properties[name] = smartFunc(attr.value, true)
+      }
+      // standard properties
       else if (attr.name.startsWith("let-") || attr.name.startsWith("set-")){
         let name = dashCaseToCamelCase(attr.name.substring(4))
         properties["let_"+name] = attr.value
