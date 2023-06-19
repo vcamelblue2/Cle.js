@@ -5544,7 +5544,7 @@ const resolveAndConvertHtmlElement = (element, tagReplacers, extraDefs, jsValCon
 
     if (tag === "js-val"){
       // it's implicit a function with this args.
-      return smartFuncWithCustomArgs("Cle", "params", "state", "DepsInj") (Array.from(element.childNodes)[0].textContent, true)(Cle, jsValContext.params, jsValContext.state, jsValContext.DepsInj)
+      return smartFuncWithCustomArgs("Cle", "params", "state", "DepsInj") (Array.from(element.childNodes)[0].textContent, true)(undefined, Cle, jsValContext.params, jsValContext.state, jsValContext.DepsInj)
     }
 
     const properties = {}
