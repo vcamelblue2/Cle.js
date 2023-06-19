@@ -1,0 +1,25 @@
+<script> return [
+{ 
+  id: "home",
+
+  let: {
+    myVar: "hi to all",
+    name: "user1"
+  }
+
+},
+
+{ 
+  deps: { Clock: DepsInj.Clock }
+}]
+</script>
+
+<view>
+  <approot style="display: block; width: 1000px;">
+      
+    <h1>Hello from Homepage {{@myVar}}</h1>
+
+    <use-Clock [set-name]="@name"></use-Clock>
+      
+  </approot>
+</view>
