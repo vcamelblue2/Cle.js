@@ -7013,7 +7013,10 @@ const appDemoSubChildsInUseAndHandleChildsBeforeInit = async ()=>{
         <use-injectableList> 
           <li>Hi to all!</li>
           <li>Insert How Many Childs You Whant!</li>
-          <js-val>({ li: { text: "Or do in cle-in-js way from HTML", onclick: $=>{$.el.style.color = 'blue'} } })</js-val>
+
+          <js-val>({ li: { onclick: $=>{$.el.style.color = 'blue', text: "Or do in cle-in-js way from HTML" } } })</js-val>
+          <!-- JS-VAL its'a function like with 4 args: (Cle, params, state, DepsInj) => ...  -->
+          <js-val>Cle.cle.li({ onclick: $=>{$.el.style.color = 'blue'}, "Or do in cle-in-js way from HTML" )</js-val>
           
           <!-- handled and convertedby beforeInit handler -->
           <js-val>"sublist"</js-val>

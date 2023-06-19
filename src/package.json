@@ -1,7 +1,7 @@
 {
     "name": "cle.js",
     "description": "A modern and small Javascript framework to create webapp",
-    "version": "0.13.0",
+    "version": "0.14.0",
 
     "author": {
         "name": "Vincenzo Villani",
@@ -17,6 +17,7 @@
     "files": ["*"],
     "main": "index.js",
     "module": "index.js",
+    "types": "index.js",
     "exports": {
       ".": {
         "import": "./index.js"

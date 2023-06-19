@@ -1,0 +1,24 @@
+<script>return [
+{
+  let: {
+    name: "unknown",
+    date: $ => new Date().toString()
+  }
+}, 
+
+{
+  deps: { 
+    CustomHeader: DepsInj.CustomHeader ?? { h2: { }}
+  }
+}]
+</script>
+
+
+<view>
+  <div>
+    <!-- injectable from external or default -->
+    <use-CustomHeader>
+      custom - hi {{@name}} from clock: {{@date}}
+    </use-CustomHeader>
+  </div>
+</view>

@@ -5488,7 +5488,7 @@ const htmlConverterHookRemap = {
   onupdate: 'onUpdate',
   constructor: 'constructor',
 }
-const resolveAndConvertHtmlElement = (element, tagReplacers, extraDefs )=>{
+const resolveAndConvertHtmlElement = (element, tagReplacers, extraDefs, jsValContext )=>{
   // console.log("parsing: ", element)
   if (element.nodeType === 8){ // is a comment, skip
     return undefined
@@ -5525,7 +5525,8 @@ const resolveAndConvertHtmlElement = (element, tagReplacers, extraDefs )=>{
     let tag = element.tagName.toLowerCase()
 
     if (tag === "js-val"){
-      return smartFunc(Array.from(element.childNodes)[0].textContent, true)()
+      // it's implicit a function with this args.
+      return smartFuncWithCustomArgs("Cle", "params", "state", "DepsInj") (Array.from(element.childNodes)[0].textContent, true)(Cle, jsValContext.params, jsValContext.state, jsValContext.DepsInj)
     }
 
     const properties = {}
@@ -5707,7 +5708,7 @@ const resolveAndConvertHtmlElement = (element, tagReplacers, extraDefs )=>{
       ...(extra_def_id !== undefined && extra_def_id in extraDefs ? extraDefs[extra_def_id] : {})
     }
     
-    const children = Array.from(element.childNodes).flatMap(c=>resolveAndConvertHtmlElement(c, tagReplacers, extraDefs)).filter(c=>c !== undefined)
+    const children = Array.from(element.childNodes).flatMap(c=>resolveAndConvertHtmlElement(c, tagReplacers, extraDefs, jsValContext)).filter(c=>c !== undefined)
 
     if (tag.startsWith("use-") && tag.substring(4).toLowerCase() in tagReplacers){
       return Use(tagReplacers[tag.substring(4).toLowerCase()], {...parsedDef}, {...use_options}, children)
@@ -5727,7 +5728,7 @@ const resolveAndConvertHtmlElement = (element, tagReplacers, extraDefs )=>{
   }
 }
 // export - convert and generate cle components from html string and a definition and component tag-replacer. extraDefs to add xtra definition vai obj, using a template id in template and as key in extraDefs
-const fromHtml = (text, definition={}, tagReplacers={}, extraDefs={})=>{
+const fromHtml = (text, definition={}, tagReplacers={}, extraDefs={}, jsValContext={params: {}, state: {}, DepsInj:{}})=>{
   const dp = new DOMParser()
 
   let elements = dp.parseFromString(text, 'text/html').body
@@ -5740,7 +5741,7 @@ const fromHtml = (text, definition={}, tagReplacers={}, extraDefs={})=>{
   }
   else{
     tagReplacers = Object.fromEntries(Object.entries(tagReplacers).map(([k,v])=>([k.toLowerCase(), v]))) // lowercase all the tag names
-    let children = Array.from(elements.childNodes).flatMap(c=>resolveAndConvertHtmlElement(c, tagReplacers, extraDefs)).filter(c=>c !== undefined) 
+    let children = Array.from(elements.childNodes).flatMap(c=>resolveAndConvertHtmlElement(c, tagReplacers, extraDefs, jsValContext)).filter(c=>c !== undefined) 
     // console.log("child", children)
     if (children.length === 1){
       let tag = Object.keys(children[0])[0]
@@ -5856,7 +5857,7 @@ const resolveHtmlComponentDef = async (text, {component="", params={}, state={},
   
   // _debug.log(defContent, viewContent, pureDefinition)
 
-  return fromHtml(viewContent, pureDefinition, definitionOptions.deps, definitionOptions.extraDefs)
+  return fromHtml(viewContent, pureDefinition, definitionOptions.deps, definitionOptions.extraDefs, {params, state, DepsInj})
 }
 
 const cachedRemoteHtmlComponents = new Map()
@@ -5905,9 +5906,23 @@ const remoteHtmlComponents = async (fileName, ...components)=>{
 // export
 const fromHtmlComponentDef = async (txt, {component="", params={}, state={}, DepsInj={}, def=undefined}={}) => await resolveHtmlComponentDef(txt, {component, params, state, DepsInj, externalDef: def})
 
-
-const defineHtmlComponent = (remoteHtmlPath, {component=undefined, isRemote=true, autoExtension=true, cache=true, def=async (Cle, params, state, style, DepsInj)=>{return [{}, {}]}}) => {
-  return (params, state, DepsInj)=> isRemote ? remoteHtmlComponent(remoteHtmlPath, {component, params, state, DepsInj, autoExtension, cache, externalDef: def}) : resolveHtmlComponentDef(remoteHtmlPath, {component, params, state, DepsInj, externalDef: def});
+/** 
+ * @param {string} remoteHtmlPath
+ * @param {{
+ *  component: undefined | string, 
+ *  def: undefined | (Cle, params, state, style, DepsInj)=>Promise<[any, any] | [any]>,
+ *  defArgMapper: (params: any, state: any, DepsInj: any)=>({params: any, state: any, DepsInj: any})
+ * }} param - 
+ * - def must be async, example: async (Cle, params, state, style, DepsInj)=>{return [{}, {}]}
+ * - Use defArgMapper to handle external args and remap it. eg to add some deps injection or state handling..
+ */
+const defineHtmlComponent = (remoteHtmlPath, {component=undefined, isRemote=true, autoExtension=true, cache=true, def=undefined, defArgMapper= async (params={}, state={}, DepsInj={})=>({params, state, DepsInj})}) => {
+  return async (params={}, state={}, DepsInj={})=> {
+    let resolvedParams = await defArgMapper(params, state, DepsInj)
+    return isRemote ? 
+      remoteHtmlComponent(remoteHtmlPath, {component, params: resolvedParams.params, state: resolvedParams.state, DepsInj: resolvedParams.DepsInj, autoExtension, cache, externalDef: def}) : 
+      resolveHtmlComponentDef(remoteHtmlPath, {component, params: resolvedParams.params, state: resolvedParams.state, DepsInj: resolvedParams.DepsInj, externalDef: def});
+  }
 }
 
 const defineHtmlComponents = (remoteHtmlPath, ...components) => {
