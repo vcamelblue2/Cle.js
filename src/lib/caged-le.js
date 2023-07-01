@@ -5962,8 +5962,8 @@ const defineHtmlComponent = (remoteHtmlPath, {component=undefined, isRemote=true
   return async (params={}, state={}, DepsInj={})=> {
     let resolvedParams = await defArgMapper(params, state, DepsInj)
     return isRemote ? 
-      remoteHtmlComponent(remoteHtmlPath, {component, params: resolvedParams.params, state: resolvedParams.state, DepsInj: resolvedParams.DepsInj, autoExtension, cache, externalDef: def}) : 
-      resolveHtmlComponentDef(remoteHtmlPath, {component, params: resolvedParams.params, state: resolvedParams.state, DepsInj: resolvedParams.DepsInj, externalDef: def});
+      remoteHtmlComponent(remoteHtmlPath, {component, params: resolvedParams.params ?? params, state: resolvedParams.state ?? state, DepsInj: resolvedParams.DepsInj ?? DepsInj, autoExtension, cache, externalDef: def}) : 
+      resolveHtmlComponentDef(remoteHtmlPath, {component, params: resolvedParams.params ?? params, state: resolvedParams.state ?? state, DepsInj: resolvedParams.DepsInj ?? DepsInj, externalDef: def});
   }
 }
 
