@@ -5609,8 +5609,8 @@ const resolveAndConvertHtmlElement = (element, tagReplacers, extraDefs, jsValCon
         }
       }
       // meta
-      else if (attr.name.startsWith("meta-")){
-        let name = attr.name.substring(5)
+      else if (attr.name.startsWith("meta-") || (attr.name.startsWith("[meta-") && attr.name.endsWith("]"))){
+        let name = attr.name.startsWith("[") ? attr.name.substring(6, attr.name.length-1) : attr.name.substring(5)
         if (name === "foreach"){
           let [foreach_var, of_clausole] = attr.value.split(" of ")
           meta.forEach = foreach_var
@@ -5646,6 +5646,12 @@ const resolveAndConvertHtmlElement = (element, tagReplacers, extraDefs, jsValCon
       else if (attr.name.startsWith("hook-")){
         // todo, risolvere problema per cui gli attr arrivano lowercase
         let name = htmlConverterHookRemap[attr.name.substring(5)]
+        hooks[name] = smartFunc(attr.value, true)
+      }
+      // hooks with square brakest for better syntax
+      else if (attr.name.startsWith("[hook-") && attr.name.endsWith("]")){
+        // todo, risolvere problema per cui gli attr arrivano lowercase
+        let name = htmlConverterHookRemap[attr.name.substring(6, attr.name.length-1)]
         hooks[name] = smartFunc(attr.value, true)
       }
       // standard signal definition
