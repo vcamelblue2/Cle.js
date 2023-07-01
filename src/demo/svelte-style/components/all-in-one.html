@@ -101,7 +101,7 @@ you can also replace "view" with "template" or with "_" for light sintax
     }),
   }, 
   { 
-    deps: { ...await u.localComponents({ ToolbarHeader: {}, ToolbarMenu: {}, MyButton: {}, DemoService: {}}) },  // autostyle: true // implicit: using autostyle=true the <style > is automatically inserted as "css: $ => [style.setup($.this.cssVars)]". you can define in cssVars everything you need as replacers or Hoisting
+    deps: { ...await u.localComponents({ ToolbarHeader: {}, ToolbarMenu: {}, MyButton: {}, DemoService: {}, WithPlaceholder:{}, }) },  // autostyle: true // implicit: using autostyle=true the <style > is automatically inserted as "css: $ => [style.setup($.this.cssVars)]". you can define in cssVars everything you need as replacers or Hoisting
   }])
   </script>
   
@@ -115,6 +115,7 @@ you can also replace "view" with "template" or with "_" for light sintax
         <use-MyButton let-label="Sign In" (onclick)="$.le.demo_service.signin()"></use-MyButton>
         <use-MyButton let-label="Sign up" (onclick)="$.le.demo_service.signup()"></use-MyButton>
       </div>
+      <!-- <use-WithPlaceholder [use-options]="({inject: {valueTemplate: {h1: {text: 'Hello'}} } })"></use-WithPlaceholder> -->
     </div>
   </template>
   
@@ -158,3 +159,15 @@ you can also replace "view" with "template" or with "_" for light sintax
   </_>
 
 </DemoService>
+
+
+<WithPlaceholder Test Placeholder Replace>
+  <_>
+    <div>
+      <span>this is standard. </span>
+      <js-val>(
+        Cle.Placeholder("valueTemplate", { default_component: {span: {text: "this can be changed"}} })
+      )</js-val>
+    </div>
+  </_>
+</WithPlaceholder>

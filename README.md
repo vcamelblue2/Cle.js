@@ -109,10 +109,12 @@ const app = async () => RenderApp(document.body, cle.root({},
 
    cle.hr({}),
 
-   await CircleImage(),
+   // Remote Html Components [svelte/vue style]
+   await remoteHtmlComponent("/remote-components.html", { component: "MyToolbar", params: {hello: "world"}, state: {statevar: "private state namespace.."}, DepsInj: {CircleImage}} ),
 
-   await remoteHtmlComponent("/remote-components", { component: "MyToolbar", params: {hello: "world"}, state: {statevar: "private state namespace.."}, DepsInj: {CircleImage}, cache: true} ), // cache is default
+   cle.hr(),
    
+   await CircleImage(),
    
  ))
 
