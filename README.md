@@ -1155,7 +1155,7 @@ Il funzionamento di f è quello di un Template literals
  ```
 
  Full shortcuts Reference:
- - "`@.xxx`"  -> $.scope.xxx
+ - "`@xxx`"  -> $.scope.xxx
  - "`@s.xxx`"  -> $.scope.xxx
  - "`@p.xxx`"  -> $.parent.xxx
  - "`@t.xxx`"  -> $.this.xxx
