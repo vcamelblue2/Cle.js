@@ -2521,7 +2521,11 @@ class Component {
                       this.html_pointer_element.removeAttribute(k)
                     }
                   } else { 
-                    this.html_pointer_element.setAttribute(k, val.toString())
+                    if (k === 'class' && Array.isArray(val)){
+                      this.html_pointer_element.setAttribute(k, val.filter(vv=>(typeof vv) === 'string').join(" ").toString())
+                    } else {
+                      this.html_pointer_element.setAttribute(k, val.toString())
+                    }
                   } 
                 }
 
@@ -2694,7 +2698,11 @@ class Component {
                   this.html_pointer_element.removeAttribute(k) 
                 }
               } else { 
-                this.html_pointer_element.setAttribute(k, v.toString())
+                if (k === 'class' && Array.isArray(v)){
+                  this.html_pointer_element.setAttribute(k, v.filter(vv=>(typeof vv) === 'string').join(" ").toString())
+                } else {
+                  this.html_pointer_element.setAttribute(k, v.toString())
+                }
               } 
             }
           }
