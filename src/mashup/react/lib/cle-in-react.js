@@ -38,7 +38,10 @@ const _debug = { log: (...args)=> CleInReact.DEBUG.ENABLED && console.log(...arg
 // HOOKS FOR MASHUPS
 // TO BE USED INSIDE REACT
 
-// To use react props passed as they where in $.scope.xxx
+/**
+ * - Setup and use any react props passed as they where in $.scope.xxx. Then use in cle as normal $.xxx and changes in cle deps system will be detected
+ * - if cle should edit a react property use alsoSetter={true} and setup setter as: usedProps={{prop: [reactGetter, reactSetter]}}, otherwise set as usedProps={{prop: reactGetter }}
+ */
 const UseCle = ({def, alsoSetter=false, usedProps={}, autoDestroy=false})=>{
   const [app, setApp] = CleInReact.deps.react.useState(null)
   const [oldUsedProps, setOldUsedProps] = CleInReact.deps.react.useState(null)
@@ -85,7 +88,7 @@ const UseCle = ({def, alsoSetter=false, usedProps={}, autoDestroy=false})=>{
     }
 
     if (autoDestroy){
-      return ()=>app.destroy()
+      return ()=>app?.destroy()
     }
 
   }, [def, ...(alsoSetter ? Object.values(usedProps).map(up=>up[0]) : [...Object.values(usedProps)])])
@@ -102,7 +105,7 @@ const UseDumbCle = ({def})=>{
   CleInReact.deps.react.useEffect(()=>{
     _debug.log(el, app)
     if (app !== null){
-      app.destroy()
+      app?.destroy()
       setApp(null)
     }
     setApp(CleInReact.deps.cle.RenderApp( el.current, def))
@@ -161,7 +164,7 @@ const UseSubCle = ({$, def, alsoSetter=false, usedProps={}, autoDestroy=false})=
     }
 
     if (autoDestroy){
-      return ()=>app.destroy()
+      return ()=>app?.destroy()
     }
 
   }, [def, ...(alsoSetter ? Object.values(usedProps).map(up=>up[0]) : [...Object.values(usedProps)])])
