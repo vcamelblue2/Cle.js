@@ -2174,7 +2174,7 @@ class Component {
           let depsRemover = []
 
           deps.$this_deps?.forEach(d=>{
-            let depRemover = this.properties[d]?.addOnChangedHandler(thisProp, ()=>thisProp.markAsChanged() ) // qui il ? server affinche si ci registri solo alle props (e non alle func etc!)
+            let depRemover = this.properties[d]?.addOnChangedHandler?.(thisProp, ()=>thisProp.markAsChanged() ) // qui il ? server affinche si ci registri solo alle props (e non alle func etc!). il ?.add... invece per le vere property e non alle fittizie!
             depRemover && depsRemover.push(depRemover)
           }) // supporting multiple deps, but only of first order..
 
