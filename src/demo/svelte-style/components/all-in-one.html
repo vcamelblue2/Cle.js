@@ -1,0 +1,160 @@
+Demo for v2 components. Import from the same file with simple u.localComponents({ name: {...args...} })
+
+v2 components definition using <XXX Any Other Comments></XXX> with XXX as component name and script, view and style inside
+you can also replace "view" with "template" or with "_" for light sintax
+
+
+<ToolbarHeader Component>
+
+  usage: insert h2 label via direct childs injection..
+
+  <_>
+    <h2></h2>
+  </_>
+
+  <style>h2{ font-family: cursive }</style>  // implicit use autostyle when not defined [WARNING, this is GLOBAL] //
+
+</ToolbarHeader>
+
+
+
+<MyButton Component>
+
+  <script>({
+    let: {
+      label: "Label"
+    },
+
+    style: "font-weight: 800",
+    css: [style.setup()] // manual css style apply
+  })</script>
+
+  <_>
+    <button class="colored">{{@label}}</button>
+  </_>
+
+  <style>
+    .colored{
+      color: blueviolet;
+    }
+  </style>
+
+</MyButton>
+
+
+
+<ToolbarMenu Component>
+  
+  <script>([{
+    let: {
+      items: [
+        { label: "Product", url: "/Product" },
+        { label: "Pricing", url: "/Pricing" },
+        { label: "Docs", url: "/Docs" },
+      ]
+    },
+  }, 
+  {autostyle: true} // explicit autostyle
+  ])</script>
+
+  <_>
+    <div class="toolbarmenu-component menu">
+      <span [meta-foreach]="item of @items">
+        <a [href]="@item.url">{{@item.label}}</a>
+      </span>
+    </div>
+  </_>
+
+  <style>
+     /* example for CSS HOISTING */
+    .toolbarmenu-component.menu{
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 15px;
+      padding: 5px 15px;
+      border: 1px solid black;
+      border-radius: 50px;
+    }
+    .toolbarmenu-component a{
+      color: black;
+      text-decoration: none;
+    }
+  </style>
+
+</ToolbarMenu>
+
+
+
+<MyToolbar Default Component>
+
+  <script>
+  ([{
+
+    onInit: $=>console.log("Hello from toolbar", $),
+
+    style: "height: 64px",
+
+    cssVars: $=>({
+      __COLOR__: 'gray', 
+      __UID__: $.this.t_uid//['t_uid'] // example for CSS HOISTING
+    }),
+  }, 
+  { 
+    deps: { ...await u.localComponents({ ToolbarHeader: {}, ToolbarMenu: {}, MyButton: {}, DemoService: {}}) },  // autostyle: true // implicit: using autostyle=true the <style > is automatically inserted as "css: $ => [style.setup($.this.cssVars)]". you can define in cssVars everything you need as replacers or Hoisting
+  }])
+  </script>
+  
+  <template>
+    <div class="toolbar">
+      <use-DemoService></use-DemoService>
+      <use-ToolbarHeader>Hi from the toolbar</use-ToolbarHeader>
+      <use-ToolbarMenu></use-ToolbarMenu>
+      <div class="login-buttons">
+        <use-MyButton let-label="Contact Us" [ha-style.color]="'red'"></use-MyButton>
+        <use-MyButton let-label="Sign In" (onclick)="$.le.demo_service.signin()"></use-MyButton>
+        <use-MyButton let-label="Sign up" (onclick)="$.le.demo_service.signup()"></use-MyButton>
+      </div>
+    </div>
+  </template>
+  
+  <style>
+    .toolbar[__UID__]{
+      padding: 0px 20px;
+      width: calc(100% - 40px);
+      background-color: antiquewhite;
+      color: __COLOR__;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .toolbar[__UID__] .login-buttons{
+      display: flex;
+      gap: 10px
+    }
+  </style>
+  
+</MyToolbar>
+
+
+
+<DemoService Service>
+
+  <script>({
+    id: "demo_service",
+
+    def: {
+      signin($){ console.log("signin") },
+      signup($){ console.log("signup") },
+    },
+
+  })</script>
+
+  
+  view must be declared with service tag
+  <_>
+    <service></service> 
+  </_>
+
+</DemoService>

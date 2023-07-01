@@ -5,6 +5,8 @@ const CLE_FLAGS = {
   LOG_WARNING_ENABLED: true,
 
   PROPERTY_OPTIMIZATION: true,
+  
+  REMOTE_HTML_V2_AUTOSTYLE: true,
 
   DEFAULTS: {
     META: {
@@ -5552,7 +5554,7 @@ const resolveAndConvertHtmlElement = (element, tagReplacers, extraDefs, jsValCon
 
     if (tag === "js-val"){
       // it's implicit a function with this args.
-      return smartFuncWithCustomArgs("Cle", "params", "state", "DepsInj") (Array.from(element.childNodes)[0].textContent, true)(undefined, Cle, jsValContext.params, jsValContext.state, jsValContext.DepsInj)
+      return smartFuncWithCustomArgs("Cle", "params", "state", "DepsInj", "u") (Array.from(element.childNodes)[0].textContent, true)(undefined, Cle, jsValContext.params, jsValContext.state, jsValContext.DepsInj, jsValContext.u)
     }
 
     const properties = {}
@@ -5770,7 +5772,7 @@ const resolveAndConvertHtmlElement = (element, tagReplacers, extraDefs, jsValCon
   }
 }
 // export - convert and generate cle components from html string and a definition and component tag-replacer. extraDefs to add xtra definition vai obj, using a template id in template and as key in extraDefs
-const fromHtml = (text, definition={}, tagReplacers={}, extraDefs={}, jsValContext={params: {}, state: {}, DepsInj:{}})=>{
+const fromHtml = (text, definition={}, tagReplacers={}, extraDefs={}, jsValContext={params: {}, state: {}, DepsInj:{}, u: {}})=>{
   const dp = new DOMParser()
 
   let elements = dp.parseFromString(text, 'text/html').body
@@ -5807,6 +5809,7 @@ In script we are inside a function block with signature
 (Cle [cle module], params: {...}, state: {...}, style: String) => { 
   ... 
 }
+------- V1 -------
 
 implicit return if omitted (lambda)
 <script ComponentName>
@@ -5831,15 +5834,51 @@ implicit return if omitted (lambda)
 <style ComponentName>
  div{ color: red }
 </style>
+
+------- V2 -------
+
+<MyButton  Any Other Strings >
+
+  <script>({
+    let: {
+      label: "Label"
+    },
+
+    style: "font-weight: 800",
+    css: [style.setup()] // manual css style apply
+  })</script>
+
+  <_> or <view> or <template>
+    <button class="colored">{{@label}}</button>
+  </_>
+
+  <style>
+    .colored{
+      color: blueviolet;
+    }
+  </style>
+
+</MyButton>
+
 */
 
 // from https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/AsyncFunction
 const AsyncFunction = async function () {}.constructor;
 
 
-const resolveHtmlComponentDef = async (text, {component="", params={}, state={}, DepsInj={}, externalDef=undefined}={})=>{
-  
-  const viewRegexPattern = "\\s*<view"+(component !== "" ? " "+component : '')+">([\\s\\S]*?)<\\/view>";
+const getHtmlComponentDefVersion = (text, component) => {
+  if (component !== undefined && component !== ""){
+    if (text.toUpperCase().includes("</"+component.toUpperCase()+">")){
+      return 2
+    }
+    return 1
+  }
+  return 1
+}
+
+const resolveHtmlComponentDefV1Extractor = (text, component, viewTag='view')=>{
+
+  const viewRegexPattern = "\\s*<"+viewTag+(component !== "" ? " "+component : '')+">([\\s\\S]*?)<\\/"+viewTag+">";
   const styleRegexPattern = "\\s*<style"+(component !== "" ? " "+component : '')+">([\\s\\S]*?)<\\/style>";
   const defRegexPattern = "\\s*<script"+(component !== "" ? " "+component : '')+">([\\s\\S]*?)<\\/script>";
   
@@ -5856,8 +5895,44 @@ const resolveHtmlComponentDef = async (text, {component="", params={}, state={},
   let styleContent = styleRegex.exec(text)?.[1]
   let defContent = defRegex.exec(text)?.[1]
 
+  return {viewContent, styleContent, defContent}
+}
+
+const resolveHtmlComponentDefV2Extractor = (text, component)=>{
+  
+  const componentDefRegexPattern = "\\s*<"+component+""+"\\b[^>]*>([\\s\\S]*?)<\\/"+component+">";
+  const componentDefRegex = new RegExp(componentDefRegexPattern, "gi")
+  let componentDefContent = componentDefRegex.exec(text)?.[1]
+
+  // todo: <MyComponent [options]="...">
+  // const optionsContent = new RegExp("\\s*<"+component+""+"\\[options\\]=\"([\\s\\S]*?)\">", "gi").exec(text)?.[1]
+
+  return {...resolveHtmlComponentDefV1Extractor(componentDefContent, '', componentDefContent.includes("<_>") ? '_' : ( componentDefContent.includes("<template>") ? 'template' : 'view'))}
+}
+
+
+const resolveHtmlComponentDef = async (text, {component="", params={}, state={}, DepsInj={}, externalDef=undefined}={})=>{
+
+  // "utils" namespace in side .html components 
+  const u = {
+    /** import component defined in the same file by name */
+    localComponent: (component, {params={}, state={}, DepsInj={}, externalDef=undefined}={})=>{ return resolveHtmlComponentDef(text, {component, params, state, DepsInj, externalDef})},
+    localComponents: async (components)=>{ 
+      let res = {}
+      for (let [cname, args] of Object.entries(components)){
+        res[cname] = await resolveHtmlComponentDef(text, {component: cname, ...(args ?? {})})
+      }
+      return res;
+    }
+  }
+  
+  const version = getHtmlComponentDefVersion(text, component)
+
+  let {viewContent, styleContent, defContent} = version === 1 ? resolveHtmlComponentDefV1Extractor(text, component) : resolveHtmlComponentDefV2Extractor(text, component)
+  
   let pureDefinition = {}
-  let definitionOptions = {}
+  // let definitionOptions = {}
+  let definitionOptions = version === 1 ? { } : { autostyle: CLE_FLAGS.REMOTE_HTML_V2_AUTOSTYLE } // todo, autostyle for v2 components
   
   // _debug.log(defContent, viewContent, pureDefinition)
   
@@ -5865,7 +5940,7 @@ const resolveHtmlComponentDef = async (text, {component="", params={}, state={},
     if (defContent && !defContent.includes("return")){
       defContent = "return ( " + defContent + " )"
     }
-    const func = externalDef ? externalDef : new AsyncFunction("Cle", 'params', 'state', 'style', 'DepsInj', defContent);
+    const func = externalDef ? externalDef : new AsyncFunction("Cle", 'params', 'state', 'style', 'DepsInj', 'u', defContent);
     
     if (styleContent !== undefined){
       let oj_styleContent = styleContent
@@ -5878,13 +5953,13 @@ const resolveHtmlComponentDef = async (text, {component="", params={}, state={},
       }})
     }
 
-    let defs = await func(Cle, params, state, styleContent, DepsInj);
+    let defs = await func(Cle, params, state, styleContent, DepsInj, u);
 
     if (defs !== undefined){
       if (Array.isArray(defs)){
         pureDefinition = defs[0]
         if (defs.length >= 2){
-          definitionOptions = defs[1]
+          definitionOptions = {...definitionOptions,  ...defs[1]}
         }
       }
       else {
@@ -5896,10 +5971,19 @@ const resolveHtmlComponentDef = async (text, {component="", params={}, state={},
   if (!viewContent){
     throw Error("No View Found")
   }
+
+  if (styleContent !== undefined && definitionOptions.autostyle === true && pureDefinition.css === undefined){
+    if (styleContent.setup !== undefined){
+      pureDefinition.css = [ $ => styleContent.setup('cssVars' in $['this'] ? $.this.cssVars : {}) ]
+    }
+    else {
+      pureDefinition.css = [styleContent]
+    }
+  }
   
   // _debug.log(defContent, viewContent, pureDefinition)
 
-  return fromHtml(viewContent, pureDefinition, definitionOptions.deps, definitionOptions.extraDefs, {params, state, DepsInj})
+  return fromHtml(viewContent, pureDefinition, definitionOptions.deps, definitionOptions.extraDefs, {params, state, DepsInj, u})
 }
 
 const cachedRemoteHtmlComponents = new Map()

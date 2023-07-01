@@ -1,18 +1,19 @@
 Script is the component definition, where declare variables, function etc.
 Remember: we are inside a function block with signature 
 
-  (Cle [cle module], params: {...}, state: {...}, style: String, DepsInj: {...}) => { 
+  (Cle [cle module], params: {...}, state: {...}, style: String, DepsInj: {...}, u: {...utils...}) => { 
     ... 
   }
 
 <script comp1> 
 console.log(
-  Cle, params, state, style, DepsInj
+  Cle, params, state, style, DepsInj, u
 )
 
 // we are in async context so can use await.
 // in this components import muste be absolute! we use a global var to handle this. in real Prod app you can use "/path" directly
 const listComponent = await Cle.remoteHtmlComponent(baseHref+"/components/list") 
+const allInOneComponent = await Cle.remoteHtmlComponent(baseHref+"/components/all-in-one", {component: "MyToolbar"}) 
 const {StandardComponent} = await import(baseHref+"/standard-components/standard.js")
 
 // since we do some imperative logic before definition we must use "return "
@@ -25,7 +26,7 @@ return [{ // definition
     }
   },
 
-  { deps: { listComponent, StandardComponent, InjectedComponent: DepsInj.InjectedComponentFromExternal ?? {div: "component-not-provided" } } } // options {deps, extraDefs}
+  { deps: { listComponent, allInOneComponent, StandardComponent, InjectedComponent: DepsInj.InjectedComponentFromExternal ?? {div: "component-not-provided" } } } // options {deps, extraDefs}
 ]
 </script>
 
@@ -37,6 +38,9 @@ View is the template
     <use-listComponent></use-listComponent>
     <hr>
     <use-listComponent [set-array]="['a1', 'b2', 'c3']"></use-listComponent>
+    <hr>
+    <h3>From All In One Components</h3>
+    <use-allInOneComponent></use-allInOneComponent>
     <hr>
     <use-StandardComponent></use-StandardComponent>
     <li>An external li (non-styled)</li>
