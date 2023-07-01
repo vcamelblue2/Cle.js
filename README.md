@@ -14,20 +14,20 @@ Clean.js is a declarative Javascript Framework, with pure POJO in mind (for ui, 
  Clean.js it's also a "meta-language" first. In other words something like JSON: a syntax readable both by Humans & Computers. This means that it's easy to build other syntax/frameworks with CLE. In this framework you will find differents styles & technique, each with pro and cons, but ALL styles can be used together and mixed as you prefer.
 
 ## Quick Start
-[![Try in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/edit/web-platform-xezbjg?file=main.js)
+[![Try in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/edit/web-platform-xezbjg?file=main.js,remote-components.html)
 
 Install from npm
 ```sh
 npm install cle.js
 ```
 
-or clone the project template
+or clone the [project template](https://github.com/vcamelblue2/create-cleanjs-app--use-html.git) starter [for html components] 
 ```sh
 git clone https://github.com/vcamelblue2/create-cleanjs-app--use-html.git
 ```
 Quick Example
 ```javascript
-import { RenderApp, cle, f, Bind, Use, pass } from 'cle.js/lib'
+import { RenderApp, cle, f, Bind, Use, pass, defineHtmlComponent, remoteHtmlComponent } from 'cle.js/lib'
 // or import from cdn 
 // import { RenderApp, cle, f, Bind, Use, pass } from 'https://cdn.jsdelivr.net/gh/vcamelblue2/clean.js/src/lib/caged-le.js';
 
@@ -105,7 +105,14 @@ const app = async () => RenderApp(document.body, cle.root({},
        $.le.hiddenDiv.isHidden = !$.le.hiddenDiv.isHidden 
      }
  
-   }, "The div is ", f`$.le.hiddenDiv.isHidden ? 'hidden' : 'visible'`, " (click to toggle)")
+   }, "The div is ", f`$.le.hiddenDiv.isHidden ? 'hidden' : 'visible'`, " (click to toggle)"),
+
+   cle.hr({}),
+
+   await CircleImage(),
+
+   await remoteHtmlComponent("/remote-components", { component: "MyToolbar", params: {hello: "world"}, state: {statevar: "private state namespace.."}, DepsInj: {CircleImage}, cache: true} ), // cache is default
+   
    
  ))
 
@@ -151,6 +158,33 @@ const MyReusableInputBar = cle.div({
   }, "Say Hi!" )
   
 );
+
+// Define Html Components [also remote]
+const CircleImage = defineHtmlComponent(/*html*/`
+
+  <script>({
+    let: {
+        src: "https://parceljs.org/logo.49e8bbc1.svg",
+        custom_style: {}
+    },
+
+    style: $ => ({
+        borderRadius: '50%',  
+        ...$.custom_style
+    })
+  })</script>
+
+  <view>
+      <img [src]="$.src" class="pad-img">
+  </view>
+
+  <style>
+    .pad-img{ 
+      padding: 25px;
+    }
+  </style>
+
+`, { isRemote: false })
 
 
 await app();
