@@ -7015,7 +7015,7 @@ const appDemoSubChildsInUseAndHandleChildsBeforeInit = async ()=>{
           <li>Insert How Many Childs You Whant!</li>
 
           <js-val>({ li: { onclick: $=>{$.el.style.color = 'blue', text: "Or do in cle-in-js way from HTML" } } })</js-val>
-          <!-- JS-VAL its'a function like with 4 args: (Cle, params, state, DepsInj) => ...  -->
+          <!-- JS-VAL its'a function like with 4 args: (Cle, params, state, DepsInj, u) => ...  -->
           <js-val>Cle.cle.li({ onclick: $=>{$.el.style.color = 'blue'}, "Or do in cle-in-js way from HTML" )</js-val>
           
           <!-- handled and convertedby beforeInit handler -->
