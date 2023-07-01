@@ -5869,7 +5869,7 @@ const resolveHtmlComponentDef = async (text, {component="", params={}, state={},
     
     if (styleContent !== undefined){
       let oj_styleContent = styleContent
-      styleContent = Object.assign(oj_styleContent, {setup: (valuesObj)=>{
+      styleContent = Object.assign(oj_styleContent, {setup: (valuesObj={})=>{
         let resolvedStyleContent = oj_styleContent
         Object.entries(valuesObj).forEach(([toReplace, val])=>{
           resolvedStyleContent = resolvedStyleContent.replaceAll(toReplace, val)
