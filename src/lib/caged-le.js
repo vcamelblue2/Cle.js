@@ -7,6 +7,8 @@ const CLE_FLAGS = {
   PROPERTY_OPTIMIZATION: true,
   
   REMOTE_HTML_V2_AUTOSTYLE: true,
+  
+  COMPONENT_REGISTRY_BASE_HTML_EL: 'div',
 
   DEFAULTS: {
     META: {
@@ -901,6 +903,23 @@ const extractChildsDef = (definition)=>{
   extracted_childs = childs || childs_contains || childs_text || childs_view || childs_ff || childs_arrow || childs_underscore || childs_empty
   if (extracted_childs !== undefined && !Array.isArray(unifiedDef.childs)) {extracted_childs = [extracted_childs]}
   return extracted_childs
+}
+
+const unifyChildsDef = (definition)=>{
+  let { 'childs': childs, 'contains': childs_contains, 'text': childs_text, 'view': childs_view, ">>":childs_ff, "=>": childs_arrow, '_': childs_underscore, '': childs_empty } = definition
+  // ['', "=>", "text", "_", ">>", "view", "contains", "childs"]
+  let extracted_childs = [ 
+    ...(childs_empty !== undefined ? (Array.isArray(childs_empty) ? childs_empty : [childs_empty]) : []), // todo, testare is array, altrimenti buggo le string etc
+    ...(childs_arrow !== undefined ? (Array.isArray(childs_arrow) ? childs_arrow : [childs_arrow]) : []), 
+    ...(childs_text !== undefined ? (Array.isArray(childs_text) ? childs_text : [childs_text]) : []), 
+    ...(childs_underscore !== undefined ? (Array.isArray(childs_underscore) ? childs_underscore : [childs_underscore]) : []), 
+    ...(childs_ff !== undefined ? (Array.isArray(childs_ff) ? childs_ff : [childs_ff]) : []), 
+    ...(childs_view !== undefined ? (Array.isArray(childs_view) ? childs_view : [childs_view]) : []),
+    ...(childs_contains !== undefined ? (Array.isArray(childs_contains) ? childs_contains : [childs_contains]) : []), 
+    ...(childs !== undefined ? (Array.isArray(childs) ? childs : [childs]) : [])
+  ];
+
+  return extracted_childs.length > 0 ? extracted_childs : undefined
 }
 
 const getComponentType = (template)=>{
@@ -3896,6 +3915,11 @@ class Component {
     _info.log("Component Factory: ", parent, template)
     let componentType = getComponentType(template)
     let componentDef = (template instanceof UseComponentDeclaration ? template.computedTemplate : template) [componentType]
+    
+    if (ComponentsRegistry.has(componentType)){
+      let F = ComponentsRegistry.get(componentType)
+      return Component.componentFactory(parent, Array.isArray(componentDef) ? F(...componentDef) : F(componentDef), $le, $dbus)
+    }
 
     // support smart component natively! must recreate template
     if ((typeof componentDef === "string") || (typeof componentDef === "function") || Array.isArray(componentDef)){
@@ -5754,11 +5778,21 @@ const resolveAndConvertHtmlElement = (element, tagReplacers, extraDefs, jsValCon
     
     const children = Array.from(element.childNodes).flatMap(c=>resolveAndConvertHtmlElement(c, tagReplacers, extraDefs, jsValContext)).filter(c=>c !== undefined)
 
-    if (tag.startsWith("use-") && tag.substring(4).toLowerCase() in tagReplacers){
-      return Use(tagReplacers[tag.substring(4).toLowerCase()], {...parsedDef}, {...use_options}, children)
+    if (tag.startsWith("use-")){
+      if (tag.substring(4).toLowerCase() in tagReplacers){
+        return Use(tagReplacers[tag.substring(4).toLowerCase()], {...parsedDef}, {...use_options}, children)
+      }
+      else if (ComponentsRegistry.has(tag)){ 
+        return ComponentsRegistry.get(tag)({...parsedDef}, {...use_options}, children)
+      }
     }
-    else if (tag.startsWith("extended-") && tag.substring(9).toLowerCase() in tagReplacers){
-      return Extended(tagReplacers[tag.substring(9).toLowerCase()], {...parsedDef}, {...use_options}, children)
+    else if (tag.startsWith("extended-")){
+      if (tag.substring(9).toLowerCase() in tagReplacers){
+        return Extended(tagReplacers[tag.substring(9).toLowerCase()], {...parsedDef}, {...use_options}, children)
+      }
+      else if (ComponentsRegistry.has(tag)){ 
+        return ComponentsRegistry.get(tag)({...parsedDef}, {...use_options}, children)
+      }
     }
     // if (tag.startsWith("extended-direct") && tag.substring(15).toLowerCase() in tagReplacers){
     //   let el = tagReplacers[tag.substring(15).toLowerCase()]
@@ -5766,9 +5800,11 @@ const resolveAndConvertHtmlElement = (element, tagReplacers, extraDefs, jsValCon
     //   let ext = Extended(el, {...parsedDef}, {...use_options}, children)
     //   ext[componentType].meta = el.meta
     // } // todo: fix use and extended..that skip meta definition!
-    else {
-      return { [tag]: {...parsedDef, "=>": children}}
+    else if (tag.startsWith("component-") && ComponentsRegistry.has(tag)){
+        return ComponentsRegistry.get(tag)({...parsedDef}, {...use_options}, children)
     }
+
+    return { [tag]: {...parsedDef, "=>": children}}
   }
 }
 // export - convert and generate cle components from html string and a definition and component tag-replacer. extraDefs to add xtra definition vai obj, using a template id in template and as key in extraDefs
@@ -6079,8 +6115,105 @@ const globalImportAll = async (deps={}) => {
   }
 }
 // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // 
-// Exports
+// export
+/**
+ * Cle Dependency Injection via tags
+ * 
+ * Define and use components by tag name without importing (Dependency Injection)
+ * - to use a defined component in registry simply define it in the tree using the name with a prefix:
+ *    - 'component-' | 'component_'  ->   pure component
+ *    - 'use-' | 'use_'  ->   Use component
+ *    - 'extended-' | 'extended_'   ->   Extended component
+ * 
+ * example: 
+ * 
+ * ComponentRegistry.define({ Rectangle: {
+ *  ...def...
+ * }})
+ * 
+ * usage:
+ * 
+ * { div: { childs: [
+ * 
+ *    { 'use-Rectangle': {...Use overrides...} } // overrides only
+ * 
+ *    { 'use-Rectangle': [{...Use overrides...}, ...UseArgs] } // full Use args
+ * 
+ *  ]
+ * }}
+ * 
+ */
+const ComponentsRegistry = new (class _ComponentsRegistry {
+  constructor(){
+    this.components = {}
+  }
 
-const Cle = { CLE_FLAGS, pass, none, smart, f: smartFunc, fArgs: smartFuncWithCustomArgs, asFunc, Use, Extended, Placeholder, Bind, Alias, SmartAlias, PropertyBinding, DefineSubprops, ExternalProp, useExternal, BindToProp: BindToPropInConstructor, Switch, Case, LazyComponent: LazyComponentCreation, UseShadow: ShadowRootComponentCreator, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock, cle, str, str_, input, output, ExtendSCSS, clsIf, html: fromHtml, remoteHtmlComponent, remoteHtmlComponents, fromHtmlComponentDef, defineHtmlComponent, defineHtmlComponents, importAll, globalImportAll }
+  /**
+   * 
+   * @param {any} definition 
+   * @param {'div' | string | null} baseHtmlElement - define the base html element. use null to set as the component name
+   */
+  define(definition, baseHtmlElement=CLE_FLAGS.COMPONENT_REGISTRY_BASE_HTML_EL, forceOverwrite=false){
 
-export { CLE_FLAGS, pass, none, smart, smartFunc as f, smartFuncWithCustomArgs as fArgs, asFunc, Use, Extended, Placeholder, Bind, Alias, SmartAlias, PropertyBinding, DefineSubprops, ExternalProp, useExternal, BindToPropInConstructor as BindToProp, Switch, Case, LazyComponentCreation as LazyComponent, ShadowRootComponentCreator as UseShadow, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock, cle, str, str_, input, output, ExtendSCSS, clsIf, fromHtml as html, remoteHtmlComponent, remoteHtmlComponents, fromHtmlComponentDef, defineHtmlComponent, defineHtmlComponents, importAll, globalImportAll }
+    let name = getComponentType(definition)
+    let def = definition[name]
+
+    let template = {[baseHtmlElement ?? name]: def}
+
+    let lower_name = name.toLowerCase()
+
+    if (!forceOverwrite && this.components['component_'+lower_name] !== undefined){
+      throw Error("Components Registry - Redefiniton Error")
+    }
+
+    this.components['component_'+lower_name] = this.components['component-'+lower_name] = ()=>template;
+    this.components['use_'+lower_name] = this.components['use-'+lower_name] = (overrides, args, extrachilds)=>Use(template, overrides, args, extrachilds);
+    this.components['extended_'+lower_name] = this.components['extended-'+lower_name] = (overrides, args, extrachilds)=>Extended(template, overrides, args, extrachilds);
+
+  }
+
+  /**
+   * @param {string} fullname - complete name (with prefix)
+   */
+  has(fullname){
+    return fullname.toLowerCase() in this.components
+  }
+
+  /**
+   * 
+   * @param {string} fullname - complete name (with prefix)
+   * @returns { (()=>any) | (overrides: any, args: any, extrachilds: any[])=>(Use() | Extended()) } } 
+   */
+  get(fullname){
+    return this.components[fullname.toLowerCase()]
+  }
+
+  /**
+   * 
+   * @param {string} name - registered name (without prefix)
+   */
+  remove(name){
+    
+    let lower_name = name.toLowerCase()
+
+    delete this.components['component_'+lower_name]
+    delete this.components['component-'+lower_name]
+    delete this.components['use_'+lower_name]
+    delete this.components['use-'+lower_name]
+    delete this.components['extended_'+lower_name]
+    delete this.components['extended-'+lower_name]
+
+  }
+
+  reset(){
+    this.components = {}
+  }
+
+})();
+
+// // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // 
+// Exports - remember to export also in index.js
+
+const Cle = { CLE_FLAGS, pass, none, smart, f: smartFunc, fArgs: smartFuncWithCustomArgs, asFunc, Use, Extended, Placeholder, Bind, Alias, SmartAlias, PropertyBinding, DefineSubprops, ExternalProp, useExternal, BindToProp: BindToPropInConstructor, Switch, Case, LazyComponent: LazyComponentCreation, UseShadow: ShadowRootComponentCreator, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock, cle, str, str_, input, output, ExtendSCSS, clsIf, html: fromHtml, remoteHtmlComponent, remoteHtmlComponents, fromHtmlComponentDef, defineHtmlComponent, defineHtmlComponents, importAll, globalImportAll, ComponentsRegistry }
+
+export { CLE_FLAGS, pass, none, smart, smartFunc as f, smartFuncWithCustomArgs as fArgs, asFunc, Use, Extended, Placeholder, Bind, Alias, SmartAlias, PropertyBinding, DefineSubprops, ExternalProp, useExternal, BindToPropInConstructor as BindToProp, Switch, Case, LazyComponentCreation as LazyComponent, ShadowRootComponentCreator as UseShadow, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock, cle, str, str_, input, output, ExtendSCSS, clsIf, fromHtml as html, remoteHtmlComponent, remoteHtmlComponents, fromHtmlComponentDef, defineHtmlComponent, defineHtmlComponents, importAll, globalImportAll, ComponentsRegistry }

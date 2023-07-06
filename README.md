@@ -1616,6 +1616,60 @@ visita la demo demo/misc-example.js/ -> appDemoComponentFactory per altre info
 ### Extra Childs Injection & beforeInit Hook
 T.B.D
 
+### ComponentsRegistry (Components - Dependency Injection)
+Components Registry is a Global clean.js Components Dependency Injection System via tag name.
+
+Define and use components by tag name without import into code (IoC / Dependency Injection)
+
+Define and register a component into the `ComponentsRegistry`, then use it in the tree by using the registered name as the tag with a prefix:
+   - `'component-'` or `'component_'`
+      - Retrive a "pure" cle component
+   - `'use-'` or `'use_'`
+      - Retrive a "Use "component and setup the `Use` function arguments
+   - `'extended-'` or `'extended_'`
+      - Retrive an "Extended" component and setup the `Extended` function arguments
+
+Define Example: 
+```js
+import { ComponentsRegistry } from "cle.js/lib"
+
+ComponentsRegistry.define({ Rectangle: {
+ ...def...
+}})
+
+```
+then import this file to be executed
+
+Usage Example:
+```js
+...
+
+{ div: { 
+  
+  "=>": [
+
+   { 'component-Rectangle': {} } // pure component retrive
+
+   { 'use-Rectangle': {...Use overrides...} } // overrides only
+
+   { 'use-Rectangle': [{...Use overrides...}, ...otherUseArgs] } // full Use args
+
+]}}
+```
+
+The components defined into ComponentsRegistry can be also used into "html" components & derivates as the where into "deps".
+
+Example:
+```html
+...
+<view>
+
+  <use-Rectangle [overrides]="as in standard html components" [use-options]="as in standard html components" >...childs injection</use-Rectangle>
+
+</view>
+...
+```
+
 # More About Evaluable: Bind, Alias, SmarAlias/PropertyBinding/CachedProp, Define Subprops
 T.B.D
 
@@ -1629,7 +1683,7 @@ T.B.D
 T.B.D
 
 # Advanced
-## Advanced: fromHtml, remoteHtmlComponent & fromHtmlComponentDef & defineHtmlComponent
+## Advanced: fromHtml, remoteHtmlComponent & fromHtmlComponentDef & defineHtmlComponent (V1 & V2 with localComponents)
 
 ## Advanced: Nested Detached Renderer
 ## Advanced: Dynamic Lazy Renderer
