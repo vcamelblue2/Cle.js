@@ -23,7 +23,7 @@
         "test-build": "npx http-server ./dist/browser -p 4200 -c-1"
     },
     "dependencies": {
-        "cle.js": "~0.14.4",
+        "cle.js": "~0.14.5",
         "csz": "^1.2.0"
     },
     "devDependencies": {

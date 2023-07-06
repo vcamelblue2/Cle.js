@@ -1,6 +1,8 @@
 import { cle, RenderApp, remoteHtmlComponent } from "../../lib/caged-le.js"
 import {default as csz} from 'https://unpkg.com/csz'
 
+import "./global-di-components/index.js"
+
 // setup csz lib 
 window.css = (v)=>csz([v]) // fix to not use template literal
 
