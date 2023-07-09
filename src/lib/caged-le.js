@@ -2176,10 +2176,12 @@ class Component {
         if(typeof v === 'object'){
           let {handler, options} = v
           let remover = this.html_pointer_element.addEventListener(k, (...e)=>handler.bind(undefined, this.$this, ...e)(), options)
+          this.handlerRemover.push(remover)
         } 
-        // else if ( typeof v === 'function'){
-        let remover = this.html_pointer_element.addEventListener(k, (...e)=>v.bind(undefined, this.$this, ...e)())
-        // }
+        else if ( typeof v === 'function'){
+          let remover = this.html_pointer_element.addEventListener(k, (...e)=>v.bind(undefined, this.$this, ...e)())
+          this.handlerRemover.push(remover)
+        }
       })
     }
 
