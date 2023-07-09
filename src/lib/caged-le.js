@@ -686,15 +686,6 @@ class UseComponentDeclaration{
     
     // now check for injections!
     let injections = this.inject || {}
-    let childs_def_typology = ['', "=>", "text", "_", ">>", "view", "contains", "childs"] // reverse più probabilità..
-    const get_childs_def_typology = (component_def => {
-      for (let t of childs_def_typology) {
-        if (t in component_def){
-          return t
-        }
-      }
-      return null
-    })
     const recursive_check_childs_injection = (resolved_component, lvl=0) =>{
       // _debug.log("Level: ", lvl, resolved_component)
 
@@ -732,7 +723,7 @@ class UseComponentDeclaration{
 
         // handle standard components
         let cdef = Object.assign({}, resolved_component[ctype]) // shallow copy def
-        let childs_def_key = get_childs_def_typology(cdef)
+        let childs_def_key = getUsedChildsDefTypology(cdef)
         
         // _debug.log("Level: ", lvl, "Is a component: ", resolved_component)
 
@@ -921,6 +912,16 @@ const unifyChildsDef = (definition)=>{
 
   return extracted_childs.length > 0 ? extracted_childs : undefined
 }
+
+const childs_def_typology = ['', "=>", "text", "_", ">>", "view", "contains", "childs"] // reverse più probabilità..
+const getUsedChildsDefTypology = (component_def => {
+  for (let t of childs_def_typology) {
+    if (t in component_def){
+      return t
+    }
+  }
+  return null
+})
 
 const getComponentType = (template)=>{
   // let componentDef;
@@ -3539,6 +3540,7 @@ class Component {
       data, "private:data": _data, 
       props, "private:props": _props, 
       "let": data_let, "private:let": _data_let, 
+      // read_only_props: data_read_only // todo: campo speciale in cui inserire gli evaluable / read only .. e in teoria se si prova a modificarle parte eccezione
     } = definition
     addToAlreadyResolved(
       'data', "private:data", 
