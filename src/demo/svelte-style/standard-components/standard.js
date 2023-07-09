@@ -7,7 +7,10 @@ export const StandardComponentWithGlobalDI = { div: {
         "Hi From Standard Component Imported in Remote Component That Use Global DI Component",
         
         {br: {}},
-        
-        { 'use-I_Rectangle': {} } // Zero import required / IoC
+
+        // Zero import required / IoC
+        // { 'component-I_Rectangle': {} }, // simple usage only
+        // { 'use-I_Rectangle':  { "ha_style.color": "red" }}, // extension with use
+        { 'use-I_Rectangle': [{ "ha_style.color": "red" }, undefined, {b: ", Hello!"}] } // extension with use and args, plus extra childs!
     ]
 }}

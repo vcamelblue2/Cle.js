@@ -696,6 +696,11 @@ class UseComponentDeclaration{
       else {
         let ctype = getComponentType(resolved_component)
         let oj_cdef = resolved_component[ctype]
+
+        // check for zero-import-components
+        if (ComponentsRegistry.has(ctype)){ 
+          return resolved_component
+        }
         
         // handle smart definition, like: {h3: "..."} or {h3: ["...", ...]}
         if ((typeof oj_cdef === "function") || (typeof oj_cdef === "string") || Array.isArray(oj_cdef)){ // shallow copy def
@@ -811,7 +816,7 @@ class _BindToPropInConstructor {
         return {prop: prop, signal: signal}
       }
     }
-    console.log("thiss", this)
+    // console.log("thiss", this)
   }
   build($context){
     const {prop, signal} = this.extractor.bind(undefined, $context)()
@@ -5787,7 +5792,7 @@ const resolveAndConvertHtmlElement = (element, tagReplacers, extraDefs, jsValCon
         return Use(tagReplacers[tag.substring(4).toLowerCase()], {...parsedDef}, {...use_options}, children)
       }
       else if (ComponentsRegistry.has(tag)){ 
-        return ComponentsRegistry.get(tag)({...parsedDef}, {...use_options}, children)
+        return ComponentsRegistry.get(tag)({...parsedDef}, {...use_options}, ...children)
       }
     }
     else if (tag.startsWith("extended-")){
@@ -5795,7 +5800,7 @@ const resolveAndConvertHtmlElement = (element, tagReplacers, extraDefs, jsValCon
         return Extended(tagReplacers[tag.substring(9).toLowerCase()], {...parsedDef}, {...use_options}, children)
       }
       else if (ComponentsRegistry.has(tag)){ 
-        return ComponentsRegistry.get(tag)({...parsedDef}, {...use_options}, children)
+        return ComponentsRegistry.get(tag)({...parsedDef}, {...use_options}, ...children)
       }
     }
     // if (tag.startsWith("extended-direct") && tag.substring(15).toLowerCase() in tagReplacers){
@@ -5805,7 +5810,7 @@ const resolveAndConvertHtmlElement = (element, tagReplacers, extraDefs, jsValCon
     //   ext[componentType].meta = el.meta
     // } // todo: fix use and extended..that skip meta definition!
     else if (tag.startsWith("component-") && ComponentsRegistry.has(tag)){
-        return ComponentsRegistry.get(tag)({...parsedDef}, {...use_options}, children)
+        return ComponentsRegistry.get(tag)({...parsedDef}, ...children)
     }
 
     return { [tag]: {...parsedDef, "=>": children}}
@@ -6170,9 +6175,29 @@ const ComponentsRegistry = new (class _ComponentsRegistry {
       throw Error("Components Registry - Redefiniton Error")
     }
 
-    this.components['component_'+lower_name] = this.components['component-'+lower_name] = ()=>template;
-    this.components['use_'+lower_name] = this.components['use-'+lower_name] = (overrides, args, extrachilds)=>Use(template, overrides, args, extrachilds);
-    this.components['extended_'+lower_name] = this.components['extended-'+lower_name] = (overrides, args, extrachilds)=>Extended(template, overrides, args, extrachilds);
+    this.components['component_'+lower_name] = this.components['component-'+lower_name] = (overrides={}, ...extrachilds)=>{
+      if (overrides !== undefined && typeof def === "object") {
+        
+        let oj_def_extrachilds = {}
+        let ovverides_def_extrachilds = {}
+
+        let oj_childs_def_type = getUsedChildsDefTypology(def)
+        if (oj_childs_def_type !== null){
+          oj_def_extrachilds =  {[oj_childs_def_type]: [...def[oj_childs_def_type], ...extrachilds]}
+        }
+
+        let overrides_childs_def_type = getUsedChildsDefTypology(overrides)
+        if (overrides_childs_def_type !== null){
+          ovverides_def_extrachilds =  {[overrides_childs_def_type]: [...overrides[overrides_childs_def_type], ...extrachilds]}
+        }
+
+        return {[baseHtmlElement ?? name]: {...def, ...oj_def_extrachilds, ...overrides, ...ovverides_def_extrachilds}} 
+      } else {
+        return template
+      }
+    }; // full overried!
+    this.components['use_'+lower_name] = this.components['use-'+lower_name] = (overrides, args, ...extrachilds)=>Use(template, overrides, args, extrachilds);
+    this.components['extended_'+lower_name] = this.components['extended-'+lower_name] = (overrides, args, ...extrachilds)=>Extended(template, overrides, args, extrachilds);
 
   }
 
@@ -6186,7 +6211,7 @@ const ComponentsRegistry = new (class _ComponentsRegistry {
   /**
    * 
    * @param {string} fullname - complete name (with prefix)
-   * @returns { (()=>any) | (overrides: any, args: any, extrachilds: any[])=>(Use() | Extended()) } } 
+   * @returns { (()=>any) | (overrides: any, args: any, ...extrachilds: any[])=>(Use() | Extended()) } } 
    */
   get(fullname){
     return this.components[fullname.toLowerCase()]
