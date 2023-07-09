@@ -1,17 +1,25 @@
 # CLE - Welcome to  Clean.js
 
-Clean.js is a declarative Javascript Framework, with pure POJO in mind (for ui, data model & logic), a "caged" environment, a True reactive nature and "static" analysis (used to build dependencies between componentes). Optionally imperative code can still be used for some dynamic parts.
- 
- Inspired mostly by: 
-  - QML (id, scoping & naming, true "reactive" properties, signals & slot, mangling for declarations, coding by convention, everything has a signal, components sub-editing from external, elements/ref by ID, auto context/scope)
-  - Angular (declarative & templatingm ng-for, ng-if, 2 way data binding, "auto-update", Hooks & life-cycle)
-  - React (non-verbose, render library first, light & dynamic, with very limited size & memory footprint, easy to learn)
-  - Python (function declaration must have "self" as first parameter, natural langauge syntax like)
+`Clean.js` is a declarative Javascript Framework, with pure `POJO` in mind (for ui, data model & logic), `no virtual dom`, a "caged" environment, a True `reactive` nature, a powerful context system, native state management utils and fast rt "static" analysis (used to build dependencies between components and achieve true reactivity).
+
+Clean.js  `is not a "all-or-nothing"` framework, it can be mixed up with other frameworks, this way applications can be gradually migrated to cle or take the best from different worlds with `mashups` (eg. simple status management with props, scope, signal and dbus, or "zero imports" for components declaration). See the `React mashup` example in src/mashups/react.
+
+Clean.js can be taken from `NPM`, for structured projects, or it can be also imported directly from `CDN`, for fast prototyping or small, simple pure-js-based projects (it doesn't require to be compiled, as it leverage on es6 modules with benefits for DX, eg. start dev server for big projects). Cle promotes open-source and suggest to avoid "security-by-obfuscation" pratiques and just minimize the code for production.
+
+Clean.js `is fast`. For his POJO nature one of it's major improve w.r.t other frameworks is that reactivity is not achieved by using virtual dom and diffing algorithms, instead it leverage the "caged" system and very a fast "static analysis" to determinate the dependencies between components, props, attrs etc, in order to re-render parts only in reaction to changes. Lazy loading and rendering does the rest. This makes cle `really fast`.
+
+Another remarkable improve is that `components are just object`, still editable, customizable and extensible, also if taken from NPM (in other frameworks everything a component can do should be "prepared" from developers). This lead for eg. UI library developers to create and `handle less code`, because components are not sealed, or handle re-hydration in different ways.
+
+Clean.js it's also a `"meta-language" first`. In other words something like JSON: a syntax readable both by Humans & Computers that does not require compilation. This means that it's easy to build `other syntax/frameworks` with CLE. In this framework you will find `different` styles & techniques, each with pro and cons, but ALL styles can be used together and mixed as you prefer.
+
+Inspired mostly by: 
+  - `QML` (id, scoping & naming, true "reactive" properties, events as signals & slot, mangling for declarations, coding by convention, everything has a signal, component editing from external, assignment system, elements/ref by ID, auto context/scope)
+  - `Angular` (pure declarative & templating, ng-for, ng-if, 2 way data binding, "auto-update", Hooks & life-cycle)
+  - `React` (non-verbose, render library first, lightweight, fast and dynamic, with very limited size & memory footprint, easy to learn, css approach)
+  - `Vue` (html like files for components declaration with script/style/template)
+  - `Python` (read-first, mangling, function declaration must have "self" as first parameter, natural language syntax like)
   - and many more
 
- For his POJO nature one of it's major improve w.r.t other frameworks is that components are just object, still editable, customizable and extensible, also if taken from NPM (in other frameworks everything a component can do should be "prepared" from developers). This lead for eg. UI library developers to create and handle less code, because components are not sealed.
-
- Clean.js it's also a "meta-language" first. In other words something like JSON: a syntax readable both by Humans & Computers. This means that it's easy to build other syntax/frameworks with CLE. In this framework you will find differents styles & technique, each with pro and cons, but ALL styles can be used together and mixed as you prefer.
 
 ## Quick Start
 [![Try in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/edit/web-platform-xezbjg?file=main.js,remote-components.html)
