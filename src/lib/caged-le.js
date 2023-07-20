@@ -6176,14 +6176,28 @@ const ComponentsRegistry = new (class _ComponentsRegistry {
     }
 
     this.components['component_'+lower_name] = this.components['component-'+lower_name] = (overrides={}, ...extrachilds)=>{
-      if (overrides !== undefined && typeof def === "object") {
+      let declared_def = def
+
+      if (typeof declared_def === 'function'){
+        
+        declared_def = declared_def(overrides)
+
+        if (overrides?.extra_use_args !== undefined ){
+          overrides = overrides?.extra_use_args
+        }
+        else {
+          overrides = {}
+        }
+      }
+
+      if (overrides !== undefined && typeof declared_def === "object") {
         
         let oj_def_extrachilds = {}
         let ovverides_def_extrachilds = {}
 
-        let oj_childs_def_type = getUsedChildsDefTypology(def)
+        let oj_childs_def_type = getUsedChildsDefTypology(declared_def)
         if (oj_childs_def_type !== null){
-          oj_def_extrachilds =  {[oj_childs_def_type]: [...def[oj_childs_def_type], ...extrachilds]}
+          oj_def_extrachilds =  {[oj_childs_def_type]: [...declared_def[oj_childs_def_type], ...extrachilds]}
         }
 
         let overrides_childs_def_type = getUsedChildsDefTypology(overrides)
@@ -6191,13 +6205,49 @@ const ComponentsRegistry = new (class _ComponentsRegistry {
           ovverides_def_extrachilds =  {[overrides_childs_def_type]: [...overrides[overrides_childs_def_type], ...extrachilds]}
         }
 
-        return {[baseHtmlElement ?? name]: {...def, ...oj_def_extrachilds, ...overrides, ...ovverides_def_extrachilds}} 
+        return {[baseHtmlElement ?? name]: {...declared_def, ...oj_def_extrachilds, ...overrides, ...ovverides_def_extrachilds}} 
       } else {
-        return template
+        return {[baseHtmlElement ?? name]: declared_def}
       }
     }; // full overried!
-    this.components['use_'+lower_name] = this.components['use-'+lower_name] = (overrides, args, ...extrachilds)=>Use(template, overrides, args, extrachilds);
-    this.components['extended_'+lower_name] = this.components['extended-'+lower_name] = (overrides, args, ...extrachilds)=>Extended(template, overrides, args, extrachilds);
+    this.components['use_'+lower_name] = this.components['use-'+lower_name] = (overrides, args, ...extrachilds)=>{
+      let declared_def = def
+      let declared_template = template
+
+      if (typeof declared_def === 'function'){
+        
+        declared_def = declared_def(overrides)
+        declared_template = {[baseHtmlElement ?? name]: declared_def}
+
+        if (overrides?.extra_use_args !== undefined ){
+          overrides = overrides?.extra_use_args
+        }
+        else {
+          overrides = {}
+        }
+      }
+
+      return Use(declared_template, overrides, args, extrachilds)
+    };
+    this.components['extended_'+lower_name] = this.components['extended-'+lower_name] = (overrides, args, ...extrachilds)=>{
+      let declared_def = def
+      let declared_template = template
+
+      if (typeof declared_def === 'function'){
+        
+        declared_def = declared_def(overrides)
+        declared_template = {[baseHtmlElement ?? name]: declared_def}
+
+        if (overrides?.extra_use_args !== undefined ){
+          overrides = overrides?.extra_use_args
+        }
+        else {
+          overrides = {}
+        }
+      }
+
+      return Extended(declared_template, overrides, args, extrachilds)
+    };
 
   }
 
