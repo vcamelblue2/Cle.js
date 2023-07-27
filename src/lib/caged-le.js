@@ -1393,6 +1393,7 @@ class Component {
   // attrProperties = {}// real attr Props Container // todo: qualcosa del genere per gli attr
   signals = {} // type {signalX: Signal}
   hooks = {}// hook alle onInit dei componenti etc..
+  hooks_destructors = {} // destructor returned by onInit etc hook
   meta = {} // container of "local" meta variable (le-for)
   
   signalsHandlerRemover = []
@@ -3267,7 +3268,7 @@ class Component {
     this.isA$ctxComponent && this.convertedDefinition.constructor !== undefined && this.hooks.constructor()
 
     // trigger init
-    this.hooks.onInit !== undefined && this.hooks.onInit()
+    if (this.hooks.onInit !== undefined){ this.hooks_destructors.onInit = this.hooks.onInit() }
 
     // create childs
     for (let _child of this.childs){
@@ -3275,7 +3276,7 @@ class Component {
     }
 
     // afterChildsInit (non lazy!)
-    this.hooks.afterChildsInit !== undefined && this.hooks.afterChildsInit()
+    this.hooks.afterChildsInit !== undefined && this.hooks.afterChildsInit() // todo: hoosk destructor
 
     // trigger afterInit (lazy..)
     this.hooks.afterInit !== undefined && setTimeout(()=>this.hooks.afterInit(), 1)
@@ -3363,6 +3364,7 @@ class Component {
   // }
   // regenerate(){}
   destroy(){
+    if (this.hooks_destructors?.onInit !== undefined) { this.hooks_destructors.onInit.bind(undefined, this.$this)(); this.hooks_destructors.onInit = undefined }
     this.hooks.onDestroy !== undefined && this.hooks.onDestroy()
     this.childs?.forEach(child=>child.destroy())
     this.destroyDynamicChilds(undefined, true, true)
