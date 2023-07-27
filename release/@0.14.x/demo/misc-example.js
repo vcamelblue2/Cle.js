@@ -7302,9 +7302,9 @@ const logPropChanges = ({prop, scope="$.scope"})=>{
 
 console.log(logPropChanges({prop: "condition"}))
 
-RenderApp(document.body, cle.root({},
+RenderApp(document.body, cle.root({ vals: [1,2] },
 
-  cle.div({ meta: {forEach: "q", of: [1,2]},
+  cle.div({ meta: {forEach: "q", of: f`@vals`},
 
     condition: true,
 
@@ -7335,6 +7335,9 @@ RenderApp(document.body, cle.root({},
     ...logPropChanges({prop: "condition", scope: "$.this"})
 
   }, "I'm a rectangle! Click to change condition"),
+
+  cle.button({ onclick: f`{ @vals = [...@vals, 1] }`, text: "+", style: "width: 200px; height: 80px"}),
+  cle.button({ onclick: f`{ @vals = @vals.filter((_,i)=>i<@vals.length-1) }`, text: "-", style: "width: 200px; height: 80px"}),
 
 ))
 }
@@ -7401,4 +7404,4 @@ RenderApp(document.body, cle.root({},
 // appDemoShadowRoot()
 // appDemoHeavyPropertyFuncEvalOptimization()
 // appDemoFixStyleWithHAStyleProp()
-// appDemoDirectivesSystem()
+appDemoDirectivesSystem()
