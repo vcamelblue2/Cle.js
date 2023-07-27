@@ -7196,6 +7196,152 @@ const appDemoFixStyleWithHAStyleProp = ()=>{
 
 
 
+const appDemoDirectivesSystem = ()=>{
+
+const colorOnHover = ({preferredColor='orange'})=>({ dir_colorOnHover: {
+
+  onInit: $ => {
+
+    let colors = [preferredColor, 'gray']
+
+    const count = ExternalProp(0)
+
+    count.addOnChangedHandler($.this, (...args)=>{
+      console.log("directives: count changed!!", count.value, args)
+    })
+
+    let oj_color = $.el.style.color
+    let onMouseEnter = (e)=>{
+      oj_color = $.el.style.color
+      $.el.style.color = colors[count.value%2]
+    }
+    let onMouseLeave = (e)=>{
+      $.el.style.color = oj_color
+      count.value += 1
+    }
+
+    $.this.el.addEventListener("mouseenter", onMouseEnter)
+    $.this.el.addEventListener("mouseleave", onMouseLeave)
+
+    // REMOVER
+    return ()=>{
+      console.log("dirctive: ret destroy")
+      $.this.el.removeEventListener("mouseenter", onMouseEnter)
+      $.this.el.removeEventListener("mouseleave", onMouseLeave)
+      count.destroy(true)
+    }
+  },
+
+  onDestroy($){
+    console.log("dirctive: ondestroy")
+  }
+}})
+
+// more configurable & multi-use!
+const colorOnHoverV2 = ({preferredColor='orange', kind="color"})=>({ ['dir_colorOnHover'+kind]: {  // multi-use directive ready
+  
+  onInit: $ => {
+
+    let colors = [preferredColor, 'gray']
+
+    const count = ExternalProp(0)
+
+    count.addOnChangedHandler($.this, (...args)=>{
+      console.log("directives: count changed!!", count.value, args)
+    })
+
+    let oj_color = $.el.style[kind]
+    let onMouseEnter = (e)=>{
+      oj_color = $.el.style[kind]
+      $.el.style[kind] = colors[count.value%2]
+    }
+    let onMouseLeave = (e)=>{
+      $.el.style[kind] = oj_color
+      count.value += 1
+    }
+
+    $.this.el.addEventListener("mouseenter", onMouseEnter)
+    $.this.el.addEventListener("mouseleave", onMouseLeave)
+
+    // REMOVER
+    return ()=>{
+      console.log("dirctive: ret destroy")
+      $.this.el.removeEventListener("mouseenter", onMouseEnter)
+      $.this.el.removeEventListener("mouseleave", onMouseLeave)
+      count.destroy(true)
+    }
+  },
+
+  onDestroy($){
+    console.log("dirctive: ondestroy")
+  }
+}})
+
+// example of how to declare variable and signals..
+const logPropChanges = ({prop, scope="$.scope"})=>{
+  return {
+    // use standard injection in component definition!
+    // declare a variable
+    ['__logPropChanges__followed_prop__'+prop]: undefined, // f(scope+"."+prop, true)
+
+    // declare a signal handling
+    ['on_this_'+'__logPropChanges__followed_prop__'+prop+"Changed"]: ($, v, o) => {
+      console.log("the followed prop changed!!", v, o)
+    },
+
+    
+    // standard directives def
+    ['dir_logPropChanges'+prop]: { // multi-use directive ready
+      onInit: $=>{
+        console.log("logPropChanges active on prop:", prop, "i will log this prop changes")
+        $['__logPropChanges__followed_prop__'+prop] = f(scope+"."+prop, true)
+      }
+    }
+  }
+}
+
+console.log(logPropChanges({prop: "condition"}))
+
+RenderApp(document.body, cle.root({},
+
+  cle.div({ meta: {forEach: "q", of: [1,2]},
+
+    condition: true,
+
+    style: $ => ( 
+      $.condition === true ? 
+      {
+        background: "green",
+        color: "white"
+      } : {
+        background: "red",
+        color: "white"
+      }
+    ),
+
+    "ha.style.width": "200px",
+    "ha.style.height": "200px",
+
+    "ha.style.border": $ => ($.condition ? 5 : 10 ) + "px solid black",
+    "ha.style.padding": $ => $.condition ? "25px" : "0px",
+
+    onclick: $=>{
+      $.condition = !$.condition
+    },
+
+    ...colorOnHoverV2({preferredColor: 'red', kind: 'color'}),
+    ...colorOnHoverV2({preferredColor: 'blue', kind: 'background'}),
+
+    ...logPropChanges({prop: "condition", scope: "$.this"})
+
+  }, "I'm a rectangle! Click to change condition"),
+
+))
+}
+
+
+
+
 // app0()
 // test2way()
 // appTodolist()
@@ -7255,3 +7401,4 @@ const appDemoFixStyleWithHAStyleProp = ()=>{
 // appDemoShadowRoot()
 // appDemoHeavyPropertyFuncEvalOptimization()
 // appDemoFixStyleWithHAStyleProp()
+// appDemoDirectivesSystem()

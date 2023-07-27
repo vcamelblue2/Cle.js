@@ -1706,6 +1706,9 @@ T.B.D
 # Childs Ref By Name & Ctx Ref Id
 T.B.D
 
+# Directives
+T.B.D /demo/misc-example.js/directives
+
 # Advanced
 ## Advanced: fromHtml, remoteHtmlComponent & fromHtmlComponentDef & defineHtmlComponent (V1 & V2 with localComponents)
 
@@ -1999,6 +2002,14 @@ Cle can easly used in combination with other framework like React. visit /src/ma
       myName: "single",
       myNameMulti: "multi"
     },
+
+    directives: {
+      name: {
+        ...definition...
+      }
+    }
+    // inline shortcut:
+    // dir_name: {...definition...}
   }
   // any others unknonw key that cannot be deducted will become a props
   // this way you can also declare myProp: ... without props/let etc.
