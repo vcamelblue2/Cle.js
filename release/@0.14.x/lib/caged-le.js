@@ -568,7 +568,7 @@ class UseComponentDeclaration{
         // throw new Error("Not Implemented Yet!")
         const impossible_to_redefine = []
         const direct_lvl = ["id", "ctx_id", "ctx_ref_id", "constructor", "beforeInit", "onInit", "afterChildsInit", "afterInit", "onUpdate", "onDestroy", "oos"] // direct copy
-        const first_lvl = ["signals", "dbus_signals", "data", "private:data", "props", "private:props", "let", "alias", "handle", "when"] // on first lvl direct
+        const first_lvl = ["signals", "dbus_signals", "data", "private:data", "props", "private:props", "let", "alias", "handle", "when", "directives"] // on first lvl direct
         const first_lvl_special = ["s_css"] // first lvl direct + eventual overwrite
         const second_lvl = ["on", "on_s", "on_a"]
         const first_or_second_lvl = ["def", "private:def"] // check for function (may exist "first lvl namespace")
@@ -1393,7 +1393,10 @@ class Component {
   // attrProperties = {}// real attr Props Container // todo: qualcosa del genere per gli attr
   signals = {} // type {signalX: Signal}
   hooks = {}// hook alle onInit dei componenti etc..
+  hooks_destructors = {} // destructor returned by onInit etc hook
   meta = {} // container of "local" meta variable (le-for)
+  directives = {} // directives
+  directives_hooks_destructors // [] directives destructors
   
   signalsHandlerRemover = []
   attrHattrRemover = []
@@ -2062,6 +2065,22 @@ class Component {
 
   // step 3: create and renderize
   create(){
+
+    // setup directives space 
+    if (this.convertedDefinition.directives !== undefined) {
+      // convert   directives: { myDirective: {onInit: ...}}   =>   directives: { onInit: [...]}
+      Object.entries(this.convertedDefinition.directives).forEach(([dir,dir_space])=>{
+        Object.entries(dir_space).forEach(([key,val])=>{
+          if (key in this.directives){
+            this.directives[key].push(val)
+          } else {
+            this.directives[key] = [val]
+          }
+        })
+      })
+      // init hook destructrs 
+      this.directives_hooks_destructors = []
+    }
 
     // check dependencies
     if (this.convertedDefinition.checked_deps !== undefined) {
@@ -3267,7 +3286,9 @@ class Component {
     this.isA$ctxComponent && this.convertedDefinition.constructor !== undefined && this.hooks.constructor()
 
     // trigger init
-    this.hooks.onInit !== undefined && this.hooks.onInit()
+    if (this.hooks.onInit !== undefined){ this.hooks_destructors.onInit = this.hooks.onInit() }
+    if (this.directives?.onInit !== undefined) { this.directives_hooks_destructors = [...this.directives_hooks_destructors, ...this.directives.onInit.map(hook=>hook.bind(undefined, this.$this)()).filter(v=>v !== undefined && typeof v === 'function')] }
+
 
     // create childs
     for (let _child of this.childs){
@@ -3275,10 +3296,12 @@ class Component {
     }
 
     // afterChildsInit (non lazy!)
-    this.hooks.afterChildsInit !== undefined && this.hooks.afterChildsInit()
+    this.hooks.afterChildsInit !== undefined && this.hooks.afterChildsInit() // todo: hoosk destructor
+    if(this.directives?.afterChildsInit !== undefined) { this.directives_hooks_destructors = [...this.directives_hooks_destructors, ...this.directives.afterChildsInit.map(hook=>hook.bind(undefined, this.$this)()).filter(v=>v !== undefined && typeof v === 'function')] }
 
     // trigger afterInit (lazy..)
     this.hooks.afterInit !== undefined && setTimeout(()=>this.hooks.afterInit(), 1)
+    if(this.directives?.afterInit !== undefined) { this.directives_hooks_destructors = [...this.directives_hooks_destructors, ...this.directives.afterInit.map(hook=>setTimeout(()=>hook.bind(undefined, this.$this)(), 1)).filter(v=>v !== undefined && typeof v === 'function')] }
 
 
     // s_css, TODO: support function etc. must be AFTER childs creation, because NESTED redefinition require ORDER PRESERVATION (to use natural css overwrite) todo: is it buggy for le-for & le-if component? 
@@ -3363,6 +3386,9 @@ class Component {
   // }
   // regenerate(){}
   destroy(){
+    if (this.directives.onDestroy !== undefined) { this.directives.onDestroy.forEach(hook=>hook.bind(undefined, this.$this)()) }
+    if (this.directives_hooks_destructors !== undefined && this.directives_hooks_destructors.length) { this.directives_hooks_destructors.forEach(hook=>hook.bind(undefined, this.$this)()); this.directives_hooks_destructors = undefined }
+    if (this.hooks_destructors?.onInit !== undefined) { this.hooks_destructors.onInit.bind(undefined, this.$this)(); this.hooks_destructors.onInit = undefined }
     this.hooks.onDestroy !== undefined && this.hooks.onDestroy()
     this.childs?.forEach(child=>child.destroy())
     this.destroyDynamicChilds(undefined, true, true)
@@ -3557,6 +3583,11 @@ class Component {
     unifiedDef._data = _data || _props || _data_let || {}
 
 
+    let { directives } = definition
+    addToAlreadyResolved('directives')
+    unifiedDef.directives = directives
+
+
     const dash_shortucts_keys = {
       attrs: {},
       hattrs: {},
@@ -3573,6 +3604,7 @@ class Component {
       on_le: {},
       on_ctx: {},
       on_ref: {},
+      directives: {}
     }
 
     // let has_dash_shortucts_keys = false // todo performance by skip next if series
@@ -3724,6 +3756,11 @@ class Component {
 
         else if (k.startsWith('on') && k.endsWith("_event")){ // handle html events like  "onclick_event" 
           dash_shortucts_keys.handle[k.substring(0, k.length-6)] = val
+          addToAlreadyResolved(k)
+        }
+
+        else if (k.startsWith('dir_')){ // handle directives
+          dash_shortucts_keys.directives[k.substring(4)] = val
           addToAlreadyResolved(k)
         }
       }
@@ -3899,6 +3936,10 @@ class Component {
         
       }
       else { unifiedDef.on = { ref: dash_shortucts_keys.on_ref }}
+    }
+    if (Object.keys(dash_shortucts_keys.directives).length > 0){
+      if (unifiedDef.directives !== undefined){ unifiedDef.directives = { ...unifiedDef.directives, ...dash_shortucts_keys.directives } }
+      else { unifiedDef.directives = dash_shortucts_keys.directives }
     }
 
     // handle subcomponent transformation
@@ -6176,14 +6217,28 @@ const ComponentsRegistry = new (class _ComponentsRegistry {
     }
 
     this.components['component_'+lower_name] = this.components['component-'+lower_name] = (overrides={}, ...extrachilds)=>{
-      if (overrides !== undefined && typeof def === "object") {
+      let declared_def = def
+
+      if (typeof declared_def === 'function'){
+        
+        declared_def = declared_def(overrides)
+
+        if (overrides?.extra_use_args !== undefined ){
+          overrides = overrides?.extra_use_args
+        }
+        else {
+          overrides = {}
+        }
+      }
+
+      if (overrides !== undefined && typeof declared_def === "object") {
         
         let oj_def_extrachilds = {}
         let ovverides_def_extrachilds = {}
 
-        let oj_childs_def_type = getUsedChildsDefTypology(def)
+        let oj_childs_def_type = getUsedChildsDefTypology(declared_def)
         if (oj_childs_def_type !== null){
-          oj_def_extrachilds =  {[oj_childs_def_type]: [...def[oj_childs_def_type], ...extrachilds]}
+          oj_def_extrachilds =  {[oj_childs_def_type]: [...declared_def[oj_childs_def_type], ...extrachilds]}
         }
 
         let overrides_childs_def_type = getUsedChildsDefTypology(overrides)
@@ -6191,13 +6246,49 @@ const ComponentsRegistry = new (class _ComponentsRegistry {
           ovverides_def_extrachilds =  {[overrides_childs_def_type]: [...overrides[overrides_childs_def_type], ...extrachilds]}
         }
 
-        return {[baseHtmlElement ?? name]: {...def, ...oj_def_extrachilds, ...overrides, ...ovverides_def_extrachilds}} 
+        return {[baseHtmlElement ?? name]: {...declared_def, ...oj_def_extrachilds, ...overrides, ...ovverides_def_extrachilds}} 
       } else {
-        return template
+        return {[baseHtmlElement ?? name]: declared_def}
       }
     }; // full overried!
-    this.components['use_'+lower_name] = this.components['use-'+lower_name] = (overrides, args, ...extrachilds)=>Use(template, overrides, args, extrachilds);
-    this.components['extended_'+lower_name] = this.components['extended-'+lower_name] = (overrides, args, ...extrachilds)=>Extended(template, overrides, args, extrachilds);
+    this.components['use_'+lower_name] = this.components['use-'+lower_name] = (overrides, args, ...extrachilds)=>{
+      let declared_def = def
+      let declared_template = template
+
+      if (typeof declared_def === 'function'){
+        
+        declared_def = declared_def(overrides)
+        declared_template = {[baseHtmlElement ?? name]: declared_def}
+
+        if (overrides?.extra_use_args !== undefined ){
+          overrides = overrides?.extra_use_args
+        }
+        else {
+          overrides = {}
+        }
+      }
+
+      return Use(declared_template, overrides, args, extrachilds)
+    };
+    this.components['extended_'+lower_name] = this.components['extended-'+lower_name] = (overrides, args, ...extrachilds)=>{
+      let declared_def = def
+      let declared_template = template
+
+      if (typeof declared_def === 'function'){
+        
+        declared_def = declared_def(overrides)
+        declared_template = {[baseHtmlElement ?? name]: declared_def}
+
+        if (overrides?.extra_use_args !== undefined ){
+          overrides = overrides?.extra_use_args
+        }
+        else {
+          overrides = {}
+        }
+      }
+
+      return Extended(declared_template, overrides, args, extrachilds)
+    };
 
   }
 

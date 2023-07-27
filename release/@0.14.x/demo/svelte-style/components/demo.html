@@ -55,6 +55,11 @@ View is the template
       <br/>
       [Injected from Global DI!]
     </use-I_Rectangle>
+    <hr>
+    <use-I_RectangleAsFunc (onclick)="{ @el.style.color = 'red' }" ha-style.font-size="24px" [raw-def-extra_use_args]="({'ha_style.fontWeight': 600})">
+      <br/>
+      [Injected from Global DI!]
+    </use-I_RectangleAsFunc>
   </div>
 </view>
 

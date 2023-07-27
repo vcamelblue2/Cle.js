@@ -1641,9 +1641,15 @@ Define Example:
 ```js
 import { ComponentsRegistry } from "cle.js/lib"
 
+// cle way
 ComponentsRegistry.define({ Rectangle: {
  ...def...
 }})
+
+// or as function
+ComponentsRegistry.define({ Rectangle: (props) => ({
+ ...def...
+})})
 
 ```
 then import this file to be executed
@@ -1662,6 +1668,14 @@ Usage Example:
 
    { 'use-Rectangle': [{...Use overrides...}, ...otherUseArgs] } // full Use args
 
+
+   // usage for function style is the same, except that overrides will be the "props/args" of the function
+   { 'component-Rectangle': {} } // pure component retrive
+
+   { 'use-Rectangle': {...props..., extra_use_args:...Use overrides...} } // overrides only
+
+   { 'use-Rectangle': [{...props..., extra_use_args:...Use overrides...}, ...otherUseArgs] } // full Use args
+
 ]}}
 ```
 
@@ -1678,6 +1692,8 @@ Example:
 ...
 ```
 
+Tips: for "use args" in function like used inside html component try [raw-def-extra_use_args]="({...})"
+
 # More About Evaluable: Bind, Alias, SmarAlias/PropertyBinding/CachedProp, Define Subprops
 T.B.D
 
@@ -1689,6 +1705,9 @@ T.B.D
 
 # Childs Ref By Name & Ctx Ref Id
 T.B.D
+
+# Directives
+T.B.D /demo/misc-example.js/directives
 
 # Advanced
 ## Advanced: fromHtml, remoteHtmlComponent & fromHtmlComponentDef & defineHtmlComponent (V1 & V2 with localComponents)
@@ -1983,6 +2002,14 @@ Cle can easly used in combination with other framework like React. visit /src/ma
       myName: "single",
       myNameMulti: "multi"
     },
+
+    directives: {
+      name: {
+        ...definition...
+      }
+    }
+    // inline shortcut:
+    // dir_name: {...definition...}
   }
   // any others unknonw key that cannot be deducted will become a props
   // this way you can also declare myProp: ... without props/let etc.
