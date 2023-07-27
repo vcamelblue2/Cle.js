@@ -3286,8 +3286,8 @@ class Component {
     this.isA$ctxComponent && this.convertedDefinition.constructor !== undefined && this.hooks.constructor()
 
     // trigger init
-    if (this.hooks.onInit !== undefined){ this.hooks_destructors.onInit = this.hooks.onInit() }
-    if (this.directives?.onInit !== undefined) { this.directives_hooks_destructors = [...this.directives_hooks_destructors, ...this.directives.onInit.map(hook=>hook.bind(undefined, this.$this)()).filter(v=>v !== undefined && typeof v === 'function')] }
+    if (this.hooks.onInit !== undefined){ const destructor = this.hooks.onInit(); this.hooks_destructors.onInit =  typeof destructor === 'function' ? destructor : undefined }
+    if (this.directives?.onInit !== undefined) { this.directives.onInit.map(hook=>hook.bind(undefined, this.$this)()).filter(v=>v !== undefined && typeof v === 'function').forEach(v=>this.directives_hooks_destructors.push(v)) }
 
 
     // create childs
@@ -3297,11 +3297,11 @@ class Component {
 
     // afterChildsInit (non lazy!)
     this.hooks.afterChildsInit !== undefined && this.hooks.afterChildsInit() // todo: hoosk destructor
-    if(this.directives?.afterChildsInit !== undefined) { this.directives_hooks_destructors = [...this.directives_hooks_destructors, ...this.directives.afterChildsInit.map(hook=>hook.bind(undefined, this.$this)()).filter(v=>v !== undefined && typeof v === 'function')] }
+    if(this.directives?.afterChildsInit !== undefined) { this.directives.afterChildsInit.map(hook=>hook.bind(undefined, this.$this)()).filter(v=>v !== undefined && typeof v === 'function').forEach(v=>this.directives_hooks_destructors.push(v)) }
 
     // trigger afterInit (lazy..)
     this.hooks.afterInit !== undefined && setTimeout(()=>this.hooks.afterInit(), 1)
-    if(this.directives?.afterInit !== undefined) { this.directives_hooks_destructors = [...this.directives_hooks_destructors, ...this.directives.afterInit.map(hook=>setTimeout(()=>hook.bind(undefined, this.$this)(), 1)).filter(v=>v !== undefined && typeof v === 'function')] }
+    if(this.directives?.afterInit !== undefined) { this.directives.afterInit.map(hook=>setTimeout(()=>hook.bind(undefined, this.$this)(), 1)).filter(v=>v !== undefined && typeof v === 'function').forEach(v=>this.directives_hooks_destructors.push(v)) }
 
 
     // s_css, TODO: support function etc. must be AFTER childs creation, because NESTED redefinition require ORDER PRESERVATION (to use natural css overwrite) todo: is it buggy for le-for & le-if component? 
@@ -3388,7 +3388,7 @@ class Component {
   destroy(){
     if (this.directives.onDestroy !== undefined) { this.directives.onDestroy.forEach(hook=>hook.bind(undefined, this.$this)()) }
     if (this.directives_hooks_destructors !== undefined && this.directives_hooks_destructors.length) { this.directives_hooks_destructors.forEach(hook=>hook.bind(undefined, this.$this)()); this.directives_hooks_destructors = undefined }
-    if (this.hooks_destructors?.onInit !== undefined) { this.hooks_destructors.onInit.bind(undefined, this.$this)(); this.hooks_destructors.onInit = undefined }
+    if (this.hooks_destructors?.onInit !== undefined) { this.hooks_destructors.onInit?.bind?.(undefined, this.$this)(); this.hooks_destructors.onInit = undefined }
     this.hooks.onDestroy !== undefined && this.hooks.onDestroy()
     this.childs?.forEach(child=>child.destroy())
     this.destroyDynamicChilds(undefined, true, true)
