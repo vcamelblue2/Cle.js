@@ -1641,9 +1641,15 @@ Define Example:
 ```js
 import { ComponentsRegistry } from "cle.js/lib"
 
+// cle way
 ComponentsRegistry.define({ Rectangle: {
  ...def...
 }})
+
+// or as function
+ComponentsRegistry.define({ Rectangle: (props) => ({
+ ...def...
+})})
 
 ```
 then import this file to be executed
@@ -1662,6 +1668,14 @@ Usage Example:
 
    { 'use-Rectangle': [{...Use overrides...}, ...otherUseArgs] } // full Use args
 
+
+   // usage for function style is the same, except that overrides will be the "props/args" of the function
+   { 'component-Rectangle': {} } // pure component retrive
+
+   { 'use-Rectangle': {...props..., extra_use_args:...Use overrides...} } // overrides only
+
+   { 'use-Rectangle': [{...props..., extra_use_args:...Use overrides...}, ...otherUseArgs] } // full Use args
+
 ]}}
 ```
 
@@ -1677,6 +1691,8 @@ Example:
 </view>
 ...
 ```
+
+Tips: for "use args" in function like used inside html component try [raw-def-extra_use_args]="({...})"
 
 # More About Evaluable: Bind, Alias, SmarAlias/PropertyBinding/CachedProp, Define Subprops
 T.B.D
