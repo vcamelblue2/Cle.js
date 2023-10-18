@@ -23,7 +23,7 @@ export const Timer = { Model: {
       },
 
       stop($){
-        $.oos.private.start()
+        $.oos.private.stop()
       }
     },
 
@@ -36,6 +36,10 @@ export const Timer = { Model: {
         $._private.setupPrivateModel($.this);
         
         $.running && $.start();
+      },
+
+      onDestroy: $ => { 
+        $.stop();
       },
 
       on_runningChanged: ($, running, oldRunning) => {
