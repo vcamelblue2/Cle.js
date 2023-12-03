@@ -1,5 +1,7 @@
 import { CLE_FLAGS,  Alias, Bind, BindToProp, Case, cle, DefineSubprops, Extended, ExtendSCSS, ExternalProp, f, fArgs,  asFunc, LE_BackendApiMock, LE_LoadCss, LE_LoadScript, pass, Placeholder, RenderApp, smart, SmartAlias, str, Switch, toInlineStyle, Use, useExternal, html, LazyComponent, remoteHtmlComponent, fromHtmlComponentDef, UseShadow } from "../lib/caged-le.js"
 import { NavSidebarLayout } from "../layouts/layouts.js"
+import { App, H2 } from "../extra/smart-alias.js"
+import { useProtocols, defineProtocols, ServerProtocol, PROTOCOL } from "../extra/protocols.js"
 
 
 const NEW_APP_TEMPLATE = async ()=>{
@@ -7343,6 +7345,107 @@ RenderApp(document.body, cle.root({ vals: [1,2] },
 }
 
 
+const appDemoModelInExternalVar = ()=>{
+
+  RenderApp(document.body, cle.root({ 
+    vals: [1,2] 
+  }, 
+    cle.h2("Hello"),
+
+    (()=>{
+      let $;
+
+      return { div: { onInit: model=>{ $ = model},
+
+        varabile: 123,
+        doubleVar: ()=>$.varabile*2,
+
+        afterInit(){
+          console.log("afterInit: ", $, $.varabile)
+        },
+
+        text: ["hello", " - ", ()=>$.varabile, " - ", ()=>$.doubleVar]
+      }}
+
+    })()
+  ))
+}
+
+
+const appDemoProtocols = ()=>{
+
+  const Client1 = cle.div({
+
+    response: "",
+
+    def_start_hello_protocol: async ($)=>{
+      let final_resp = await $.exec_protocol("com.server1/hello", $.this, [
+
+        // obj mode
+        { op: ({send, cancel}, {msg}={}) => { 
+          console.log("CLIENT: i will send msg", "hello"); 
+          send({msg: "hello"}) 
+          // cancel()
+        }},
+
+        // or use array notation
+        [({send, cancel}, {msg}={}) => { 
+            console.log("CLIENT: received", "client review", msg); 
+            send({msg: "review " + msg})
+        }, undefined, undefined, {sig: PROTOCOL.THEN.REPEAT_ALL, options: {max_times: 2}}]
+
+      ], undefined);
+
+      // let response = await final_resp.response
+      let response = final_resp
+
+      console.log("final resp: ", response)
+      
+      $.response = response.msg
+    }
+
+  }, 
+    cle.div("Resp: ", $=>$.response),
+
+    cle.button({
+      onclick: async $ => await $.start_hello_protocol()
+    }, "Start")
+  )
+
+  const Server1 = cle.div({
+
+    ...defineProtocols(()=>({
+
+      "com.server1/hello": new ServerProtocol([ 
+
+        [({send, cancel}, {msg}={})=>{ 
+
+            console.log("SERVER: msg is", msg); 
+
+            setTimeout(() => {
+              send({msg: "hi"}) 
+            }, 1000);
+        }]
+
+      ])
+    }))
+  })
+
+  RenderApp(document.body, App({
+
+      // class: css(``)
+      ...useProtocols
+
+    }, 
+      H2("HI, test the app with the button above"),
+
+      /////////////////
+      Server1,
+      Client1,
+      /////////////////
+
+  ))
+}
 
 
 // app0()
@@ -7404,4 +7507,6 @@ RenderApp(document.body, cle.root({ vals: [1,2] },
 // appDemoShadowRoot()
 // appDemoHeavyPropertyFuncEvalOptimization()
 // appDemoFixStyleWithHAStyleProp()
-appDemoDirectivesSystem()
+// appDemoDirectivesSystem()
+// appDemoModelInExternalVar()
+appDemoProtocols()
