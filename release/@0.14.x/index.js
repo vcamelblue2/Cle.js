@@ -4,7 +4,9 @@ import * as ReactMashup from "./mashup/react"
 import * as Layouts from "./layouts/layouts"
 import * as Anchors from "./layouts/anchors"
 import * as Components from "./components"
+import * as SmartAlias from "./extra/smart-alias"
+import * as Protocols from "./extra/protocols"
 
 export { 
-    Cle, LiteRouting, ReactMashup, Layouts, Anchors, Components
+    Cle, LiteRouting, ReactMashup, Layouts, Anchors, Components, SmartAlias, Protocols
 }

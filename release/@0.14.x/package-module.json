@@ -1,7 +1,7 @@
 {
     "name": "cle.js",
     "description": "A modern and small Javascript framework for web apps",
-    "version": "0.14.10",
+    "version": "0.14.11",
 
     "author": {
         "name": "Vincenzo Villani",
@@ -31,6 +31,8 @@
       "./mashup/react/lib/react-in-cle": "./mashup/react/lib/react-in-cle.js",
       "./layouts/layouts": "./layouts/layouts.js",
       "./layouts/anchors": "./layouts/anchors.js",
+      "./extra/smart-alias": "./extra/smart-alias.js",
+      "./extra/protocols": "./extra/protocols.js",
       "./components": "./components"
     },
 
