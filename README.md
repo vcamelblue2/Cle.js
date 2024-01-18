@@ -33,10 +33,16 @@ or clone the [project template](https://github.com/vcamelblue2/create-cleanjs-ap
 ```sh
 git clone https://github.com/vcamelblue2/create-cleanjs-app--use-html.git
 ```
+
+or the [mashup project template](https://github.com/vcamelblue2/create-cleanjs-app--use-html.git) starter [for Cle - React mashup components] 
+```sh
+git clone https://github.com/vcamelblue2/create-cleanjs-app--use-react-mashup
+```
+
 Quick Example
 ```javascript
 import { RenderApp, cle, f, Bind, Use, pass, defineHtmlComponent, remoteHtmlComponent } from 'cle.js/lib'
-// or import from cdn 
+// from cdn 
 // import { RenderApp, cle, f, Bind, Use, pass } from 'https://cdn.jsdelivr.net/gh/vcamelblue2/clean.js/src/lib/caged-le.js';
 
 // App Definition
@@ -201,8 +207,11 @@ await app();
 
 ```
 
-# IT Docs
-# Basic Concepts
+Real World Example: 
+- [Web Tv - Clean.js Web App](https://vcamelblue2.github.io/cle-js-apps--web-tv) / [Code - Github Repo](https://github.com/vcamelblue2/cle-js-apps--web-tv) 
+
+
+# Basic Concepts (it-ITA Docs)
 
 ## POJO - Plain Old Javascript Object
  Un elemento CLE è un POJO (Plain Old Javascript Object) la cui unica e prima chiave è un tag html. Il valore associato a questo tag può essere invece: 
