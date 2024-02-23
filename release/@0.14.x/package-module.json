@@ -1,7 +1,7 @@
 {
     "name": "cle.js",
     "description": "A modern and small Javascript framework for web apps",
-    "version": "0.14.11",
+    "version": "0.14.12",
 
     "author": {
         "name": "Vincenzo Villani",
@@ -33,6 +33,7 @@
       "./layouts/anchors": "./layouts/anchors.js",
       "./extra/smart-alias": "./extra/smart-alias.js",
       "./extra/protocols": "./extra/protocols.js",
+      "./extra/lang": "./extra/lang.js",
       "./components": "./components"
     },
 

@@ -1,4 +1,4 @@
-import { cle } from "../lib/caged-le";
+import { cle } from "../lib/caged-le.js";
 
 export const AppRoot = cle.root;
 export const App = cle.div;
