@@ -1630,6 +1630,9 @@ L'idea alla base è quella di sfruttare lo scope o altre sofisticazioni come le 
 
 visita la demo demo/misc-example.js/ -> appDemoComponentFactory per altre info
 
+### @Input
+T.B.D - Setup property on childs using the point of view of the parent without constructors / use. This enable react style coding using functions (functional components).
+
 ### Extra Childs Injection & beforeInit Hook
 T.B.D
 
@@ -1729,6 +1732,8 @@ T.B.D /demo/misc-example.js/directives
 ## Advanced: React Mashup
 Cle can easly used in combination with other framework like React. visit /src/mashup/react/demo to see some example
 
+## Advanced: Pure Declarative - Lang Utils
+
 ## Advanced: Imperative & Dynamic - DynamicSignal
 ## Advanced: Imperative & Dynamic - ExternalProps
 ## Advanced: Imperative & Dynamic - GetCleElByDomEl
@@ -1738,6 +1743,8 @@ Cle can easly used in combination with other framework like React. visit /src/ma
 ## Advanced: CLE_FLAGS
 ## Advanced: Properties Class
 ## Advanced: Signals Class
+
+## Advanced: Protocols
 
 # Full Component Definition Reference
  ```javascript
@@ -1776,6 +1783,11 @@ Cle can easly used in combination with other framework like React. visit /src/ma
       myFunc: asFunc(($, ...args)=>{...}) // declare function costants as props (to be passed)
     },
     // shortcuts -> let_counter: 0
+
+    '@input': { // property passed by the parent using parent Point Of View (useful with react style component functional definition)
+      inputProp1,
+      inputHandler
+    }
 
 
     // Functions definition 'a-la-python'
@@ -2059,6 +2071,16 @@ $ => {
 
         // + every props and function defined
     },
+
+    $.oss: {/* any defined by user [untracked] */ }, 
+
+    $.parent,
+    $.scope,
+    $.meta,
+    $.le,
+    $.ctx,
+    $.ref,
+    $.dbus,
 
     $.u = {
 
