@@ -6,7 +6,8 @@ import * as Anchors from "./layouts/anchors"
 import * as Components from "./components"
 import * as SmartAlias from "./extra/smart-alias"
 import * as Protocols from "./extra/protocols"
+import * as Lang from "./extra/lang"
 
 export { 
-    Cle, LiteRouting, ReactMashup, Layouts, Anchors, Components, SmartAlias, Protocols
+    Cle, LiteRouting, ReactMashup, Layouts, Anchors, Components, SmartAlias, Protocols, Lang
 }

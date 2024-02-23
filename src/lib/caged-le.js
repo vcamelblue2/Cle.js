@@ -568,7 +568,7 @@ class UseComponentDeclaration{
         // throw new Error("Not Implemented Yet!")
         const impossible_to_redefine = []
         const direct_lvl = ["id", "ctx_id", "ctx_ref_id", "constructor", "beforeInit", "onInit", "afterChildsInit", "afterInit", "onUpdate", "onDestroy", "oos"] // direct copy
-        const first_lvl = ["signals", "dbus_signals", "data", "private:data", "props", "private:props", "let", "alias", "handle", "when", "directives"] // on first lvl direct
+        const first_lvl = ["signals", "dbus_signals", "data", "private:data", "props", "private:props", "let", '@input', "alias", "handle", "when", "directives"] // on first lvl direct
         const first_lvl_special = ["s_css"] // first lvl direct + eventual overwrite
         const second_lvl = ["on", "on_s", "on_a"]
         const first_or_second_lvl = ["def", "private:def"] // check for function (may exist "first lvl namespace")
@@ -2210,6 +2210,79 @@ class Component {
       })
     }
 
+    // handle INPUT DATA / PARAMS (aka variable defined with "parent" scope in mind. eg: A whan to pass to B the prop x, a call that $.scope.x, but for B is "$.(parent)scope.x". this is a syntactic sugar for automagically make it work)
+    if (this.convertedDefinition.input_params !== undefined && !this.meta_options.isNewScope){
+      Object.entries(this.convertedDefinition.input_params).forEach(([k,v])=>{
+
+        // Create but do not init
+        this.properties[k] = new Property(pass, pass, pass, pass, ()=>this.parent.$this, (thisProp, deps, externalDeps=[])=>{
+
+          // deps connection logic
+
+          let depsRemover = []
+
+          deps.$this_deps?.forEach(d=>{
+            let depRemover = this.parent.properties[d]?.addOnChangedHandler?.(thisProp, ()=>thisProp.markAsChanged() ) // qui il ? server affinche si ci registri solo alle props (e non alle func etc!). il ?.add... invece per le vere property e non alle fittizie!
+            depRemover && depsRemover.push(depRemover)
+          }) // supporting multiple deps, but only of first order..
+
+          deps.$parent_deps?.forEach(d=>{
+            let depRemover = this.parent.parent?.properties[d]?.addOnChangedHandler?.(thisProp, ()=>thisProp.markAsChanged() )
+            depRemover && depsRemover.push(depRemover)
+          })
+
+          deps.$scope_deps?.forEach(d=>{
+            let [propsOwner, isPropertiesProp] = this.parent.get$ScopedPropsOwner(d);
+            let depRemover = (isPropertiesProp ? propsOwner.properties[d] : propsOwner.meta[d])?.addOnChangedHandler?.(thisProp, ()=>thisProp.markAsChanged() ); // qui il ? server affinche si ci registri solo alle props (e non alle func etc!)
+            depRemover && depsRemover.push(depRemover)
+          }) // supporting multiple deps, but only of first order..
+
+
+          deps.$le_deps?.forEach(d=>{ // [le_id, property]
+            let depRemover;
+            exponentialRetry(()=>{
+              depRemover = this.parent.$le[d[0]].properties[d[1]]?.addOnChangedHandler?.(thisProp, ()=>thisProp.markAsChanged() )
+            }, pass, pass, pass, "Cannot connect to CLE Obj by Id", 5)
+            depsRemover.push((...args)=>depRemover(...args))
+          })
+
+          deps.$ctx_deps?.forEach(d=>{ // [ctx_id, property]
+            let depRemover;
+            exponentialRetry(()=>{
+              depRemover = this.parent.$ctx[d[0]].properties[d[1]]?.addOnChangedHandler?.(thisProp, ()=>thisProp.markAsChanged() )
+            }, pass, pass, pass, "Cannot connect to CLE Obj by Ctx Id", 5)
+            depsRemover.push((...args)=>depRemover(...args))
+          })
+
+          deps.$ref_deps?.forEach(d=>{ // [refName, property]
+            // _debug.log("try match", d, this.getChildsRefOwner(d[0]));
+            let depRemover;
+            exponentialRetry(()=>{
+              // _debug.log("try match", d, this.getChildsRefOwner(d[0]), this.getChildsRefOwner(d[0])?.childsRefPointers, this.getChildsRefOwner(d[0])?.childsRefPointers?.[d[0]]?.properties[d[1]]);
+              const owner = this.parent.getChildsRefOwner(d[0]).childsRefPointers[d[0]]
+              if (Array.isArray(owner)){ throw Error("Cannot Bind to multi-ref child") }
+              depRemover = owner?.properties[d[1]]?.addOnChangedHandler?.(thisProp, ()=>thisProp.markAsChanged() )
+            }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5)
+            depsRemover.push(()=>depRemover())
+          })
+
+          externalDeps?.forEach(extDep=>{
+            let depRemover = extDep?.addOnChangedHandler?.(thisProp, ()=>thisProp.markAsChanged() )
+            depRemover && depsRemover.push(depRemover)
+          })
+          
+          return depsRemover
+
+        }, false)
+
+        // Create associated Signal -> Every property has an associated signal, fired on change, that we use to notify interested components
+        let signalName = k+"Changed" // nomde del segnale che useranno i dev per definirlo nelle on.. name used to store signal
+        let manualMarkSignalName = "_mark_"+k+"_as_changed" // nome visible ai dev per marcare manualmente la property come changed
+        this.signals[signalName] = new Signal(signalName, "stream => (newValue: any, oldValue: any) - property change signal")
+        this.properties[manualMarkSignalName] = ()=>this.properties[k].markAsChanged() // via on set scatenerà il signal etc!
+      })
+      _info.log("Parsed data definition: ", this, this.signals, this.properties)
+    }
     // first of all: declare all "data" possible property changes handler (in this way ww are sure that exist in the future for deps analysis) - they also decalre a signal!
     if (this.convertedDefinition.data !== undefined){
       Object.entries(this.convertedDefinition.data).forEach(([k,v])=>{
@@ -2443,6 +2516,29 @@ class Component {
     })
     
 
+    // INPUT PARAMS / data, TODO: check deps on set, "cached get", support function etc
+    if (this.convertedDefinition.input_params !== undefined && !this.meta_options.isNewScope){
+      Object.entries(this.convertedDefinition.input_params).forEach(([k,v])=>{
+
+        // finally init!
+        this.properties[k].init(
+          v,
+          ()=>_debug.log(k, "getted!"), 
+          (v, ojV, self)=>{ _debug.log(k, "setted!", this); 
+            if (self.isCachable()){
+              if (self.isCacheInvalid(v)){
+                this.signals[k+"Changed"].emit(v, this.properties[k]._latestResolvedValue);
+              }
+            } 
+            else {
+              this.signals[k+"Changed"].emit(v, this.properties[k]._latestResolvedValue);
+            }
+          },
+          //()=>{console.log("TODO: on destroy clear stuff and signal!!")}
+        )
+        _debug.log("Parser, data initialized: ", this, this.properties)
+      })
+    }
     // data, TODO: check deps on set, "cached get", support function etc
     if (this.convertedDefinition.data !== undefined){
       Object.entries(this.convertedDefinition.data).forEach(([k,v])=>{
@@ -3496,6 +3592,8 @@ class Component {
     unifiedDef.checked_deps = definition.deps
     addToAlreadyResolved('deps')
     
+    unifiedDef.input_params = definition['@input'] // input params: vars passed from the parent, must be resolved with parent scope
+    addToAlreadyResolved('@input')
 
 
 
@@ -5630,7 +5728,8 @@ const resolveAndConvertHtmlElement = (element, tagReplacers, extraDefs, jsValCon
       // it's implicit a function with this args.
       return smartFuncWithCustomArgs("Cle", "params", "state", "DepsInj", "u") (Array.from(element.childNodes)[0].textContent, true)(undefined, Cle, jsValContext.params, jsValContext.state, jsValContext.DepsInj, jsValContext.u)
     }
-
+    
+    const input_params = {} // todo: input params in html
     const properties = {}
     const signals = {}
     const on_handlers = {}

@@ -2,6 +2,7 @@ import { CLE_FLAGS,  Alias, Bind, BindToProp, Case, cle, DefineSubprops, Extende
 import { NavSidebarLayout } from "../layouts/layouts.js"
 import { App, H2 } from "../extra/smart-alias.js"
 import { useProtocols, defineProtocols, ServerProtocol, PROTOCOL } from "../extra/protocols.js"
+import { self, T, get, set, fun } from "../extra/lang.js"
 
 
 const NEW_APP_TEMPLATE = async ()=>{
@@ -7448,6 +7449,81 @@ const appDemoProtocols = ()=>{
 }
 
 
+const appDemoAvoidLambdaForComponentPropertySetupAndInputProps = ()=>{ // pure react style (with the declarative limits..)
+  // new: use input to avoid scope problem while passing parent to child props, in order to enable react functional component style
+
+  const SquareLabel = ({currentSize}) => cle.div({'ha.style.fontWeight': 600}, currentSize)
+
+  const SizeLabel = ({size}) => (
+    cle.div({ '@input': {size} }, 
+      get.size
+    )
+  )
+
+  const Square = ({size=10, setSize, color='red', useBind=false, inject}) => {
+
+    return cle.div({
+
+      '@input': {size, setSize}, // new! use @input to declare local variable as given by "parent". this will change the internal resolution, and resolving with the parent point of view. this resolve the "same name var" passing problem of the pure scope approach while using components
+
+      style: $ => ({
+        width: $.size+'px',
+        height: $.size+'px',
+        background: color,
+        color: "black"
+      }),
+      // or use by ref but declare deps with comments trick // style: $ => ({ /* deps: $.size */ width: size($)+'px' }),
+
+      ...(useBind ? {
+        handle_onclick: $ => { $.size = ($.size*2) } // for binded value we can use directly the variable! (it will act as an alias)
+      } : {
+        handle_onclick: $ => $.setSize($.size*2)
+      } )
+    },
+      cle.div({}, get.size),
+      SquareLabel({currentSize: get.size}),
+      SizeLabel({size: self.scope.get.size}), // no problem to pass same name using scope!
+      inject ?? ''
+    )
+  }
+
+  const ResetButton = ({reset, text}) => (
+    
+    cle.button({
+      '@input': {reset, text},
+
+      onclick: $=>{
+        console.log("RESET", $.reset);
+        $.reset()
+      }
+    },
+      get.text
+    )
+  )
+
+  RenderApp(document.body, cle.root({ 
+    squareSize: 100,
+
+    def: {
+      resetSquareSize: $ => {
+        $.squareSize=100
+      }
+    }
+  }, 
+    cle.h2("Hello"),
+
+    ResetButton({reset: fun.resetSquareSize, text: 'Reset'}),
+
+    Square({size: get.squareSize,      setSize: set.squareSize,    useBind: false}),
+    Square({size: Bind("@squareSize"), setSize: set.squareSize,    useBind: true, color: 'green'}),
+    Square({size: self.get.squareSize, setSize: set.squareSize,    useBind: false}),
+    Square({size: T.get.squareSize,    setSize: set.squareSize,    useBind: false, color: 'green'}),
+    Square({size: Bind("@squareSize"), setSize: set.squareSize,    useBind: true, inject: {span: 'hi'}}),
+
+  ))
+}
+
+
 // app0()
 // test2way()
 // appTodolist()
@@ -7509,4 +7585,5 @@ const appDemoProtocols = ()=>{
 // appDemoFixStyleWithHAStyleProp()
 // appDemoDirectivesSystem()
 // appDemoModelInExternalVar()
-appDemoProtocols()
+// appDemoProtocols()
+appDemoAvoidLambdaForComponentPropertySetupAndInputProps()
