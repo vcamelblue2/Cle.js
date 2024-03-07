@@ -947,6 +947,24 @@ const getComponentType = (template)=>{
   // return [elementType, componentDef ?? definition] // per i template veri restituisco la definizione (aka la definizione del componente), mentre per gli UseComponent il template/classe passata
 }
 
+const isSvgComponentType = (tag) => {
+  return tag.startsWith('svg.')
+}
+const getRealSvgComponentType = (tag)=>{
+  // MUST BE isSvgComponentType
+  const realTag = tag.split('.')[1]
+  return realTag === 'component' ? 'svg' : realTag
+}
+const createSvgComponentElement = (tag)=>{
+  return document.createElementNS('http://www.w3.org/2000/svg', getRealSvgComponentType(tag))
+}
+// export 
+/** Syntactic Sugar to define svg component using svg.component({ DEFINITION }, ...CHILDS), svg.circle({}, ...) instead of normal object "svg.component" | "svg.circle" ... */
+const svg = new Proxy({}, {
+  get: (_target, prop, receiver)=> cle['svg.'+prop],
+  set: () => {}
+})
+
 const analizeDepsStatically = (f, isUseExt=false)=>{
 
   // const f = $ => $.this.title + $.parent.width + $.le.navbar.height
@@ -1428,6 +1446,8 @@ class Component {
 
   htmlElementType
   isObjComponent
+  isPlaceholderPointerComponent
+  isSvgComponent
   html_pointer_element
   html_end_pointer_element // future use, per i componenti dinamici e liste..
   css_html_pointer_element
@@ -1448,6 +1468,7 @@ class Component {
     this.htmlElementType = getComponentType(definition)
     this.isObjComponent = ["Model", "Controller", "Service", "service", "Component", "Connector", "Signals", "Style", "Css"].includes(this.htmlElementType)
     this.isPlaceholderPointerComponent = ["LazyPointer"].includes(this.htmlElementType)
+    this.isSvgComponent = isSvgComponentType(this.htmlElementType)
     this.convertedDefinition = Component.parseComponentDefinition( (definition instanceof UseComponentDeclaration ? definition.computedTemplate : definition) [this.htmlElementType])
     this.meta_options = {
       isNewScope: this.convertedDefinition.meta?.newScope,
@@ -1672,7 +1693,7 @@ class Component {
     }
     else {
 
-      this.html_pointer_element = document.createElement(this.htmlElementType)
+      this.html_pointer_element = this.isSvgComponent ? createSvgComponentElement(this.htmlElementType) : document.createElement(this.htmlElementType)
 
       if (this.isMyParentHtmlRoot){
         this.parent.appendChild(this.html_pointer_element)
@@ -4678,7 +4699,7 @@ class ConditionalComponent extends Component{
     }
     else {
 
-      this.html_pointer_element = document.createElement(this.htmlElementType)
+      this.html_pointer_element = this.isSvgComponent ? createSvgComponentElement(this.htmlElementType) : document.createElement(this.htmlElementType)
 
       this.html_pointer_element_anchor.after(this.html_pointer_element)
 
@@ -4948,7 +4969,7 @@ class IterableViewComponent{
 
   buildChildHtmlPointerElement(child, childIndex, is_full_rebuild){
     // create
-    child.html_pointer_element = document.createElement(child.htmlElementType)
+    child.html_pointer_element = child.isSvgComponent ? createSvgComponentElement(child.htmlElementType) : document.createElement(child.htmlElementType)
     
     // check insert position
     if (is_full_rebuild){
@@ -6433,6 +6454,6 @@ const ComponentsRegistry = new (class _ComponentsRegistry {
 // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // 
 // Exports - remember to export also in index.js
 
-const Cle = { CLE_FLAGS, pass, none, smart, f: smartFunc, fArgs: smartFuncWithCustomArgs, asFunc, Use, Extended, Placeholder, Bind, Alias, SmartAlias, PropertyBinding, DefineSubprops, ExternalProp, useExternal, BindToProp: BindToPropInConstructor, Switch, Case, LazyComponent: LazyComponentCreation, UseShadow: ShadowRootComponentCreator, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock, cle, str, str_, input, output, ExtendSCSS, clsIf, html: fromHtml, remoteHtmlComponent, remoteHtmlComponents, fromHtmlComponentDef, defineHtmlComponent, defineHtmlComponents, importAll, globalImportAll, ComponentsRegistry }
+const Cle = { CLE_FLAGS, pass, none, smart, f: smartFunc, fArgs: smartFuncWithCustomArgs, asFunc, Use, Extended, Placeholder, Bind, Alias, SmartAlias, PropertyBinding, DefineSubprops, ExternalProp, useExternal, BindToProp: BindToPropInConstructor, Switch, Case, LazyComponent: LazyComponentCreation, UseShadow: ShadowRootComponentCreator, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock, cle, svg, str, str_, input, output, ExtendSCSS, clsIf, html: fromHtml, remoteHtmlComponent, remoteHtmlComponents, fromHtmlComponentDef, defineHtmlComponent, defineHtmlComponents, importAll, globalImportAll, ComponentsRegistry }
 
-export { CLE_FLAGS, pass, none, smart, smartFunc as f, smartFuncWithCustomArgs as fArgs, asFunc, Use, Extended, Placeholder, Bind, Alias, SmartAlias, PropertyBinding, DefineSubprops, ExternalProp, useExternal, BindToPropInConstructor as BindToProp, Switch, Case, LazyComponentCreation as LazyComponent, ShadowRootComponentCreator as UseShadow, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock, cle, str, str_, input, output, ExtendSCSS, clsIf, fromHtml as html, remoteHtmlComponent, remoteHtmlComponents, fromHtmlComponentDef, defineHtmlComponent, defineHtmlComponents, importAll, globalImportAll, ComponentsRegistry }
+export { CLE_FLAGS, pass, none, smart, smartFunc as f, smartFuncWithCustomArgs as fArgs, asFunc, Use, Extended, Placeholder, Bind, Alias, SmartAlias, PropertyBinding, DefineSubprops, ExternalProp, useExternal, BindToPropInConstructor as BindToProp, Switch, Case, LazyComponentCreation as LazyComponent, ShadowRootComponentCreator as UseShadow, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock, cle, svg, str, str_, input, output, ExtendSCSS, clsIf, fromHtml as html, remoteHtmlComponent, remoteHtmlComponents, fromHtmlComponentDef, defineHtmlComponent, defineHtmlComponents, importAll, globalImportAll, ComponentsRegistry }

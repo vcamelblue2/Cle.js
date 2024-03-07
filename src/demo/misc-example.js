@@ -1,4 +1,4 @@
-import { CLE_FLAGS,  Alias, Bind, BindToProp, Case, cle, DefineSubprops, Extended, ExtendSCSS, ExternalProp, f, fArgs,  asFunc, LE_BackendApiMock, LE_LoadCss, LE_LoadScript, pass, Placeholder, RenderApp, smart, SmartAlias, str, Switch, toInlineStyle, Use, useExternal, html, LazyComponent, remoteHtmlComponent, fromHtmlComponentDef, UseShadow } from "../lib/caged-le.js"
+import { CLE_FLAGS,  Alias, Bind, BindToProp, Case, cle, svg, DefineSubprops, Extended, ExtendSCSS, ExternalProp, f, fArgs,  asFunc, LE_BackendApiMock, LE_LoadCss, LE_LoadScript, pass, Placeholder, RenderApp, smart, SmartAlias, str, Switch, toInlineStyle, Use, useExternal, html, LazyComponent, remoteHtmlComponent, fromHtmlComponentDef, UseShadow } from "../lib/caged-le.js"
 import { NavSidebarLayout } from "../layouts/layouts.js"
 import { App, H2 } from "../extra/smart-alias.js"
 import { useProtocols, defineProtocols, ServerProtocol, PROTOCOL } from "../extra/protocols.js"
@@ -7524,6 +7524,73 @@ const appDemoAvoidLambdaForComponentPropertySetupAndInputProps = ()=>{ // pure r
 }
 
 
+const appDemoSupportSvg = ()=>{ 
+  // Create an element within the svg - namespace (NS) 
+
+  RenderApp(document.body, cle.root({ 
+    radius: 40,
+
+    items: [
+      {type: 'circle', x: 100, y: 100},
+      {type: 'circle', x: 200, y: 200},
+      {type: 'rect',   x: 300, y: 300, w: 50, h: 50},
+      {type: 'line',   x1: 400, y1: 400, x2: 500, y2: 500, },
+    ]
+  }, 
+    cle.h2("Hello"),
+
+    svg.component({
+      counter: 1,
+      attrs: {
+        width:"100%", 
+        height: "700"
+      } 
+    },
+
+      svg.circle({
+        attrs: {
+          cx: $=>$.counter*50, 
+          cy: 50, 
+          r: $=>$.radius+($.counter**2), 
+          stroke: "green", 
+          strokeWidth: 10, 
+          fill: "white" 
+        }, 
+        onclick: $=>$.counter+=1
+      }),
+
+      svg.g({ meta: {forEach: 'item', of: f`@items`}, attrs: {
+        stroke: "green", 
+        strokeWidth: 10, 
+        fill: "white" 
+      }},
+
+        svg.circle({ meta: {if: f`@item.type === 'circle'`}, attrs: {
+          cx: f`@item.x`,
+          cy: f`@item.y`,
+          r: f`@radius`
+        }}),
+
+        svg.rect({ meta: {if: f`@item.type === 'rect'`}, attrs: {
+          x: f`@item.x`,
+          y: f`@item.y`,
+          width: f`@item.w`,
+          height: f`@item.h`,
+        }}),
+
+        svg.line({ meta: {if: f`@item.type === 'line'`}, attrs: {
+          x1: f`@item.x1`,
+          y1: f`@item.y1`,
+          x2: f`@item.x2`,
+          y2: f`@item.y2`,
+        }}),
+      )
+    ),
+  ))
+}
+
+
+
 // app0()
 // test2way()
 // appTodolist()
@@ -7586,4 +7653,5 @@ const appDemoAvoidLambdaForComponentPropertySetupAndInputProps = ()=>{ // pure r
 // appDemoDirectivesSystem()
 // appDemoModelInExternalVar()
 // appDemoProtocols()
-appDemoAvoidLambdaForComponentPropertySetupAndInputProps()
+// appDemoAvoidLambdaForComponentPropertySetupAndInputProps()
+appDemoSupportSvg()

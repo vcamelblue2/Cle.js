@@ -1721,6 +1721,9 @@ T.B.D
 # Directives
 T.B.D /demo/misc-example.js/directives
 
+# Svg
+T.B.D /demo/misc-example.js/appDemoSupportSvg
+
 # Advanced
 ## Advanced: fromHtml, remoteHtmlComponent & fromHtmlComponentDef & defineHtmlComponent (V1 & V2 with localComponents)
 
