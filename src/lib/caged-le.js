@@ -10,6 +10,8 @@ const CLE_FLAGS = {
   
   COMPONENT_REGISTRY_BASE_HTML_EL: 'div',
 
+  AUTO_SMARTFUNC_ENABLED: true,
+
   DEFAULTS: {
     META: {
       FULL_OPTIMIZED: false,
@@ -946,6 +948,11 @@ const getComponentType = (template)=>{
   return elementType
   // return [elementType, componentDef ?? definition] // per i template veri restituisco la definizione (aka la definizione del componente), mentre per gli UseComponent il template/classe passata
 }
+
+const isSmartFuncTextComponentType = (template) => {
+  return template && typeof template === 'object' && typeof template?.f_text === 'string' // && Object.keys(template).length === 1
+}
+
 
 const isSvgComponentType = (tag) => {
   return tag.startsWith('svg.')
@@ -3682,6 +3689,33 @@ class Component {
     addToAlreadyResolved('meta')
 
     unifiedDef.meta = meta
+
+    
+    // f static def
+    if (CLE_FLAGS.AUTO_SMARTFUNC_ENABLED){
+
+      // f hooks
+      if (definition.f_onInit){
+        unifiedDef.onInit = smartFunc(definition.f_onInit, true)
+        addToAlreadyResolved('f_onInit')
+      }
+      if (definition.f_afterInit){
+        unifiedDef.afterInit = smartFunc(definition.f_afterInit, true)
+        addToAlreadyResolved('f_afterInit')
+      }
+      if (definition.f_afterChildsInit){
+        unifiedDef.afterChildsInit = smartFunc(definition.f_afterChildsInit, true)
+        addToAlreadyResolved('f_afterChildsInit')
+      }
+      if (definition.f_onDestroy){
+        unifiedDef.onDestroy = smartFunc(definition.f_onDestroy, true)
+        addToAlreadyResolved('f_onDestroy')
+      }
+      if (definition.f_onUpdate){
+        unifiedDef.onUpdate = smartFunc(definition.f_onUpdate, true)
+        addToAlreadyResolved('f_onUpdate')
+      }  
+    }
     
 
     // maybe private def and multichoice
@@ -3741,6 +3775,12 @@ class Component {
           dash_shortucts_keys.attrs[k.substring(5)] = val
           addToAlreadyResolved(k)
         }
+        else if (k.startsWith('f_attr_')){ // AUTO SMART FUNC
+          if (CLE_FLAGS.AUTO_SMARTFUNC_ENABLED){
+            dash_shortucts_keys.attrs[k.substring(7)] = smartFunc(val, true)
+          }
+          addToAlreadyResolved(k)
+        }
 
         else if (k.startsWith('ha_')){
           dash_shortucts_keys.hattrs[k.substring(3)] = val
@@ -3750,17 +3790,25 @@ class Component {
           dash_shortucts_keys.hattrs[k.substring(6)] = val
           addToAlreadyResolved(k)
         }
+        else if (k.startsWith('f_hattr_')){ // AUTO SMART FUNC
+          if (CLE_FLAGS.AUTO_SMARTFUNC_ENABLED){
+            dash_shortucts_keys.hattrs[k.substring(8)] = smartFunc(val, true)
+          }
+          addToAlreadyResolved(k)
+        }
         
         else if (k.startsWith('p_')){
           dash_shortucts_keys.data[k.substring(2)] = val
           addToAlreadyResolved(k)
         }
-        else if (k.startsWith('let_')){
+        else if (k.startsWith('let_') || k.startsWith('let ')){
           dash_shortucts_keys.data[k.substring(4)] = val
           addToAlreadyResolved(k)
         }
-        else if (k.startsWith('let ')){
-          dash_shortucts_keys.data[k.substring(4)] = val
+        else if (k.startsWith('f_let_')){ // AUTO SMART FUNC
+          if (CLE_FLAGS.AUTO_SMARTFUNC_ENABLED){
+            dash_shortucts_keys.data[k.substring(6)] = smartFunc(val, true)
+          }
           addToAlreadyResolved(k)
         }
 
@@ -3770,6 +3818,12 @@ class Component {
         }
         else if (k.startsWith('def_')){
           dash_shortucts_keys.def[k.substring(4)] = val
+          addToAlreadyResolved(k)
+        }
+        else if (k.startsWith('f_def_')){ // AUTO SMART FUNC
+          if (CLE_FLAGS.AUTO_SMARTFUNC_ENABLED){
+            dash_shortucts_keys.def[k.substring(6)] = smartFuncWithCustomArgs('$arg')(val, true)
+          }
           addToAlreadyResolved(k)
         }
 
@@ -3783,6 +3837,12 @@ class Component {
         }
         else if (k.startsWith('handle_')){
           dash_shortucts_keys.handle[k.substring(7)] = val
+          addToAlreadyResolved(k)
+        }
+        else if (k.startsWith('f_handle_')){ // AUTO SMART HANDLE
+          if (CLE_FLAGS.AUTO_SMARTFUNC_ENABLED){
+            dash_shortucts_keys.handle[k.substring(9)] = smartFuncWithCustomArgs('$arg')(val, true)
+          }
           addToAlreadyResolved(k)
         }
 
@@ -3871,6 +3931,30 @@ class Component {
             dash_shortucts_keys.on_scope[k.substring(3)] = val
             addToAlreadyResolved(k)
           }
+        }
+
+        else if (k.startsWith('f_on_')){ // AUTO SMART FUNC ON SCOPE
+          if (CLE_FLAGS.AUTO_SMARTFUNC_ENABLED){
+            let f_val = smartFuncWithCustomArgs('newVal', 'oldVal')(val, true)
+            if (k.startsWith('f_on_le_')){
+              let id_and_sign = k.substring(8)
+              let [id, ...rest] = id_and_sign.split("_")
+              let sign = rest.join("_")
+              if (dash_shortucts_keys.on_le[id] !== undefined) {
+                dash_shortucts_keys.on_le[id][sign] = f_val
+              }
+              else {
+                dash_shortucts_keys.on_le[id] = { [sign]: f_val }
+              }
+            }
+            else if (k.startsWith('f_on_dbus_')){
+              dash_shortucts_keys.on_dbus[k.substring(10)] = f_val
+            }
+            else {
+              dash_shortucts_keys.on_scope[k.substring(5)] = f_val
+            }
+          }
+          addToAlreadyResolved(k)
         }
 
         else if (k.startsWith('on') && k.endsWith("_event")){ // handle html events like  "onclick_event" 
@@ -4081,6 +4165,11 @@ class Component {
       return component
     }
 
+    if(CLE_FLAGS.AUTO_SMARTFUNC_ENABLED && isSmartFuncTextComponentType(template)){
+      component = new TextNodeComponent(parent, smartFunc(template.f_text, true))
+      return component
+    }
+
     _info.log("Component Factory: ", parent, template)
     let componentType = getComponentType(template)
     let componentDef = (template instanceof UseComponentDeclaration ? template.computedTemplate : template) [componentType]
@@ -4098,6 +4187,11 @@ class Component {
 
 
     if("meta" in componentDef){
+      // f in meta -> correct f_if, f_of
+      if (CLE_FLAGS.AUTO_SMARTFUNC_ENABLED){
+        componentDef.meta = Component.detect_and_fix_f_meta(componentDef.meta)
+      }
+
       if ("if" in componentDef.meta){ // is a conditionalComponet
         component = new ConditionalComponent(parent, template, $le, $dbus)
       }
@@ -4114,6 +4208,20 @@ class Component {
     }
   
     return component
+  }
+
+  static detect_and_fix_f_meta = (meta)=>{
+    if (meta){
+      if (meta?.f_if){
+        meta['if'] = smartFunc(meta.f_if, true)
+        delete meta['f_if']
+      }
+      if (meta?.f_of){
+        meta['of'] = smartFunc(meta.f_of, true)
+        delete meta['f_of']
+      }
+    }
+    return meta
   }
   
 }

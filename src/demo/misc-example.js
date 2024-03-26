@@ -1,6 +1,6 @@
 import { CLE_FLAGS,  Alias, Bind, BindToProp, Case, cle, svg, DefineSubprops, Extended, ExtendSCSS, ExternalProp, f, fArgs,  asFunc, LE_BackendApiMock, LE_LoadCss, LE_LoadScript, pass, Placeholder, RenderApp, smart, SmartAlias, str, Switch, toInlineStyle, Use, useExternal, html, LazyComponent, remoteHtmlComponent, fromHtmlComponentDef, UseShadow } from "../lib/caged-le.js"
 import { NavSidebarLayout } from "../layouts/layouts.js"
-import { App, H2 } from "../extra/smart-alias.js"
+import { App, Button, H2, Div, Textarea, Service } from "../extra/smart-alias.js"
 import { useProtocols, defineProtocols, ServerProtocol, PROTOCOL } from "../extra/protocols.js"
 import { self, T, get, set, fun } from "../extra/lang.js"
 
@@ -7590,6 +7590,51 @@ const appDemoSupportSvg = ()=>{
 }
 
 
+const appDemoAutoFVarDefAndText = ()=>{ 
+
+  CLE_FLAGS.AUTO_SMARTFUNC_ENABLED = true
+
+  RenderApp(document.body, cle.root({ 
+    id: 'app',
+
+    let_counter: 0,
+    
+    f_let_doubleCounter: '@counter * 2',
+
+    f_def_incCounter: '@counter += $arg',
+
+    f_onInit: "{ console.log('init!', @counter) }"
+  }, 
+    Service({
+      f_on_counterChanged: '{ console.log("counter changed!", @counter, oldVal, newVal) }',
+      f_on_le_app_counterChanged: '{ console.log("app counter changed!", @counter, oldVal, newVal) }'
+    }),
+
+    cle.h2({
+      f_attr_style: '"font-weight: " + Math.min(900, (100 * (@counter+1)))',
+    }, "Hello"),
+
+    cle.h2({
+      'f_hattr_style.fontWeight': 'Math.min(900, (100 * (@counter+1)))',
+    }, "Hello"),
+
+    cle.div({}, 'The Counter is:', f`@counter`),
+    cle.div({}, 'The Double Counter is:', f`@doubleCounter`),
+    cle.div({}, 'The Double Counter is:', {f_text: '@doubleCounter'}),
+    cle.div({}, 'The 4x Counter is:', {f_text: '@doubleCounter*2'}),
+    
+    Button({onclick: $ => $.incCounter(1)}, 'Inc Counter'),
+    Button({f_handle_onclick: '{ console.log($arg); @incCounter(1) }'}, 'Inc Counter'),
+
+    cle.div("f-for"),
+    cle.div({meta: {forEach: "item", f_of: "[1,2,3, @counter]"}}, {f_text: "' - '+ @item"}),
+    cle.div({meta: {f_if: "@counter % 2 === 0"}}, 'f_if: [if even] - The Counter is:', f`@counter`),
+
+  ))
+}
+
+
+
 
 // app0()
 // test2way()
@@ -7654,4 +7699,5 @@ const appDemoSupportSvg = ()=>{
 // appDemoModelInExternalVar()
 // appDemoProtocols()
 // appDemoAvoidLambdaForComponentPropertySetupAndInputProps()
-appDemoSupportSvg()
+// appDemoSupportSvg()
+appDemoAutoFVarDefAndText()
