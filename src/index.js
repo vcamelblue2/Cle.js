@@ -7,7 +7,8 @@ import * as Components from "./components"
 import * as SmartAlias from "./extra/smart-alias"
 import * as Protocols from "./extra/protocols"
 import * as Lang from "./extra/lang"
+import * as Hooks from "./extra/hooks"
 
 export { 
-    Cle, LiteRouting, ReactMashup, Layouts, Anchors, Components, SmartAlias, Protocols, Lang
+    Cle, LiteRouting, ReactMashup, Layouts, Anchors, Components, SmartAlias, Protocols, Lang, Hooks
 }
