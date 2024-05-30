@@ -4292,9 +4292,9 @@ const appDemoStackblitz = async ()=>{
 
   let [ f_libs_cle_lib_cagedle_js, f_libs_cle_routing_lite_routing_js, f_libs_cle_layouts_layouts_js
    ] = await Promise.all([
-    await axios.get('https://raw.githubusercontent.com/vcamelblue2/clean.js/release/@0.0.11/main/lib/caged-le.js'),
-    await axios.get('https://raw.githubusercontent.com/vcamelblue2/clean.js/release/@0.0.11/main/routing/lite_routing.js'),
-    await axios.get('https://raw.githubusercontent.com/vcamelblue2/clean.js/release/@0.0.11/main/layouts/layouts.js')
+    await axios.get('https://cdn.jsdelivr.net/npm/cle.js@0.0.12/lib/caged-le.js'),
+    await axios.get('https://cdn.jsdelivr.net/npm/cle.js@0.0.12/routing/lite_routing.js'),
+    await axios.get('https://cdn.jsdelivr.net/npm/cle.js@0.0.12/layouts/layouts.js')
    ])
 
   RenderApp(document.body, { div: {
