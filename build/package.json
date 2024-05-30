@@ -23,7 +23,7 @@
     "outputFormat": "esmodule",
     "targets": {
         "main": {
-            "source": "src/lib/caged-le.js",
+            "source": "../src/lib/caged-le.js",
             "distDir": "dist/libonly/lib/commonjs_caged-le.min.js",
             "context": "browser",
             "includeNodeModules": true,
@@ -31,7 +31,7 @@
             "sourceMap": false
         },
         "module": {
-            "source": "src/lib/caged-le.js",
+            "source": "../src/lib/caged-le.js",
             "distDir": "dist/libonly/lib/caged-le.min.js",
             "outputFormat": "esmodule",
             "context": "browser",
@@ -40,7 +40,7 @@
             "sourceMap": false
         },
         "browser": {
-            "source": "src/tests/test-caged-le.html",
+            "source": "../src/tests/test-caged-le.html",
             "distDir": "dist/html/src/tests/test-caged-le.html",
             "outputFormat": "esmodule",
             "includeNodeModules": true,
@@ -52,8 +52,8 @@
         "no-build-run": "npx http-server ./ -p 4050 -c-1",
         "start": "parcel",
         "build": "parcel build",
-        "build-test": "parcel build src/tests/test-caged-le.html",
-        "serve_tests": "parcel serve src/tests/test-caged-le.html -p 4050 --host 127.0.0.1 --open chrome"
+        "build-test": "parcel build ../src/tests/test-caged-le.html",
+        "serve_tests": "parcel serve ../src/tests/test-caged-le.html -p 4050 --host 127.0.0.1 --open chrome"
     },
     "devDependencies": {
         "parcel": "latest"

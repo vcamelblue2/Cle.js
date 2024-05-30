@@ -78,10 +78,6 @@ typings/
 .DS_Store
 .ds_store
 
-harmful/
-local-demos/
-todo_and_tmp.js
-
 # parcel dist stuf
 .parcel-cache
 dontuseterserrc
@@ -92,7 +88,10 @@ dontuseterserrc
 **/env.test.js
 **/env.prod.js
 
-npm_release/
-
 src/README.md
 src/LICENSE
+
+# notes and todo
+harmful/
+local-demos/
+todo_and_tmp.js
