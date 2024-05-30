@@ -93,3 +93,6 @@ dontuseterserrc
 **/env.prod.js
 
 npm_release/
+
+src/README.md
+src/LICENSE
