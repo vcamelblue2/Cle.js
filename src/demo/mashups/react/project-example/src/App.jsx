@@ -2,8 +2,8 @@
 import {RenderApp, cle, html, f, fArgs, pass, LE_LoadCss, Bind, Alias, Switch, Case } from "../../../../../lib/caged-le.js"
 
 // Import cle-react mashup utils
-import { UseReact, useCleProps, onCleSignal  } from '../../../lib/react-in-cle.js';
-import { UseCle, UseSubCle } from '../../../lib/cle-in-react.js';
+import { UseReact, useCleProps, onCleSignal  } from '../../../../../mashup/react/lib/react-in-cle.js';
+import { UseCle, UseSubCle } from '../../../../../mashup/react/lib/cle-in-react.js';
 
 // PrimeReact
 import "primereact/resources/themes/lara-light-indigo/theme.css";  //theme

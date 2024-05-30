@@ -2,7 +2,7 @@
 
 `Clean.js` is a declarative Javascript Framework, with pure `POJO` in mind (for ui, data model & logic), `no virtual dom`, a "caged" environment, a True `reactive` nature, a powerful context system, native state management utils and fast rt "static" analysis (used to build dependencies between components and achieve true reactivity).
 
-Clean.js  `is not a "all-or-nothing"` framework, it can be mixed up with other frameworks, this way applications can be gradually migrated to cle or take the best from different worlds with `mashups` (eg. simple status management with props, scope, signal and dbus, or "zero imports" for components declaration). See the `React mashup` example in src/mashups/react.
+Clean.js  `is not a "all-or-nothing"` framework, it can be mixed up with other frameworks, this way applications can be gradually migrated to cle or take the best from different worlds with `mashups` (eg. simple status management with props, scope, signal and dbus, or "zero imports" for components declaration). See the `React mashup` example in src/demo/mashups/react.
 
 Clean.js can be taken from `NPM`, for structured projects, or it can be also imported directly from `CDN`, for fast prototyping or small, simple pure-js-based projects (it doesn't require to be compiled, as it leverage on es6 modules with benefits for DX, eg. start dev server for big projects). Cle promotes open-source and suggest to avoid "security-by-obfuscation" pratiques and just minimize the code for production.
 
@@ -1733,7 +1733,7 @@ T.B.D /demo/misc-example.js/appDemoSupportSvg
 ## Advanced: SubRenderer
 
 ## Advanced: React Mashup
-Cle can easly used in combination with other framework like React. visit /src/mashup/react/demo to see some example
+Cle can easly used in combination with other framework like React. visit /src/demo/mashup/react to see some example
 
 ## Advanced: Pure Declarative - Lang Utils
 
