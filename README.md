@@ -2,9 +2,52 @@
 
 `Clean.js` is a declarative Javascript Framework, with pure `POJO` in mind (for ui, data model & logic), `no virtual dom`, a "caged" environment, a True `reactive` nature, a powerful context system, native state management utils and fast rt "static" analysis (used to build dependencies between components and achieve true reactivity).
 
+TLDR "HTML String" vs "JS Objects":
+
+<table>
+<tr><th>Html</th><th>Cle</th></tr>
+<tr>
+  <td>
+
+```html
+<div>
+
+  <h1 class="title">
+    Hello World
+  </h1>
+
+  <button onclick="console.log(...)">
+    Log
+  </button>
+
+</div>
+
+```
+  </td>
+  <td>
+
+```js
+{ div: { '=>': [
+
+    { h1: { class:'title', 
+      text:'Hello World' 
+    }},
+
+    { button: { onclick: $ => console.log(...), 
+      text:'Log' 
+    }},
+
+  ]
+}}
+```
+  </td>
+</tr>
+</table>
+
+
 Clean.js  `is not a "all-or-nothing"` framework, it can be mixed up with other frameworks, this way applications can be gradually migrated to cle or take the best from different worlds with `mashups` (eg. simple status management with props, scope, signal and dbus, or "zero imports" for components declaration). See the `React mashup` example in src/demo/mashups/react.
 
-Clean.js can be taken from `NPM`, for structured projects, or it can be also imported directly from `CDN`, for fast prototyping or small, simple pure-js-based projects (it doesn't require to be compiled, as it leverage on es6 modules with benefits for DX, eg. start dev server for big projects). Cle promotes open-source and suggest to avoid "security-by-obfuscation" pratiques and just minimize the code for production.
+Clean.js can be installed from `NPM`, for structured projects, or it can be also imported directly from `CDN`, for fast prototyping or small, simple pure-js-based projects (it doesn't require to be compiled, as it leverage on es6 modules with benefits for DX, eg. start dev server for big projects). Cle promotes open-source and suggest to avoid "security-by-obfuscation" pratiques and just minimize the code for production.
 
 Clean.js `is fast`. For his POJO nature one of it's major improve w.r.t other frameworks is that reactivity is not achieved by using virtual dom and diffing algorithms, instead it leverage the "caged" system and very a fast "static analysis" to determinate the dependencies between components, props, attrs etc, in order to re-render parts only in reaction to changes. Lazy loading and rendering does the rest. This makes cle `really fast`.
 
@@ -37,6 +80,89 @@ git clone https://github.com/vcamelblue2/create-cleanjs-app--use-html.git
 or the [mashup project template](https://github.com/vcamelblue2/create-cleanjs-app--use-html.git) starter [for Cle - React mashup components] 
 ```sh
 git clone https://github.com/vcamelblue2/create-cleanjs-app--use-react-mashup
+```
+
+Quick Start - From React
+
+<table>
+<tr><th>React</th><th>Cle</th></tr>
+<tr>
+  <td>
+
+```jsx
+const App = () => {
+  // States
+  const [user, setUser] = useState('Username')
+  const [counter, setCounter] = useState(0)
+  const computed = user + ' - ' + counter
+  
+  // Functions
+  const increment = () => { 
+    setCounter( x => x + 1 ) 
+  }
+
+  // Childs
+  return (<>
+    <h1>Hello {user}</h1>
+    <Counter count={counter} increment={increment}/>
+  </>)
+}
+
+const Counter =  ({count, increment}) => (
+  <div>
+    <h3>The counter is: {count}</h3>
+    <button onclick={increment}>+1</button>
+  <div/>
+)
+
+```
+  </td>
+  <td>
+
+```js
+const App = () => ({ app: {
+  // States, just "variables"
+  let: { 
+    user: 'Username'
+    count: 0,
+    computed: $ => $.user + ' - ' + $.count
+  },
+
+  // Functions
+  def: {
+    increment: $ => { $.count += 1 }
+  },
+
+  // Childs
+  '=>': [
+    { h1: ['Hello ', $ => $.user] },
+    Counter(), /* no manual bind, just "scope" visibility. */
+  ]
+}})
+
+const Counter = () => Div({ 
+  deps: ['count', 'increment']
+}, 
+  H3({}, 'The Counter is (', $ => $.count, ')'),
+  Button({ onclick: $ => $.increment()}, '+1')
+)
+```
+  </td>
+</tr>
+</table>
+
+"Scope..what?". Don't worry, you will understand it later. To calm you: in/out can always be passed down as in other frameworks
+```js
+...
+Counter({count: $=>$.count, increment: $=>$.increment})
+...
+
+const Counter = ({count, increment}) => Div({ 
+  '@input': {count, increment}
+}, 
+  H3({}, 'The Counter is (', $ => $.count, ')'),
+  Button({ onclick: $ => $.increment()}, '+1')
+)
 ```
 
 Quick Example
@@ -1938,7 +2064,9 @@ Cle can easly used in combination with other framework like React. visit /src/de
       scope: ["myTextProp", "myFunc"],
       parent: ["myParentDepsProp"],
       ...
-    },
+    }, 
+    // shortcuts: array for scope only deps
+    // deps: ["myTextProp", "myFunc"]
 
     // auto smartfunc -> CLE_FLAGS.AUTO_SMARTFUNC_ENABLED
     // f_let_myvar: "2 * @counter"
