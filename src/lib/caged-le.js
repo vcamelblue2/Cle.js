@@ -2112,13 +2112,23 @@ class Component {
 
     // check dependencies
     if (this.convertedDefinition.checked_deps !== undefined) {
-      Object.entries(this.convertedDefinition.checked_deps).forEach(([kind,deps])=>{
-        for(let depName of deps){
-          if (!(depName in this.$this[kind])){
+      // Array of strings => SCOPE
+      if (Array.isArray(this.convertedDefinition.checked_deps)) {
+        for(let depName of this.convertedDefinition.checked_deps){
+          if (!(depName in this.$this.scope)){
             throw Error(`Unsatisfied Dep! ${kind}: ${depName}`)
           }
         }
-      })
+      }
+      else { // Object
+        Object.entries(this.convertedDefinition.checked_deps).forEach(([kind,deps])=>{
+          for(let depName of deps){
+            if (!(depName in this.$this[kind])){
+              throw Error(`Unsatisfied Dep! ${kind}: ${depName}`)
+            }
+          }
+        })
+      }
     }
 
     if (this.convertedDefinition.oos !== undefined){
