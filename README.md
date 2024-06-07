@@ -1,8 +1,8 @@
-# CLE - Welcome to  Clean.js
+# Cle.js - Welcome to Clever Javascript Framework
 
-`Clean.js` is a declarative Javascript Framework, with pure `POJO` in mind (for ui, data model & logic), `no virtual dom`, a "caged" environment, a True `reactive` nature, a powerful context system, native state management utils and fast rt "static" analysis (used to build dependencies between components and achieve true reactivity).
+`Cle.js` (Clever Js) is a `declarative` Javascript Framework, with `Pure Objects` in mind (for ui, data model & logic), `no virtual dom`, a "caged" environment, a True `reactive` nature, a powerful context system, native state management utils and fast rt "static" analysis (used to build dependencies between components and achieve true reactivity).
 
-TLDR "HTML String" vs "JS Objects":
+TLDR "HTML String" (XML) vs "Pure JS Objects" (JS):
 
 <table>
 <tr><th>Html</th><th>Cle</th></tr>
@@ -45,15 +45,15 @@ TLDR "HTML String" vs "JS Objects":
 </table>
 
 
-Clean.js  `is not a "all-or-nothing"` framework, it can be mixed up with other frameworks, this way applications can be gradually migrated to cle or take the best from different worlds with `mashups` (eg. simple status management with props, scope, signal and dbus, or "zero imports" for components declaration). See the `React mashup` example in src/demo/mashups/react.
+Cle.js  `is not a "all-or-nothing"` framework, it can be mixed up with other frameworks, this way applications can be gradually migrated to cle or take the best from different worlds with `mashups` (eg. simple status management with props, scope, signal and dbus, or "zero imports" for components declaration). See the `React mashup` example in src/demo/mashups/react.
 
-Clean.js can be installed from `NPM`, for structured projects, or it can be also imported directly from `CDN`, for fast prototyping or small, simple pure-js-based projects (it doesn't require to be compiled, as it leverage on es6 modules with benefits for DX, eg. start dev server for big projects). Cle promotes open-source and suggest to avoid "security-by-obfuscation" pratiques and just minimize the code for production.
+Cle.js can be installed from `NPM`, for structured projects, or it can be also imported directly from `CDN`, for fast prototyping or small, simple pure-js-based projects (it doesn't require to be compiled, as it leverage on es6 modules with benefits for DX, eg. start dev server for big projects). Cle promotes open-source and suggest to avoid "security-by-obfuscation" pratiques and just minimize the code for production.
 
-Clean.js `is fast`. For his POJO nature one of it's major improve w.r.t other frameworks is that reactivity is not achieved by using virtual dom and diffing algorithms, instead it leverage the "caged" system and very a fast "static analysis" to determinate the dependencies between components, props, attrs etc, in order to re-render parts only in reaction to changes. Lazy loading and rendering does the rest. This makes cle `really fast`.
+Cle.js `is fast`. For his Pure Objects nature one of it's major improve w.r.t other frameworks is that reactivity is not achieved by using virtual dom and diffing algorithms, instead it leverage the "caged" system and very a fast "static analysis" to determinate the dependencies between components, props, attrs etc, in order to re-render parts only in reaction to changes. Lazy loading and rendering does the rest. This makes cle `really fast`.
 
 Another remarkable improve is that `components are just object`, still editable, customizable and extensible, also if taken from NPM (in other frameworks everything a component can do should be "prepared" from developers). This lead for eg. UI library developers to create and `handle less code`, because components are not sealed, or handle re-hydration in different ways.
 
-Clean.js it's also a `"meta-language" first`. In other words something like JSON: a syntax readable both by Humans & Computers that does not require compilation. This means that it's easy to build `other syntax/frameworks` with CLE. In this framework you will find `different` styles & techniques, each with pro and cons, but ALL styles can be used together and mixed as you prefer.
+Cle.js it's also a `"meta-language" first`. In other words something like JSON: a syntax readable both by Humans & Computers that does not require compilation. This means that it's easy to build `other syntax/frameworks` with Cle. In this framework you will find `different` styles & techniques, each with pro and cons, but ALL styles can be used together and mixed as you prefer.
 
 Inspired mostly by: 
   - `QML` (id, scoping & naming, true "reactive" properties, events as signals & slot, mangling for declarations, coding by convention, everything has a signal, component editing from external, assignment system, elements/ref by ID, auto context/scope)
@@ -65,21 +65,21 @@ Inspired mostly by:
 
 
 ## Quick Start
-[![Try in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/edit/web-platform-xezbjg?file=main.js,remote-components.html)
+[![Try in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/edit/web-platform-xezbjg?file=main.js)
 
 Install from npm
 ```sh
 npm install cle.js
 ```
 
-or clone the [project template](https://github.com/vcamelblue2/create-cleanjs-app--use-html.git) starter [for html components] 
+or clone the [project template](https://github.com/vcamelblue2/create-cle-js-app--use-html.git) starter [for html components] 
 ```sh
-git clone https://github.com/vcamelblue2/create-cleanjs-app--use-html.git
+git clone https://github.com/vcamelblue2/create-cle-js-app--use-html.git
 ```
 
-or the [mashup project template](https://github.com/vcamelblue2/create-cleanjs-app--use-html.git) starter [for Cle - React mashup components] 
+or the [mashup project template](https://github.com/vcamelblue2/create-cle-js-app--use-html.git) starter [for Cle - React mashup components] 
 ```sh
-git clone https://github.com/vcamelblue2/create-cleanjs-app--use-react-mashup
+git clone https://github.com/vcamelblue2/create-cle-js-app--use-react-mashup
 ```
 
 Quick Start - From React
@@ -167,12 +167,20 @@ const Counter = ({count, increment}) => Div({
 
 Quick Example
 ```javascript
-import { RenderApp, cle, f, Bind, Use, pass, defineHtmlComponent, remoteHtmlComponent } from 'cle.js/lib'
-// from cdn 
-// import { RenderApp, cle, f, Bind, Use, pass } from 'https://cdn.jsdelivr.net/gh/vcamelblue2/clean.js/src/lib/caged-le.js';
+const { RenderApp, cle, f, Bind, Use, pass, html, defineHtmlComponent, remoteHtmlComponent } = await import('https://cdn.jsdelivr.net/npm/cle.js/lib/caged-le.js');
+const { App, Div, Hr, H4 } = await import('https://cdn.jsdelivr.net/npm/cle.js/extra/smart-alias.js');
+
+
+const SimpleComponent = { div: {
+  style: "margin-bottom: 1rem",
+  text: "Author: Vincenzo Villani"
+}}
+ 
 
 // App Definition
-const app = async () => RenderApp(document.body, cle.root({},
+const app = async () => RenderApp(document.body, cle.root({
+  css: [`body { padding: 20px }`] 
+},
  
    { h1: "Hello World!" },
    
@@ -188,12 +196,14 @@ const app = async () => RenderApp(document.body, cle.root({},
    
  
    { hr: {}},
+
+   SimpleComponent,
  
-   // Use components
+   // Use components, for "advanced usage"
    Use(MyReusableInputBar, {
      
     // setup variable
-     let_val: "ABC", 
+     val: "ABC", 
  
      // handle signals & variable changes
      on_valChanged: ($, txt, oldtxt) => console.log("new text: ", txt, " - old: ", oldtxt),
@@ -202,7 +212,6 @@ const app = async () => RenderApp(document.body, cle.root({},
    }),
  
    cle.hr({}),
- 
  
  
    { div: {
@@ -247,13 +256,37 @@ const app = async () => RenderApp(document.body, cle.root({},
  
    }, "The div is ", f`$.le.hiddenDiv.isHidden ? 'hidden' : 'visible'`, " (click to toggle)"),
 
-   cle.hr({}),
+   // Or Smart Alias
+   H4({
+ 
+    handle_onclick: $ => { 
+      $.le.hiddenDiv.isHidden = !$.le.hiddenDiv.isHidden 
+    }
+
+  }, "The div is ", f`$.le.hiddenDiv.isHidden ? 'hidden' : 'visible'`, " (click to toggle)"),
+
+   Hr(),
+
+   // Html Components (dynamics)
+   html`
+    <div>
+      <h1 style="font-weight: 600">Hi from simple HTML</h1>
+
+      <span>(with a twist!)</span>
+
+      <div [meta-foreach]="item of [1,2,3]">
+        - {{ @item }}
+      </div>
+    </div>
+   `,
+
+   Hr(),
 
    // Remote Html Components [svelte/vue style]
    await remoteHtmlComponent("/remote-components.html", { component: "MyToolbar", params: {hello: "world"}, state: {statevar: "private state namespace.."}, DepsInj: {CircleImage}} ),
 
    cle.hr(),
-   
+
    await CircleImage(),
    
  ))
@@ -322,26 +355,25 @@ const CircleImage = defineHtmlComponent(/*html*/`
 
   <style>
     .pad-img{ 
-      padding: 25px;
+      padding: 5px;
     }
   </style>
 
 `, { isRemote: false })
-
 
 await app();
 
 ```
 
 Real World Example: 
-- [Web Tv - Clean.js Web App](https://vcamelblue2.github.io/cle-js-apps--web-tv) / [Code - Github Repo](https://github.com/vcamelblue2/cle-js-apps--web-tv) 
+- [Web Tv - Cle.js Web App](https://vcamelblue2.github.io/cle-js-apps--web-tv) / [Code - Github Repo](https://github.com/vcamelblue2/cle-js-apps--web-tv) 
 
 
 # Basic Concepts (it-ITA Docs)
 
-## POJO - Plain Old Javascript Object
- Un elemento CLE è un POJO (Plain Old Javascript Object) la cui unica e prima chiave è un tag html. Il valore associato a questo tag può essere invece: 
-  - un POJO contenente la `definizione` delle caratteristiche dell'elemento HTML che si vuole renderizzare, nonchè dati, metodi etc.
+## Pure Object
+ Un elemento Cle è un qualsiasi `Object` (oggetto standard javascript) la cui unica e prima chiave è un tag html. Il valore associato a questo tag può essere invece: 
+  - un Object contenente la `definizione` delle caratteristiche dell'elemento HTML che si vuole renderizzare, nonchè dati, metodi etc.
   - una stringa
   - un Valore-Funzione (Evaluable)
 
@@ -360,9 +392,9 @@ Per esempio, un elemento HTML `h1` può essere scritto come:
  { h1: $ => ...something that return text... }
  ```
 
- i sotto-elementi possono essere: 
+ i sottoelementi possono essere: 
 
- - un elemento CLE 
+ - un elemento Cle 
     - { span: ... }
  - una stringa 
  - un Valore-Funzione (Evaluable)
@@ -382,9 +414,9 @@ Per esempio, un elemento HTML `h1` può essere scritto come:
     ]
 }}
 ```
-Nei casi di un singolo sotto-elemento l'array può essere omesso.
+Nei casi di un singolo sottoelemento l'array può essere omesso.
 
-Per avere un elemento html di tipo `h1` contenente un `"Hello World!"` (ovvero il cui unico sotto-elemento è un testo) basta scrivere:
+Per avere un elemento html di tipo `h1` contenente un `"Hello World!"` (ovvero il cui unico sottoelemento è un testo) basta scrivere:
 
  ```javascript
  { h1: {
@@ -392,7 +424,7 @@ Per avere un elemento html di tipo `h1` contenente un `"Hello World!"` (ovvero i
  }}
  ```
 
-Nel caso di più sotto-elementi basta semplicemente utilizzare un Array:
+Nel caso di più sottoelementi basta semplicemente utilizzare un Array:
 
  ```javascript
  { h1: {
@@ -402,8 +434,8 @@ Nel caso di più sotto-elementi basta semplicemente utilizzare un Array:
 
  Esistono poi delle shortcuts:
 
- 1) Se la `definition` dichiara un solo sotto-elemento e nulla più, si può passare il sotto-elemento direttamente come valore al tag. 
- 2) Nel caso di più sotto-elementi (definiti come array), è possibile passare direttamente come valore al tag.
+ 1) Se la `definition` dichiara un solo sottoelemento e nulla più, si può passare il sottoelemento direttamente come valore al tag. 
+ 2) Nel caso di più sottoelementi (definiti come array), è possibile passare direttamente come valore al tag.
 
  ```javascript
  // Shortcuts
@@ -412,7 +444,7 @@ Nel caso di più sotto-elementi basta semplicemente utilizzare un Array:
  ```
 
 ## Rendering
- L'unità minima che è possibile rendirizzare in CLE è un singolo elemento CLE (ovvero un unico elemento HTML), che si può immaginare come un "componente" per come è inteso in altri framework.
+ L'unità minima che è possibile rendirizzare in Cle è un singolo elemento Cle (ovvero un unico elemento HTML), che si può immaginare come un "componente" per come è inteso in altri framework.
 
  Per renderizzare un Componente possiamo utilizzare la funzione `RenderApp(htmlContainer, cleComponent)` importandola da `lib`.
 
@@ -434,11 +466,11 @@ RenderApp(document.body, cle.root({},
     { div: "This is the body" }
 ))
  ```
-[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/edit/web-platform-zpqsmf?file=main.js)
+[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/edit/web-platform-gdwrjo?file=main.js)
 
 
 ## Component Lyfecicle & Hooks
-Il lifecycle di un componente CLE prevede di fatto che prima venga renderizzato l'albero "spoglio" di elementi HTML, dopodichè vengono inizializzati e lanciati gli Hooks che si possono definire con le seguenti keywords:
+Il lifecycle di un componente Cle prevede di fatto che prima venga renderizzato l'albero "spoglio" di elementi HTML, dopodichè vengono inizializzati e lanciati gli Hooks che si possono definire con le seguenti keywords:
     
 - `constructor`: async? ($, {...args}) => { } 
     - Constructor, called at component creations, useful to setup properties from external with the `Use` declaration. use onInit in other cases. Only called in Use components.
@@ -456,7 +488,7 @@ Infine, sotto determinate condizioni l'elemento viene distrutto
 
 
 ## Standard Definition - Declare by keyword
-La standard `definition` di un componente prevede che all'interno della definizione possano essere esplicitati, oltre ai sotto-elementi tramite una delle chiavi di cui sopra, molte altre cose.
+La standard `definition` di un componente prevede che all'interno della definizione possano essere esplicitati, oltre ai sottoelementi tramite una delle chiavi di cui sopra, molte altre cose.
 
 E' ad esempio possibile definire variabili, funzioni, segnali, attributi html, classi css, nonchè gestire eventi html, segnali locali, di properità o globali. Per una lista approfondita si rimanda alla sezione `#Full Reference`. 
 
@@ -466,7 +498,7 @@ E' ad esempio possibile definire variabili, funzioni, segnali, attributi html, c
 Vediamo ora com'è possibile creare una variabile in un componente.
 
  ```javascript
- // Component is just a POJO and can be assigned to any variable
+ // Component is just an Object and can be assigned to any variable
 
  const TheCounter =  { div: {
     id: "myCounter",
@@ -503,11 +535,11 @@ Abbiamo anche definito l'hook `onInit` che verrà chiamato all'inizializzazione 
  }}
  // Rendered as <div>The Counter Is: 0</div>
  ```
- Per la definizione degli Evaluable (funzioni il cui primo argomento è sempre '`$`') ci si rifà alla definizione di funzione in python, per cui il primo argomento è sempre "`self`". Nel caso di CLE, invece, è sempre `$`, anche se l'argomento `$` è qualcosa di più complesso di un mero riferimento al '`this`' del Componente.
+ Per la definizione degli Evaluable (funzioni il cui primo argomento è sempre '`$`') ci si rifà alla definizione di funzione in python, per cui il primo argomento è sempre "`self`". Nel caso di Cle, invece, è sempre `$`, anche se l'argomento `$` è qualcosa di più complesso di un mero riferimento al '`this`' del Componente.
 
 `$` here is a special variable that contains some reference to certain `scope selector`. It contains:
     
-- '`this`' scope selector, wich is a refernce to `this` CLE element. like the 'self' in python
+- '`this`' scope selector, wich is a refernce to `this` Cle element. like the 'self' in python
     - here we can find variables, methods, signals, a reference to the parent element ("parent"), and a reference to the renderized html element via "`el`" property
 - '`parent`' scope selector, wich contain a refernce to the parent
 - '`scope`' scope selector, wich contain all the variables and methods of this element, it's meta and of all the parents in his parent chain (equivalent to: `this` & `meta` & `parent` & `parent.parent` & `parent.parent.parent` + ...). With normal  shadowing rule.
@@ -555,7 +587,7 @@ Visto che abbiamo definito un id univoco per questo componente (`myCounter`) è 
 
  RenderApp(dcoment.body, cle.root({},
     
-    { h2: "Welcome to Clean.js" },
+    { h2: "Welcome to Cle.js" },
 
     TheCounter,
 
@@ -591,7 +623,7 @@ Inoltre, grazie a `$.parent` e `$.scope` possiamo utilizzare le proprietà nella
  */
  ```
 
- Per concludere sulle variabili andiamo a valutare il meccanismo di change detection adottato da CLE, più simile a quello di React che a quello di Angular.
+ Per concludere sulle variabili andiamo a valutare il meccanismo di change detection adottato da Cle, più simile a quello di React che a quello di Angular.
 
  Data infatti una variabile contenente un oggetto:
  ```javascript
@@ -648,7 +680,7 @@ es:
 }}
 ```
 
-In ultima analisi, nel caso in cui si inserisca una "keyword" nella definizione che NON è tra le reserved e/o non viene riconosciuta, questa diventerà per CLE una definizione di una variabile. Dunque per dichiarare una variabile è sufficiente scrivere:
+In ultima analisi, nel caso in cui si inserisca una "keyword" nella definizione che NON è tra le reserved e/o non viene riconosciuta, questa diventerà per Cle una definizione di una variabile. Dunque per dichiarare una variabile è sufficiente scrivere:
 
 ```javascript
 { div: {
@@ -734,7 +766,7 @@ Come per le variabili, esiste poi la possibilità di collassare la definizione `
 ```
 
 ## Signals
-I Segnali in CLE sono un meccanismo PUB/SUB like di tipo stream che i componenti possono definire e lanciare affinchè altri componenti (o essi stessi) possano decidere di ascoltare per reagire ad eventi ad esso collegati. 
+I Segnali in Cle sono un meccanismo PUB/SUB like di tipo stream che i componenti possono definire e lanciare affinchè altri componenti (o essi stessi) possano decidere di ascoltare per reagire ad eventi ad esso collegati. 
 
 I segnali, come gli Event in Angular, possono trasmettere diversi tipi di dato, al fine di poter essere utilizzati non solo come notifica ma come meccanismo di Input/Outut, disaccoppiando prodicer dal consumer, e dunque codice.
 
@@ -742,13 +774,13 @@ Esistono due tipi di segnali:
 - `Segnali "Puri`"
     - definiti tramite keyword "`signal`: { [`name`]: "`stream => (myData: string)`" }" // definition as descriptive string
 - `Segnali connessi a variabili`
-    - autogenerati da CLE per ogni variabile definita, nella forma "`xxxChanged`"
+    - autogenerati da Cle per ogni variabile definita, nella forma "`xxxChanged`"
 
 I primi trasportano solo i valori "emessi", mentre i secondi si differenziano dai primi in quanto trasportano il nuovo e il vecchio valore della property puntata, al fine di fare opportuni ragionamenti.
 
-I segnali "puri" possono anche essere lanciati in modo imperativo utilizzando `$.yyy.signal_name.emit(...args)`, mentre i secondi non possono essere lanciati direttamente ma vengono emessi da CLE al change del dato, o dopo una "`mark as changed`" esplicita.
+I segnali "puri" possono anche essere lanciati in modo imperativo utilizzando `$.yyy.signal_name.emit(...args)`, mentre i secondi non possono essere lanciati direttamente ma vengono emessi da Cle al change del dato, o dopo una "`mark as changed`" esplicita.
 
-I segnali sono dunque locali al componente e vivono nel namespace dello stesso. Per ascoltarli sarà necessario poter puntare a quel namespace, (es via $.scope, $.parent, $.le, $.ref, ...). Come vedremo in seguito, è però possibile creare segnali globali (univoci) grazie al DBUS di CLE.
+I segnali sono dunque locali al componente e vivono nel namespace dello stesso. Per ascoltarli sarà necessario poter puntare a quel namespace, (es via $.scope, $.parent, $.le, $.ref, ...). Come vedremo in seguito, è però possibile creare segnali globali (univoci) grazie al DBUS di Cle.
 
 E' possibile definire un segnale con:
 ```javascript
@@ -954,7 +986,7 @@ Anche per dbus troviamo le varianti della emit definite per i Signals.
 
 
 ## HTML Attributes - attrs & hattrs
-Gli attributi HTML in CLE vengono dichiarati dalla keyword "`attrs`" e la sua shortcut "`a`". Gli attributi permessi in questa definizione sono solo quelli `testuali` (quindi non le funzioni come onclick etc, che vanno gestiti in "handle").
+Gli attributi HTML in Cle vengono dichiarati dalla keyword "`attrs`" e la sua shortcut "`a`". Gli attributi permessi in questa definizione sono solo quelli `testuali` (quindi non le funzioni come onclick etc, che vanno gestiti in "handle").
 
 ```javascript
 const coloredDiv = { div: {
@@ -1241,7 +1273,7 @@ visita la demo demo/misc-example.js/ -> appDemoSCSS per altre info
 
 -------
 
-## CLE Shortcuts: Smart Component (`cle`) & Smart Function (`f`, `fArgs`, ) 
+## Cle Shortcuts: Smart Component (`cle`) & Smart Function (`f`, `fArgs`, ) 
 Tra le varie shortcuts linguistiche presenti in cle, in grado di migliorare la sintassi e al tempo stesso la velocità di scrittura del codice troviamo gli `Smart Component` e le `Smart Function` (Evaluable).
 
 Per utilizzare gli `Smart Component` è sufficiente importare `cle`.
@@ -1250,7 +1282,7 @@ Per utilizzare gli `Smart Component` è sufficiente importare `cle`.
 import { cle } from "cle.js/lib"
  ```
 
- cle è una shortcuts linguistica che permette di scrivere componenti CLE come :
+ cle è una shortcuts linguistica che permette di scrivere componenti Cle come :
  ```javascript
  cle.xxxHTMLTAGxxx(standardDefinition, ...childs)
  ```
@@ -1299,7 +1331,7 @@ Possiamo riscrivere il componente `TheCounter` di prima come:
  cle.div("Text ", $=>$.evaluable, ...)
  ```
 
-La seconda shortcuts riguarda invece la possibilità di scrivere Funzioni (Evaluable) inline tramite stringhe di testo, inserendo dei riferimenti a variabili dei componenti CLE tramite "`@`". Ricorda, anche se scritte come testo sono a tutti gli effetti Funzioni, dunque NON provare a fare metaprogrammazione combinando o manipolando le Smart Function come faresti con le stringhe ed eviterai spiacevoli attacchi XSS!
+La seconda shortcuts riguarda invece la possibilità di scrivere Funzioni (Evaluable) inline tramite stringhe di testo, inserendo dei riferimenti a variabili dei componenti Cle tramite "`@`". Ricorda, anche se scritte come testo sono a tutti gli effetti Funzioni, dunque NON provare a fare metaprogrammazione combinando o manipolando le Smart Function come faresti con le stringhe ed eviterai spiacevoli attacchi XSS!
 
 Per utilizzarla basta importare le funzioni `f` o `fArgs`
  ```javascript
@@ -1407,9 +1439,9 @@ Per realizzare componenti ripetuti, come una lista di elementi, si utilizza la d
 }}
 ```
 
-questa sintssi non farebbe altro che generare un evaluable che CLE proverebbe a renderizzare come testo alla sua risoluzione, e dunque il risultato a video sarebbe un [Object, Object..].
+questa sintssi non farebbe altro che generare un evaluable che Cle proverebbe a renderizzare come testo alla sua risoluzione, e dunque il risultato a video sarebbe un [Object, Object..].
 
-Questo perchè CLE è un framework prettamente dichiarativo, non avrebbe senso mischiare codice imperativo/funzionale in un contesto del genere.
+Questo perchè Cle è un framework prettamente dichiarativo, non avrebbe senso mischiare codice imperativo/funzionale in un contesto del genere.
 ```javascript
  // Correct!
 { div: {
@@ -1420,9 +1452,9 @@ Questo perchè CLE è un framework prettamente dichiarativo, non avrebbe senso m
 }}
 ```
 ### Abaout variables in meta & pushback
-a differenza di framework come react in cui è impossibile modificare un elemento di una lista in una map senza passare dalla useState in CLE è possibile modificare direttamente un singolo item via semplice assegnazione con `$.item = ...` 
+a differenza di framework come react in cui è impossibile modificare un elemento di una lista in una map senza passare dalla useState in Cle è possibile modificare direttamente un singolo item via semplice assegnazione con `$.item = ...` 
 
-questo perchè il meccanismo interno di CLE possied il vero riferimento e fa in modo che l'utente modifichi realmente quello.
+questo perchè il meccanismo interno di Cle possied il vero riferimento e fa in modo che l'utente modifichi realmente quello.
 
 Come già detto però modificare un singolo elemento di una lista non porterebbe a una detect changes, quindi come in react bisognerebbe comunque riassegnare l'intero array.
 
@@ -1507,28 +1539,28 @@ meta: {
     noThisInScope: bool (false) //remove this from the scope
     noMetaInScope: bool (false) // remove meta variable in scope
     
-    hasViewChilds: bool (false) // materialize CLE Object
+    hasViewChilds: bool (false) // materialize Cle Object
 }
 ```
 
 
 # Componentization
-Componentizzare in CLE significa principalmente 'splittare' il codice in diversi oggetti riutilizzabili (variabili/costanti). A differenza di altri framwork non esiste un vero e proprio concetto di "Componente" da dover definire obbligatoriamente. 
+Componentizzare in Cle significa principalmente 'splittare' il codice in diversi oggetti riutilizzabili (variabili/costanti). A differenza di altri framwork non esiste un vero e proprio concetto di "Componente" da dover definire obbligatoriamente. 
 
-Un vero componente CLE è di fatto un singolo elemento HTML. Grazie però allo `scope` e al `ctx`, nonchè alle due funzioni `Use` ed `Extend` è possibile definire un 'componente' in modo abbastanza simile a ciò che siamo abituati a usare.
+Un vero componente Cle è di fatto un singolo elemento HTML. Grazie però allo `scope` e al `ctx`, nonchè alle due funzioni `Use` ed `Extend` è possibile definire un 'componente' in modo abbastanza simile a ciò che siamo abituati a usare.
 
 Questa scelta di fatto aiuta a pensare alla separazione e componentizzazione del codice come un operazione facile e veloce come in React (ctrl+c, ctr+v), piuttosto che onerosa come in Angular (ng-generate, ctrl+c, ctr+v).
 
 Inoltre, rispetto a framework come React, non è necessario passare in avanti esplicitamente (o con i context manager..) le i getter e setter dello stato, in quanto grazie allo `scope` queset sono esposte e visibili automaticamente, a meno di non essere splicitamente disabilitato. In questo modo si evita di passare in avanti infinite props e in particolare l'uso di `id` e `name` (aka reference) permette di evitare l'effetto "move state into parent components" per permettere la comunicazione, e dunque si ritorna ad avere uno "stato" vicino all'owner naturale.
 
-Pur sembrando un antipattern, rilassare questo vincolo, ovvero che i child possono vedono proprietà del padre, se ben utilizzato tramite i CLE Object (Model/Controller/Service..) permette un incredibile modularità, spostando il concetto di dipendenza come accoppiamento di codice (che tende a generare boilerplate code) a dipendenza come "convenzione" / "concetto atteso" (Coding By Convention, DI like). Per non cadere nel loop del "what is used?" consigliamo di esplicitare sempre le dipendenze tramite "deps". 
+Pur sembrando un antipattern, rilassare questo vincolo, ovvero che i child possono vedono proprietà del padre, se ben utilizzato tramite i Cle Object (Model/Controller/Service..) permette un incredibile modularità, spostando il concetto di dipendenza come accoppiamento di codice (che tende a generare boilerplate code) a dipendenza come "convenzione" / "concetto atteso" (Coding By Convention, DI like). Per non cadere nel loop del "what is used?" consigliamo di esplicitare sempre le dipendenze tramite "deps". 
 
 Resta però sempre possibile decidere di bloccare lo scope automatico e passare in modo imperativo proprietà, metodi etc tramite costruttore.
 
 ----------
 
 ## Component Templating, Extension & Use
-Dal momento che un componente CLE è un POJO, per definire dei componenti riutilizzabili basta semplicemente assegnare questi oggeti ad una variabile e dunque per utilizzarli basterà usare tali variabili come childs.
+Dal momento che un componente Cle è un Object, per definire dei componenti riutilizzabili basta semplicemente assegnare questi oggeti ad una variabile e dunque per utilizzarli basterà usare tali variabili come childs.
 
 ```javascript
 const ReusableH1 = { h1: { text: "I'm reusable!" }}
@@ -1552,7 +1584,7 @@ const App = { root: {
 }}
 ```
 
-Grazie alla sua natura POJO, allo scoping veso il basso e agli id/ctx_id, la modalità predefinita per `"passare" valori` ad un componente è quella della "ridefinizione". Questo concetto, molto familiare agli utilizzatori di QML, è quello di fare "override" di una qualsiasi definizione/keyword del componente, e dunque impostare i valori, le properità da seguire, le reazioni ai segnali. E' possibile addirittura cambiare il comportamento originale. Possiamo infatti utilizzare la funzione `"Use"` da lib per dichiarare l'utilizzo di un componente e allo stesso tempo passare delle `"redefinitions"`. 
+Grazie alla sua natura "POJO" (Plain Old `Javascript` Object), allo scoping veso il basso e agli id/ctx_id, la modalità predefinita per `"passare" valori` ad un componente è quella della "ridefinizione". Questo concetto, molto familiare agli utilizzatori di QML, è quello di fare "override" di una qualsiasi definizione/keyword del componente, e dunque impostare i valori, le properità da seguire, le reazioni ai segnali. E' possibile addirittura cambiare il comportamento originale. Possiamo infatti utilizzare la funzione `"Use"` da lib per dichiarare l'utilizzo di un componente e allo stesso tempo passare delle `"redefinitions"`. 
 
 ```javascript
 Use(
@@ -1655,7 +1687,7 @@ Con l'utilizzo della Use è anche possibile utilizzare l'opzione `"init"` per pa
 Visita la demo in demo/misc-example.js/ -> appDemoConstructor per altre info sui constructor.
 
 ### Placeholder
-Una delle possibilità della Use è quella di andare a definire in maniera dichiarativa quali sono i sotto-componenti che è possibile "sostituire", ovvero quelli che si possono "iniettare" all'interno di un componente che verrà utilizzato tramite Use. In particolare basterà definire dei "Placeholder" nel componente che prevede l'injection, e utilizzare il parametro "inject" della Use. 
+Una delle possibilità della Use è quella di andare a definire in maniera dichiarativa quali sono i sottocomponenti che è possibile "sostituire", ovvero quelli che si possono "iniettare" all'interno di un componente che verrà utilizzato tramite Use. In particolare basterà definire dei "Placeholder" nel componente che prevede l'injection, e utilizzare il parametro "inject" della Use. 
 
 ```javascript
 // Signature
@@ -1686,8 +1718,8 @@ Use(EditableComponent, pass, { inject: {
     bodyEl: cle.div({},  cle.b("A Simple Bold Body")),
 }})
 ```
-è anche possibile specificare che un elemento deve essere necessariamente specificato, e inoltre è possibile devinire dei Placeholder in tutti i sotto-childs per iniezioni profonde.
-
+è anche possibile specificare che un elemento deve essere necessariamente specificato, e inoltre è possibile devinire dei Placeholder in tutti i sottochilds per iniezioni profonde.
+kbl
 ### Extended
 Se non vogliamo creare un nuovo contesto ma vogliamo comunque sfruttare le potenzialità della Use è possibile utilizzare la "Extended". Questa utility è in tutto e per tutto identica alla Use, ma la differenza principale è che "inietterà" il componente nell contesto padre, senza generarne uno nuovo.
 
@@ -1763,7 +1795,7 @@ T.B.D - Setup property on childs using the point of view of the parent without c
 T.B.D
 
 ### ComponentsRegistry (Components - Dependency Injection)
-Components Registry is a Global clean.js Components Dependency Injection System via tag name.
+Components Registry is a Global Cle.js Components Dependency Injection System via tag name.
 
 Define and use components by tag name without import into code (IoC / Dependency Injection)
 
@@ -1838,7 +1870,7 @@ T.B.D
 # Html Element Reference
 T.B.D
 
-# CLE Object
+# Cle Object
 T.B.D
 
 # Childs Ref By Name & Ctx Ref Id
@@ -2111,7 +2143,7 @@ Cle can easly used in combination with other framework like React. visit /src/de
         newScope: false, bool, // block scope visibility
         noThisInScope: false, bool, //remove this from the scope
         noMetaInScope: false, bool, // remove meta variable in scope
-        hasViewChilds: false, bool, // materialize CLE Object
+        hasViewChilds: false, bool, // materialize Cle Object
         metaPushbackAutomark: true, bool // autoset value into array when a 'forEach' variable is edited and mark array as changed.
     }
 
@@ -2247,7 +2279,7 @@ $ => {
       // block and await for signal fired (eventually with condition filter), then get value
       signalFired: (scopeGetter, signal, condition=v=>true, ms_timeout=undefined, retry=5) => { return Promise }
 
-      // utils per andare ad ottenre l'elemento CLE da elementi HTML/DOM .. per fare cosy tricky :(
+      // utils per andare ad ottenre l'elemento Cle da elementi HTML/DOM .. per fare cosy tricky :(
       getCleElementByDom: (dom_el)=>{ return cleElement | throw Error("Null-Query-Sel") },
       getCleElementsByDom: (...dom_els)=>{ return cleElements | throw Error("Null-Query-Sel") },
 
