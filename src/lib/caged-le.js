@@ -171,6 +171,19 @@ const DefineSubprops = (scope_prop="", subprops="", prefix="", comparers={})=>{
 const ExternalProp = (value, onSet) => {
   return new Property(value, none, onSet || none, none, none, none, none, true)
 }
+// export
+/** External State */
+const useState = ExternalProp;
+// export
+const useStateWithSignal = (value, onSet) => {
+  const signal = new Signal()
+  const onChange = (...args)=>{
+    signal.emit(prop.value, prop._latestResolvedValue);
+    onSet && onSet(...args);
+  }
+  const prop = new Property(value, none, onChange, none, none, none, none, true)
+  return {prop, signal: Signal.getSignalProxy(signal)}
+}
 class _UseExternal extends PropAlias {}
 // export
 // a simply renamed alias! (reordered params..). 
@@ -365,6 +378,15 @@ class Property{
   /** return [Prop, getter, setter] */
   get asFunctions(){
     return [this, ()=>this.value, (v)=>{this.value=v}]
+  }
+  get asState(){
+    return [()=>this.value, (v)=>{this.value=v}]
+  }
+  /**
+   * use as external property directly: counter.use() || counter.use( ($, val) => 'the counter is: ' + val )
+   */
+  use(getter=(($,v)=>v), ...otherDeps){
+    return useExternal([this, ...otherDeps], $=>getter($, this.value, otherDeps.map(v=>v.value)))
   }
 
 }
@@ -1273,6 +1295,7 @@ const HAttrBind = (bindFunc, {remap=undefined, event=undefined}={}) => new HAttr
 /** may be:
  * - HAttrBind, for ha_value etc, signature: (bindFunc, {remap=undefined, event=undefined) => 
  * - PropertyBinding, signature: (getterAndSetterStr, cachingComparer)
+ * - Property: for use as external Bind
  */
 const Bind = (bindigDefinition, ...args) => {
   if (isFunction(bindigDefinition)){
@@ -1280,6 +1303,9 @@ const Bind = (bindigDefinition, ...args) => {
   }
   else if (typeof bindigDefinition === 'string'){
     return PropertyBinding(bindigDefinition, ...args)
+  }
+  else if (bindigDefinition instanceof Property){
+    return useExternal(bindigDefinition, $=>bindigDefinition.value, ($, v)=>bindigDefinition.value = v)
   }
 }
 
@@ -2617,6 +2643,8 @@ class Component {
             _warning.log("CLE - WARNING! ATTRS does not support '.' property navigation!")
           }
           else {
+            let isUseExt = isUseExternalDefinition(v)
+
             if (k === "style"){
 
               const resolveObjStyle = (o)=> typeof o === "object" ? toInlineStyle(o) : o
@@ -2632,12 +2660,12 @@ class Component {
                 // recompute all ha style (if any)
                 this.singlePropStyleRecomputeHooks?.forEach(runner=>runner?.())
               }
-              // let isUseExt = isUseExternalDefinition(v)
-              if (isFunction(v)){// || isUseExt ){
-                let staticDeps = analizeDepsStatically(v)//, isUseExt) // WARNING actally w're bypassing the "deps storage" machanism..this wil break deps update in future!!!
+
+              if (isFunction(v) || isUseExt ){
+                let staticDeps = analizeDepsStatically(v, isUseExt) // WARNING actally w're bypassing the "deps storage" machanism..this wil break deps update in future!!!
                 _debug.log("Attr static deps analysis: ", staticDeps)
 
-                // v = isUseExt ? v.getter : v
+                v = isUseExt ? v.getter : v
 
                 staticDeps.$this_deps?.forEach(d=>{
                   let deps = this.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupStyle(v) ) // questa cosa da rivdere...il who non lo salviam ma in generale ora questa roba deve essere una prop, fully automated!
@@ -2681,11 +2709,11 @@ class Component {
                   this.attrHattrRemover.push(()=>depRemover())
                 })
 
-                // staticDeps.$external_deps?.forEach(d=>{
-                //   const deps = d?.addOnChangedHandler([this, "attr", k], ()=>setupStyle(v) )
-                //   deps && this.attrHattrRemover.push(deps)
-                //   console.log("attr remover must be completeed!!")
-                // })
+                staticDeps.$external_deps?.forEach(d=>{
+                  const deps = d?.addOnChangedHandler([this, "attr", k], ()=>setupStyle(v) )
+                  deps && this.attrHattrRemover.push(deps)
+                  // console.log("attr remover must be completeed!!")
+                })
 
               }
               else {
@@ -2695,9 +2723,9 @@ class Component {
               setupStyle(v)
 
             } 
-            else if (isFunction(v)){
-                const setupValue = ()=>{ 
-                  const val = v.bind(undefined, this.$this)(); 
+            else if (isFunction(v) || isUseExt ){
+                const setupValue = (oval)=>{ 
+                  const val = isFunction(oval) ? oval.bind(undefined, this.$this)() : oval; 
                   if ((val === null || val === undefined)) { 
                     if (this.html_pointer_element.hasAttribute(k)) { 
                       this.html_pointer_element.removeAttribute(k)
@@ -2706,43 +2734,46 @@ class Component {
                     if (k === 'class' && Array.isArray(val)){
                       this.html_pointer_element.setAttribute(k, val.filter(vv=>(typeof vv) === 'string').join(" ").toString())
                     } else {
+                      this.html_pointer_element.removeAttribute(k)
                       this.html_pointer_element.setAttribute(k, val.toString())
                     }
                   } 
                 }
 
-                let staticDeps = analizeDepsStatically(v) // WARNING actally w're bypassing the "deps storage" machenism..this wil break deps update in future!!!
+                let staticDeps = analizeDepsStatically(v, isUseExt) // WARNING actally w're bypassing the "deps storage" machenism..this wil break deps update in future!!!
                 _debug.log("Attr static deps analysis: ", staticDeps)
+                
+                v = isUseExt ? v.getter : v
 
                 staticDeps.$this_deps?.forEach(d=>{
-                  let deps = this.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
+                  let deps = this.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue(v) )
                   deps && this.attrHattrRemover.push(deps)
                 }) // supporting multiple deps, but only of first order..
 
                 staticDeps.$parent_deps?.forEach(d=>{
-                  let deps = this.parent.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
+                  let deps = this.parent.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue(v) )
                   deps && this.attrHattrRemover.push(deps)
                 })
                 
                 staticDeps.$scope_deps?.forEach(d=>{
                   let [propsOwner, isPropertiesProp] = this.get$ScopedPropsOwner(d);
-                  let deps = (isPropertiesProp ? propsOwner.properties[d] : propsOwner.meta[d])?.addOnChangedHandler([this, "attr", k], ()=>setupValue() );
+                  let deps = (isPropertiesProp ? propsOwner.properties[d] : propsOwner.meta[d])?.addOnChangedHandler([this, "attr", k], ()=>setupValue(v) );
                   deps && this.attrHattrRemover.push(deps)
                 })
 
                 staticDeps.$le_deps?.forEach(d=>{ // [le_id, property]
                   let depRemover;
                   exponentialRetry(()=>{
-                    depRemover = this.$le[d[0]].properties[d[1]].addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
-                  }, pass, pass, pass, "Cannot connect to CLE Obj by Id", 5, (firstTry, res)=>{!firstTry && setupValue()})
+                    depRemover = this.$le[d[0]].properties[d[1]].addOnChangedHandler([this, "attr", k],  ()=>setupValue(v) )
+                  }, pass, pass, pass, "Cannot connect to CLE Obj by Id", 5, (firstTry, res)=>{!firstTry && setupValue(v)})
                   this.attrHattrRemover.push((...args)=>depRemover(...args))
                 })
 
                 staticDeps.$ctx_deps?.forEach(d=>{ // [ctx_id, property]
                   let depRemover;
                   exponentialRetry(()=>{
-                    depRemover = this.$ctx[d[0]].properties[d[1]].addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
-                  }, pass, pass, pass, "Cannot connect to CLE Obj by Ctx Id", 5, (firstTry, res)=>{!firstTry && setupValue()})
+                    depRemover = this.$ctx[d[0]].properties[d[1]].addOnChangedHandler([this, "attr", k],  ()=>setupValue(v) )
+                  }, pass, pass, pass, "Cannot connect to CLE Obj by Ctx Id", 5, (firstTry, res)=>{!firstTry && setupValue(v)})
                   this.attrHattrRemover.push((...args)=>depRemover(...args))
                 })
 
@@ -2751,12 +2782,18 @@ class Component {
                   exponentialRetry(()=>{
                     const owner = this.getChildsRefOwner(d[0]).childsRefPointers[d[0]]
                     if (Array.isArray(owner)){ throw Error("Cannot Bind to multi-ref child") }
-                    depRemover = owner.properties[d[1]].addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
-                  }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5, (firstTry, res)=>{!firstTry && setupValue()})
+                    depRemover = owner.properties[d[1]].addOnChangedHandler([this, "attr", k],  ()=>setupValue(v) )
+                  }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5, (firstTry, res)=>{!firstTry && setupValue(v)})
                   this.attrHattrRemover.push(()=>depRemover())
                 })
+                
+                staticDeps.$external_deps?.forEach(d=>{
+                  const deps = d?.addOnChangedHandler([this, "attr", k], ()=>setupValue(v) )
+                  deps && this.attrHattrRemover.push(deps)
+                  // console.log("attr remover must be completeed!!")
+                })
 
-                setupValue()
+                setupValue(v)
 
             }
             else if (v instanceof HAttrBinding){ 
@@ -2953,55 +2990,55 @@ class Component {
       Object.entries(this.convertedDefinition.hattrs).forEach(([k,v])=>{
         
         const toExecMabyLazy = (k)=>{
-
           
           _debug.log("Exec HAttr: ", k,v)
 
           let _oj_k = k
+          let isUseExt = isUseExternalDefinition(v)
 
           if (k.includes(".")){ // devo andare a settare l'attr as property dinamicamente [nested!]
 
-            if (isFunction(v)){
-              const setupValue = ()=>{ 
+            if (isFunction(v) || isUseExt){
+              const setupValue = (val)=>{ 
                 let [pointer, final_k] = recursiveAccessor(this.html_pointer_element, k.split("."))
-
-                const val = v.bind(undefined, this.$this)(); 
                 
-                pointer[final_k] = val
+                pointer[final_k] = isFunction(val) ? val.bind(undefined, this.$this)() : val; 
               }
 
-              let staticDeps = analizeDepsStatically(v) // WARNING actally w're bypassing the "deps storage" machenism..this wil break deps update in future!!!
+              let staticDeps = analizeDepsStatically(v, isUseExt) // WARNING actally w're bypassing the "deps storage" machenism..this wil break deps update in future!!!
               _info.log("HAttr static deps analysis: ", staticDeps)
 
+              v = isUseExt ? v.getter : v
+
               staticDeps.$this_deps?.forEach(d=>{
-                let deps = this.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
+                let deps = this.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue(v) )
                 deps && this.attrHattrRemover.push(deps)
               }) // supporting multiple deps, but only of first order..
 
               staticDeps.$parent_deps?.forEach(d=>{
-                let deps = this.parent.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
+                let deps = this.parent.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue(v) )
                 deps && this.attrHattrRemover.push(deps)
               })
 
               staticDeps.$scope_deps?.forEach(d=>{
                 let [propsOwner, isPropertiesProp] = this.get$ScopedPropsOwner(d);
-                let deps = (isPropertiesProp ? propsOwner.properties[d] : propsOwner.meta[d])?.addOnChangedHandler([this, "attr", k], ()=>setupValue() );
+                let deps = (isPropertiesProp ? propsOwner.properties[d] : propsOwner.meta[d])?.addOnChangedHandler([this, "attr", k], ()=>setupValue(v) );
                 deps && this.attrHattrRemover.push(deps)
               })
 
               staticDeps.$le_deps?.forEach(d=>{ // [le_id, property]
                 let depRemover;
                 exponentialRetry(()=>{
-                  depRemover = this.$le[d[0]].properties[d[1]].addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
-                }, pass, pass, pass, "Cannot connect to CLE Obj by Id", 5, (firstTry, res)=>{!firstTry && setupValue()})
+                  depRemover = this.$le[d[0]].properties[d[1]].addOnChangedHandler([this, "attr", k],  ()=>setupValue(v) )
+                }, pass, pass, pass, "Cannot connect to CLE Obj by Id", 5, (firstTry, res)=>{!firstTry && setupValue(v)})
                 this.attrHattrRemover.push((...args)=>depRemover(...args))
               })
 
               staticDeps.$ctx_deps?.forEach(d=>{ // [ctx_id, property]
                 let depRemover;
                 exponentialRetry(()=>{
-                  depRemover = this.$ctx[d[0]].properties[d[1]].addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
-                }, pass, pass, pass, "Cannot connect to CLE Obj by Ctx Id", 5, (firstTry, res)=>{!firstTry && setupValue()})
+                  depRemover = this.$ctx[d[0]].properties[d[1]].addOnChangedHandler([this, "attr", k],  ()=>setupValue(v) )
+                }, pass, pass, pass, "Cannot connect to CLE Obj by Ctx Id", 5, (firstTry, res)=>{!firstTry && setupValue(v)})
                 this.attrHattrRemover.push((...args)=>depRemover(...args))
               })
 
@@ -3010,15 +3047,22 @@ class Component {
                 exponentialRetry(()=>{
                   const owner = this.getChildsRefOwner(d[0]).childsRefPointers[d[0]]
                   if (Array.isArray(owner)){ throw Error("Cannot Bind to multi-ref child") }
-                  depRemover = owner.properties[d[1]].addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
-                }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5, (firstTry, res)=>{!firstTry && setupValue()})
+                  depRemover = owner.properties[d[1]].addOnChangedHandler([this, "attr", k],  ()=>setupValue(v) )
+                }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5, (firstTry, res)=>{!firstTry && setupValue(v)})
                 this.attrHattrRemover.push(()=>depRemover())
               })
 
-              setupValue()
+              staticDeps.$external_deps?.forEach(d=>{
+                const deps = d?.addOnChangedHandler([this, "attr", k], ()=>setupValue(v) )
+                deps && this.attrHattrRemover.push(deps)
+                // console.log("attr remover must be completeed!!")
+              })
+
+
+              setupValue(v)
 
               if(k.split(".")[0] === 'style'){
-                this.singlePropStyleRecomputeHooks?.push(()=>setupValue())
+                this.singlePropStyleRecomputeHooks?.push(()=>setupValue(v))
               }
 
             }
@@ -3131,43 +3175,45 @@ class Component {
             }
 
           }
-          else if (isFunction(v)){
-              const setupValue = ()=>{ 
-                this.html_pointer_element[k] = v.bind(undefined, this.$this)(); 
+          else if (isFunction(v) || isUseExt){
+              const setupValue = (val)=>{ 
+                this.html_pointer_element[k] = isFunction(val) ? val.bind(undefined, this.$this)() : val; 
               }
 
-              let staticDeps = analizeDepsStatically(v) // WARNING actally w're bypassing the "deps storage" machenism..this wil break deps update in future!!!
+              let staticDeps = analizeDepsStatically(v, isUseExt) // WARNING actally w're bypassing the "deps storage" machenism..this wil break deps update in future!!!
               _info.log("HAttr static deps analysis: ", staticDeps)
+              
+              v = isUseExt ? v.getter : v
 
               staticDeps.$this_deps?.forEach(d=>{
-                let deps = this.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
+                let deps = this.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue(v) )
                 deps && this.attrHattrRemover.push(deps)
               }) // supporting multiple deps, but only of first order..
 
               staticDeps.$parent_deps?.forEach(d=>{
-                let deps = this.parent.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue() )
+                let deps = this.parent.properties[d]?.addOnChangedHandler([this, "attr", k], ()=>setupValue(v) )
                 deps && this.attrHattrRemover.push(deps)
               })
 
               staticDeps.$scope_deps?.forEach(d=>{
                 let [propsOwner, isPropertiesProp] = this.get$ScopedPropsOwner(d);
-                let deps = (isPropertiesProp ? propsOwner.properties[d] : propsOwner.meta[d])?.addOnChangedHandler([this, "attr", k], ()=>setupValue() );
+                let deps = (isPropertiesProp ? propsOwner.properties[d] : propsOwner.meta[d])?.addOnChangedHandler([this, "attr", k], ()=>setupValue(v) );
                 deps && this.attrHattrRemover.push(deps)
               })
 
               staticDeps.$le_deps?.forEach(d=>{ // [le_id, property]
                 let depRemover;
                 exponentialRetry(()=>{
-                  depRemover = this.$le[d[0]].properties[d[1]].addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
-                }, pass, pass, pass, "Cannot connect to CLE Obj by Id", 5, (firstTry, res)=>{!firstTry && setupValue()})
+                  depRemover = this.$le[d[0]].properties[d[1]].addOnChangedHandler([this, "attr", k],  ()=>setupValue(v) )
+                }, pass, pass, pass, "Cannot connect to CLE Obj by Id", 5, (firstTry, res)=>{!firstTry && setupValue(v)})
                 this.attrHattrRemover.push((...args)=>depRemover(...args))
               })
 
               staticDeps.$ctx_deps?.forEach(d=>{ // [ctx_id, property]
                 let depRemover;
                 exponentialRetry(()=>{
-                  depRemover = this.$ctx[d[0]].properties[d[1]].addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
-                }, pass, pass, pass, "Cannot connect to CLE Obj by Ctx Id", 5, (firstTry, res)=>{!firstTry && setupValue()})
+                  depRemover = this.$ctx[d[0]].properties[d[1]].addOnChangedHandler([this, "attr", k],  ()=>setupValue(v) )
+                }, pass, pass, pass, "Cannot connect to CLE Obj by Ctx Id", 5, (firstTry, res)=>{!firstTry && setupValue(v)})
                 this.attrHattrRemover.push((...args)=>depRemover(...args))
               })
 
@@ -3176,12 +3222,18 @@ class Component {
                 exponentialRetry(()=>{
                   const owner = this.getChildsRefOwner(d[0]).childsRefPointers[d[0]]
                   if (Array.isArray(owner)){ throw Error("Cannot Bind to multi-ref child") }
-                  depRemover = owner.properties[d[1]].addOnChangedHandler([this, "attr", k],  ()=>setupValue() )
-                }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5, (firstTry, res)=>{!firstTry && setupValue()})
+                  depRemover = owner.properties[d[1]].addOnChangedHandler([this, "attr", k],  ()=>setupValue(v) )
+                }, pass, pass, pass, "Cannot connect to CLE Obj by Ref Name", 5, (firstTry, res)=>{!firstTry && setupValue(v)})
                 this.attrHattrRemover.push(()=>depRemover())
               })
 
-              setupValue()
+              staticDeps.$external_deps?.forEach(d=>{
+                const deps = d?.addOnChangedHandler([this, "attr", k], ()=>setupValue(v) )
+                deps && this.attrHattrRemover.push(deps)
+                // console.log("attr remover must be completeed!!")
+              })
+
+              setupValue(v)
 
           }
           else if (v instanceof HAttrBinding){ 
@@ -6572,6 +6624,6 @@ const ComponentsRegistry = new (class _ComponentsRegistry {
 // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // 
 // Exports - remember to export also in index.js
 
-const Cle = { CLE_FLAGS, pass, none, smart, f: smartFunc, fArgs: smartFuncWithCustomArgs, asFunc, Use, Extended, Placeholder, Bind, Alias, SmartAlias, PropertyBinding, DefineSubprops, ExternalProp, useExternal, BindToProp: BindToPropInConstructor, Switch, Case, LazyComponent: LazyComponentCreation, UseShadow: ShadowRootComponentCreator, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock, cle, svg, str, str_, input, output, ExtendSCSS, clsIf, html: fromHtml, remoteHtmlComponent, remoteHtmlComponents, fromHtmlComponentDef, defineHtmlComponent, defineHtmlComponents, importAll, globalImportAll, ComponentsRegistry }
+const Cle = { CLE_FLAGS, pass, none, smart, f: smartFunc, fArgs: smartFuncWithCustomArgs, asFunc, Use, Extended, Placeholder, Bind, Alias, SmartAlias, PropertyBinding, DefineSubprops, ExternalProp, useState, useStateWithSignal, useExternal, BindToProp: BindToPropInConstructor, Switch, Case, LazyComponent: LazyComponentCreation, UseShadow: ShadowRootComponentCreator, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock, cle, svg, str, str_, input, output, ExtendSCSS, clsIf, html: fromHtml, remoteHtmlComponent, remoteHtmlComponents, fromHtmlComponentDef, defineHtmlComponent, defineHtmlComponents, importAll, globalImportAll, ComponentsRegistry }
 
-export { CLE_FLAGS, pass, none, smart, smartFunc as f, smartFuncWithCustomArgs as fArgs, asFunc, Use, Extended, Placeholder, Bind, Alias, SmartAlias, PropertyBinding, DefineSubprops, ExternalProp, useExternal, BindToPropInConstructor as BindToProp, Switch, Case, LazyComponentCreation as LazyComponent, ShadowRootComponentCreator as UseShadow, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock, cle, svg, str, str_, input, output, ExtendSCSS, clsIf, fromHtml as html, remoteHtmlComponent, remoteHtmlComponents, fromHtmlComponentDef, defineHtmlComponent, defineHtmlComponents, importAll, globalImportAll, ComponentsRegistry }
+export { CLE_FLAGS, pass, none, smart, smartFunc as f, smartFuncWithCustomArgs as fArgs, asFunc, Use, Extended, Placeholder, Bind, Alias, SmartAlias, PropertyBinding, DefineSubprops, ExternalProp, useState, useStateWithSignal, useExternal, BindToPropInConstructor as BindToProp, Switch, Case, LazyComponentCreation as LazyComponent, ShadowRootComponentCreator as UseShadow, RenderApp, toInlineStyle, LE_LoadScript, LE_LoadCss, LE_InitWebApp, LE_BackendApiMock, cle, svg, str, str_, input, output, ExtendSCSS, clsIf, fromHtml as html, remoteHtmlComponent, remoteHtmlComponents, fromHtmlComponentDef, defineHtmlComponent, defineHtmlComponents, importAll, globalImportAll, ComponentsRegistry }

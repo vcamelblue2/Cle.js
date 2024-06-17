@@ -1,4 +1,4 @@
-import { CLE_FLAGS,  Alias, Bind, BindToProp, Case, cle, svg, DefineSubprops, Extended, ExtendSCSS, ExternalProp, f, fArgs,  asFunc, LE_BackendApiMock, LE_LoadCss, LE_LoadScript, pass, Placeholder, RenderApp, smart, SmartAlias, str, Switch, toInlineStyle, Use, useExternal, html, LazyComponent, remoteHtmlComponent, fromHtmlComponentDef, UseShadow } from "../lib/caged-le.js"
+import { CLE_FLAGS,  Alias, Bind, BindToProp, Case, cle, svg, DefineSubprops, Extended, ExtendSCSS, ExternalProp, useState, useStateWithSignal, f, fArgs,  asFunc, LE_BackendApiMock, LE_LoadCss, LE_LoadScript, pass, Placeholder, RenderApp, smart, SmartAlias, str, Switch, toInlineStyle, Use, useExternal, html, LazyComponent, remoteHtmlComponent, fromHtmlComponentDef, UseShadow } from "../lib/caged-le.js"
 import { NavSidebarLayout } from "../layouts/layouts.js"
 import { App, Button, H2, Div, Textarea, Service } from "../extra/smart-alias.js"
 import { useProtocols, defineProtocols, ServerProtocol, PROTOCOL } from "../extra/protocols.js"
@@ -7634,6 +7634,196 @@ const appDemoAutoFVarDefAndText = ()=>{
 }
 
 
+const appDemoPureFunctionalWithExt = ()=>{ 
+
+  const FULL_EXAMPLE = false
+
+  if (FULL_EXAMPLE){
+
+    /**
+     * @param {{ addTodo: (text: string)=>void }} param0 
+     * @returns 
+     */
+    const InputBar = ({addTodo}) => {
+
+      const text = useState('Placeholder..')
+
+      return (
+        cle.div({ style: "display: flex; "},
+          cle.input({
+            // option 1) local var + double Bind:    local_input: Bind(text), a_value: Bind($=>$.local_input),
+            // option 2) std attrs (buggy): a_value: text.use(),
+            // option 3) ha attrs
+            ha_value: text.use(),
+            handle_oninput: ($, ev) => text.value = ev.target.value 
+          }),
+          cle.button({ handle_onclick: $ => {
+            addTodo(text.value);
+            text.value = ''
+          }}, 'Add')
+        )
+      )
+    }
+
+    /**
+     * @param {{todolist: Property, toggleTodoCompletion: (id: string)=>void, removeTodo: (id: string)=>void}} param0 
+     * @returns 
+     */
+    const ToDoList = ({todolist, toggleTodoCompletion, removeTodo}) => {
+
+      return (
+        cle.div({},
+          cle.div({ meta: { forEach: "todo", of: todolist.use(), optimized: true, idComparer: (a,b)=>a.id !== b.id}, style: "display: flex; gap: 4px" },
+            cle.input({ 
+              hattrs: { type: "checkbox", checked: $ => $.todo.done }, 
+              handle: { onchange: $ => toggleTodoCompletion($.todo.id) } 
+            }),
+            cle.span({}, $ => $.todo.text),
+            cle.button({ handle: { onclick: $ => removeTodo($.todo.id)  } }, 'x')
+          )
+        )
+      )
+    }
+
+    const App = () => {
+
+      const idgen = useState(0)
+
+      const todolist = useState([
+        { id: idgen.value++, text: 'todo 1', done: false }
+      ])
+
+      const addTodo = (text) => {
+        todolist.value = [...todolist.value, {id: idgen.value++, text, done: false}]
+      }
+
+      const removeTodo = (id) => {
+        todolist.value = todolist.value.filter(t => t.id !== id)
+      }
+
+      const toggleTodoCompletion = (id) => {
+        const todo = todolist.value.find(t => t.id === id)
+        todo.done = !todo.done
+        // todolist.value = [...todolist.value]
+        todolist.markAsChanged()
+      }
+      
+
+      return (
+        cle.root({},
+          InputBar({addTodo}),
+          ToDoList({todolist, toggleTodoCompletion, removeTodo})
+        )
+      )
+    }
+
+    RenderApp(document.body, App())
+  }
+  else {
+
+    const InternalPropBanner = ({internal_prop_asExt}) => {
+      return (
+        cle.h3({
+          style: 'cursor: pointer',
+          onclick: $ => internal_prop_asExt.value.set(internal_prop_asExt.value.get + 1)
+        }, "Internal Prop: ", internal_prop_asExt.use((_, v) => v.get))
+      )
+    }
+
+    const Button = ({onClick, label}) => {
+
+      return { button: {
+        onclick: $ => onClick(),
+        text: label
+      }}
+
+    }
+
+
+    const App = () =>{
+
+      const counter = useState(0, $ => {
+        console.log("counter changed!")
+      })
+
+      const incCounter = () => {
+        counter.value += 1
+      }
+
+      const internal_prop_asExt = useState({get, set}) // uso unica var con dentro getter e setter
+
+      return cle.root({
+        counter_alias: useExternal(counter, $=>counter.value, ($,v)=>counter.value=v),
+        // or simply use bind!
+        counter_alias2: Bind(counter),
+
+        on_counter_aliasChanged: $ => console.log("counter alias changed event"),
+        on_counter_alias2Changed: $ => console.log("counter alias 2 changed event"),
+
+        onDestroy: $ => counter.destroy(),
+
+        // HOW TO SET ARG USING EXTERNAL VAR OF INTERNAL PROP
+        internal_prop: 100,
+        on_internal_propChanged: ($, _new, _old)=> { console.log("change!", _new, _old ); if (internal_prop_asExt.value.get !== _new){ internal_prop_asExt.markAsChanged() }}, // prevent loop
+        onInit: $ => { 
+          internal_prop_asExt.value = () => ({ get: $.internal_prop, set: (v) => { $.internal_prop = v } })
+        }
+      },
+
+        H2({}, "Hello User"),
+
+        // ---------------- //
+        { hr: {}},
+        InternalPropBanner({internal_prop_asExt}),
+        { hr: {}},
+        // ---------------- //
+
+        Div({}, "The Counter is: ", counter.use()),
+
+        Button({onClick: incCounter, label: 'Inc Counter'}),
+        Button({onClick: incCounter, label: counter.use(($,val)=>'Inc Counter ('+val+')')}),
+
+        // ---------------- //
+        Div({}, "The Counter alias is: ", $ => $.counter_alias),
+        cle.button({ onclick: $ => $.counter_alias += 1 }, 'Inc using Alias'),
+
+        // ---------------- //
+        Div({}, "The Counter alias 2 is: ", $ => $.counter_alias2),
+        cle.button({ onclick: $ => $.counter_alias2 += 1 }, 'Inc using Alias 2'),
+        
+        // ---------------- //
+        { hr: {}},
+        // ---------------- //
+        (()=>{
+
+          const counter2 = useStateWithSignal(counter.value, $ => {
+            if (counter.value !== counter2.prop.value) { // keep in sync, avoid loop
+              counter.value = counter2.prop.value
+            }
+            console.log("counter 2 changed!")
+          })
+          
+          counter.addOnChangedHandler(0, ()=>counter2.prop.value=counter.value) // 2 way
+
+          return Div({},
+            Div({
+              onInit: $=>{
+                counter2.signal.subscribe($, ()=>console.log("counter 2 changed"))
+              }
+            }, "The Counter 2 is: ", counter2.prop.use()),
+            cle.button({ onclick: $ => counter2.prop.value += 1 }, 'Inc')
+          )
+        })()
+
+      )
+    }
+
+    RenderApp(document.body, App())
+
+  }
+
+}
+
 
 
 // app0()
@@ -7700,4 +7890,5 @@ const appDemoAutoFVarDefAndText = ()=>{
 // appDemoProtocols()
 // appDemoAvoidLambdaForComponentPropertySetupAndInputProps()
 // appDemoSupportSvg()
-appDemoAutoFVarDefAndText()
+// appDemoAutoFVarDefAndText()
+appDemoPureFunctionalWithExt()
